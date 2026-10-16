@@ -1,4 +1,4 @@
-# break-ice-hall
+# Ice-breaking hall
 
 #### 介绍
 线下面对面多人破冰游戏小程序，支持你画我猜、谁是卧底、AI 评分
