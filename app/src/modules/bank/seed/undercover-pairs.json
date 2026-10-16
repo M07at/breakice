@@ -1,0 +1,782 @@
+{
+  "format": "pobingju-bank",
+  "version": 1,
+  "gameType": "undercover",
+  "name": "系统词库·谁是卧底",
+  "description": "破冰局预置词对，标了「可画」的也用于你画我猜谁是卧底",
+  "items": [
+    {
+      "content": {
+        "civilian": "苹果",
+        "undercover": "梨",
+        "drawable": true
+      },
+      "tags": [
+        "食物"
+      ],
+      "difficulty": 1
+    },
+    {
+      "content": {
+        "civilian": "饺子",
+        "undercover": "包子",
+        "drawable": true
+      },
+      "tags": [
+        "食物"
+      ],
+      "difficulty": 1
+    },
+    {
+      "content": {
+        "civilian": "牛奶",
+        "undercover": "豆浆",
+        "drawable": true
+      },
+      "tags": [
+        "食物"
+      ],
+      "difficulty": 1
+    },
+    {
+      "content": {
+        "civilian": "西瓜",
+        "undercover": "哈密瓜",
+        "drawable": true
+      },
+      "tags": [
+        "食物"
+      ],
+      "difficulty": 1
+    },
+    {
+      "content": {
+        "civilian": "橘子",
+        "undercover": "橙子",
+        "drawable": true
+      },
+      "tags": [
+        "食物"
+      ],
+      "difficulty": 2
+    },
+    {
+      "content": {
+        "civilian": "草莓",
+        "undercover": "樱桃",
+        "drawable": true
+      },
+      "tags": [
+        "食物"
+      ],
+      "difficulty": 1
+    },
+    {
+      "content": {
+        "civilian": "葡萄",
+        "undercover": "蓝莓",
+        "drawable": true
+      },
+      "tags": [
+        "食物"
+      ],
+      "difficulty": 2
+    },
+    {
+      "content": {
+        "civilian": "榴莲",
+        "undercover": "菠萝",
+        "drawable": true
+      },
+      "tags": [
+        "食物"
+      ],
+      "difficulty": 1
+    },
+    {
+      "content": {
+        "civilian": "面包",
+        "undercover": "蛋糕",
+        "drawable": true
+      },
+      "tags": [
+        "食物"
+      ],
+      "difficulty": 1
+    },
+    {
+      "content": {
+        "civilian": "汉堡",
+        "undercover": "三明治",
+        "drawable": true
+      },
+      "tags": [
+        "食物"
+      ],
+      "difficulty": 1
+    },
+    {
+      "content": {
+        "civilian": "冰淇淋",
+        "undercover": "雪糕",
+        "drawable": true
+      },
+      "tags": [
+        "食物"
+      ],
+      "difficulty": 2
+    },
+    {
+      "content": {
+        "civilian": "火锅",
+        "undercover": "麻辣烫",
+        "drawable": true
+      },
+      "tags": [
+        "食物"
+      ],
+      "difficulty": 2
+    },
+    {
+      "content": {
+        "civilian": "奶茶",
+        "undercover": "咖啡",
+        "drawable": true
+      },
+      "tags": [
+        "食物"
+      ],
+      "difficulty": 1
+    },
+    {
+      "content": {
+        "civilian": "可乐",
+        "undercover": "雪碧",
+        "drawable": true
+      },
+      "tags": [
+        "食物"
+      ],
+      "difficulty": 2
+    },
+    {
+      "content": {
+        "civilian": "粽子",
+        "undercover": "汤圆",
+        "drawable": true
+      },
+      "tags": [
+        "食物",
+        "节日"
+      ],
+      "difficulty": 1
+    },
+    {
+      "content": {
+        "civilian": "鸡蛋",
+        "undercover": "鸭蛋",
+        "drawable": true
+      },
+      "tags": [
+        "食物"
+      ],
+      "difficulty": 3
+    },
+    {
+      "content": {
+        "civilian": "胡萝卜",
+        "undercover": "白萝卜",
+        "drawable": true
+      },
+      "tags": [
+        "食物"
+      ],
+      "difficulty": 2
+    },
+    {
+      "content": {
+        "civilian": "薯片",
+        "undercover": "虾条",
+        "drawable": true
+      },
+      "tags": [
+        "食物"
+      ],
+      "difficulty": 2
+    },
+    {
+      "content": {
+        "civilian": "方便面",
+        "undercover": "螺蛳粉",
+        "drawable": true
+      },
+      "tags": [
+        "食物"
+      ],
+      "difficulty": 2
+    },
+    {
+      "content": {
+        "civilian": "月饼",
+        "undercover": "饼干",
+        "drawable": true
+      },
+      "tags": [
+        "食物",
+        "节日"
+      ],
+      "difficulty": 2
+    },
+    {
+      "content": {
+        "civilian": "老虎",
+        "undercover": "狮子",
+        "drawable": true
+      },
+      "tags": [
+        "动物"
+      ],
+      "difficulty": 1
+    },
+    {
+      "content": {
+        "civilian": "狗",
+        "undercover": "狼",
+        "drawable": true
+      },
+      "tags": [
+        "动物"
+      ],
+      "difficulty": 1
+    },
+    {
+      "content": {
+        "civilian": "熊猫",
+        "undercover": "考拉",
+        "drawable": true
+      },
+      "tags": [
+        "动物"
+      ],
+      "difficulty": 1
+    },
+    {
+      "content": {
+        "civilian": "企鹅",
+        "undercover": "鸭子",
+        "drawable": true
+      },
+      "tags": [
+        "动物"
+      ],
+      "difficulty": 1
+    },
+    {
+      "content": {
+        "civilian": "蝴蝶",
+        "undercover": "蜻蜓",
+        "drawable": true
+      },
+      "tags": [
+        "动物"
+      ],
+      "difficulty": 1
+    },
+    {
+      "content": {
+        "civilian": "蜜蜂",
+        "undercover": "苍蝇",
+        "drawable": true
+      },
+      "tags": [
+        "动物"
+      ],
+      "difficulty": 2
+    },
+    {
+      "content": {
+        "civilian": "猫",
+        "undercover": "狐狸",
+        "drawable": true
+      },
+      "tags": [
+        "动物"
+      ],
+      "difficulty": 2
+    },
+    {
+      "content": {
+        "civilian": "兔子",
+        "undercover": "松鼠",
+        "drawable": true
+      },
+      "tags": [
+        "动物"
+      ],
+      "difficulty": 1
+    },
+    {
+      "content": {
+        "civilian": "鲨鱼",
+        "undercover": "海豚",
+        "drawable": true
+      },
+      "tags": [
+        "动物"
+      ],
+      "difficulty": 1
+    },
+    {
+      "content": {
+        "civilian": "长颈鹿",
+        "undercover": "骆驼",
+        "drawable": true
+      },
+      "tags": [
+        "动物"
+      ],
+      "difficulty": 2
+    },
+    {
+      "content": {
+        "civilian": "眼镜",
+        "undercover": "墨镜",
+        "drawable": true
+      },
+      "tags": [
+        "物品"
+      ],
+      "difficulty": 1
+    },
+    {
+      "content": {
+        "civilian": "雨伞",
+        "undercover": "雨衣",
+        "drawable": true
+      },
+      "tags": [
+        "物品"
+      ],
+      "difficulty": 1
+    },
+    {
+      "content": {
+        "civilian": "口红",
+        "undercover": "唇膏",
+        "drawable": true
+      },
+      "tags": [
+        "物品"
+      ],
+      "difficulty": 2
+    },
+    {
+      "content": {
+        "civilian": "枕头",
+        "undercover": "抱枕",
+        "drawable": true
+      },
+      "tags": [
+        "物品"
+      ],
+      "difficulty": 2
+    },
+    {
+      "content": {
+        "civilian": "牙刷",
+        "undercover": "梳子",
+        "drawable": true
+      },
+      "tags": [
+        "物品"
+      ],
+      "difficulty": 2
+    },
+    {
+      "content": {
+        "civilian": "钟表",
+        "undercover": "手表",
+        "drawable": true
+      },
+      "tags": [
+        "物品"
+      ],
+      "difficulty": 1
+    },
+    {
+      "content": {
+        "civilian": "围巾",
+        "undercover": "领带",
+        "drawable": true
+      },
+      "tags": [
+        "物品"
+      ],
+      "difficulty": 1
+    },
+    {
+      "content": {
+        "civilian": "拖鞋",
+        "undercover": "凉鞋",
+        "drawable": true
+      },
+      "tags": [
+        "物品"
+      ],
+      "difficulty": 1
+    },
+    {
+      "content": {
+        "civilian": "蜡烛",
+        "undercover": "灯泡",
+        "drawable": true
+      },
+      "tags": [
+        "物品"
+      ],
+      "difficulty": 1
+    },
+    {
+      "content": {
+        "civilian": "风筝",
+        "undercover": "气球",
+        "drawable": true
+      },
+      "tags": [
+        "物品"
+      ],
+      "difficulty": 1
+    },
+    {
+      "content": {
+        "civilian": "镜子",
+        "undercover": "窗户",
+        "drawable": true
+      },
+      "tags": [
+        "物品"
+      ],
+      "difficulty": 2
+    },
+    {
+      "content": {
+        "civilian": "毛笔",
+        "undercover": "钢笔",
+        "drawable": true
+      },
+      "tags": [
+        "物品",
+        "校园"
+      ],
+      "difficulty": 1
+    },
+    {
+      "content": {
+        "civilian": "黑板",
+        "undercover": "白板",
+        "drawable": true
+      },
+      "tags": [
+        "校园"
+      ],
+      "difficulty": 2
+    },
+    {
+      "content": {
+        "civilian": "手机",
+        "undercover": "平板",
+        "drawable": true
+      },
+      "tags": [
+        "物品"
+      ],
+      "difficulty": 1
+    },
+    {
+      "content": {
+        "civilian": "吉他",
+        "undercover": "尤克里里",
+        "drawable": true
+      },
+      "tags": [
+        "音乐"
+      ],
+      "difficulty": 2
+    },
+    {
+      "content": {
+        "civilian": "钢琴",
+        "undercover": "电子琴",
+        "drawable": true
+      },
+      "tags": [
+        "音乐"
+      ],
+      "difficulty": 3
+    },
+    {
+      "content": {
+        "civilian": "自行车",
+        "undercover": "电动车",
+        "drawable": true
+      },
+      "tags": [
+        "交通"
+      ],
+      "difficulty": 1
+    },
+    {
+      "content": {
+        "civilian": "飞机",
+        "undercover": "直升机",
+        "drawable": true
+      },
+      "tags": [
+        "交通"
+      ],
+      "difficulty": 1
+    },
+    {
+      "content": {
+        "civilian": "火车",
+        "undercover": "地铁",
+        "drawable": true
+      },
+      "tags": [
+        "交通"
+      ],
+      "difficulty": 1
+    },
+    {
+      "content": {
+        "civilian": "帆船",
+        "undercover": "轮船",
+        "drawable": true
+      },
+      "tags": [
+        "交通"
+      ],
+      "difficulty": 2
+    },
+    {
+      "content": {
+        "civilian": "篮球",
+        "undercover": "足球",
+        "drawable": true
+      },
+      "tags": [
+        "运动"
+      ],
+      "difficulty": 1
+    },
+    {
+      "content": {
+        "civilian": "羽毛球",
+        "undercover": "网球",
+        "drawable": true
+      },
+      "tags": [
+        "运动"
+      ],
+      "difficulty": 1
+    },
+    {
+      "content": {
+        "civilian": "游泳",
+        "undercover": "潜水",
+        "drawable": true
+      },
+      "tags": [
+        "运动"
+      ],
+      "difficulty": 2
+    },
+    {
+      "content": {
+        "civilian": "跑步",
+        "undercover": "散步",
+        "drawable": false
+      },
+      "tags": [
+        "运动"
+      ],
+      "difficulty": 2
+    },
+    {
+      "content": {
+        "civilian": "医生",
+        "undercover": "护士",
+        "drawable": true
+      },
+      "tags": [
+        "职业"
+      ],
+      "difficulty": 1
+    },
+    {
+      "content": {
+        "civilian": "警察",
+        "undercover": "保安",
+        "drawable": true
+      },
+      "tags": [
+        "职业"
+      ],
+      "difficulty": 2
+    },
+    {
+      "content": {
+        "civilian": "厨师",
+        "undercover": "服务员",
+        "drawable": true
+      },
+      "tags": [
+        "职业"
+      ],
+      "difficulty": 2
+    },
+    {
+      "content": {
+        "civilian": "魔术师",
+        "undercover": "小丑",
+        "drawable": true
+      },
+      "tags": [
+        "职业"
+      ],
+      "difficulty": 1
+    },
+    {
+      "content": {
+        "civilian": "图书馆",
+        "undercover": "自习室",
+        "drawable": false
+      },
+      "tags": [
+        "校园"
+      ],
+      "difficulty": 1
+    },
+    {
+      "content": {
+        "civilian": "食堂",
+        "undercover": "外卖",
+        "drawable": false
+      },
+      "tags": [
+        "校园"
+      ],
+      "difficulty": 1
+    },
+    {
+      "content": {
+        "civilian": "班长",
+        "undercover": "团支书",
+        "drawable": false
+      },
+      "tags": [
+        "校园"
+      ],
+      "difficulty": 2
+    },
+    {
+      "content": {
+        "civilian": "军训",
+        "undercover": "体育课",
+        "drawable": false
+      },
+      "tags": [
+        "校园"
+      ],
+      "difficulty": 2
+    },
+    {
+      "content": {
+        "civilian": "社团",
+        "undercover": "学生会",
+        "drawable": false
+      },
+      "tags": [
+        "校园"
+      ],
+      "difficulty": 2
+    },
+    {
+      "content": {
+        "civilian": "期末考试",
+        "undercover": "四六级",
+        "drawable": false
+      },
+      "tags": [
+        "校园"
+      ],
+      "difficulty": 2
+    },
+    {
+      "content": {
+        "civilian": "早八",
+        "undercover": "晚自习",
+        "drawable": false
+      },
+      "tags": [
+        "校园"
+      ],
+      "difficulty": 2
+    },
+    {
+      "content": {
+        "civilian": "宿舍",
+        "undercover": "酒店",
+        "drawable": false
+      },
+      "tags": [
+        "校园"
+      ],
+      "difficulty": 2
+    },
+    {
+      "content": {
+        "civilian": "操场",
+        "undercover": "体育馆",
+        "drawable": true
+      },
+      "tags": [
+        "校园"
+      ],
+      "difficulty": 2
+    },
+    {
+      "content": {
+        "civilian": "圣诞老人",
+        "undercover": "雪人",
+        "drawable": true
+      },
+      "tags": [
+        "节日"
+      ],
+      "difficulty": 1
+    },
+    {
+      "content": {
+        "civilian": "春节",
+        "undercover": "中秋节",
+        "drawable": false
+      },
+      "tags": [
+        "节日"
+      ],
+      "difficulty": 1
+    },
+    {
+      "content": {
+        "civilian": "烟花",
+        "undercover": "鞭炮",
+        "drawable": true
+      },
+      "tags": [
+        "节日"
+      ],
+      "difficulty": 1
+    }
+  ]
+}

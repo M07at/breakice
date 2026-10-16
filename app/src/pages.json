@@ -1,0 +1,35 @@
+{
+	"pages": [ //pages数组中第一项表示应用启动页，参考：https://uniapp.dcloud.io/collocation/pages
+		{
+			"path": "pages/index/index",
+			"style": {
+				"navigationBarTitleText": "破冰局"
+			}
+		}
+	],
+	// 每人只在这里加自己的分包，主包页面归 D
+	"subPackages": [
+		{
+			// C：谁是卧底 / 你画我猜谁是卧底
+			"root": "pages-uc",
+			"pages": [
+				{ "path": "setup", "style": { "navigationBarTitleText": "谁是卧底" } },
+				{ "path": "play", "style": { "navigationBarTitleText": "谁是卧底" } }
+			]
+		},
+		{
+			// C：题库管理
+			"root": "pages-bank",
+			"pages": [
+				{ "path": "index", "style": { "navigationBarTitleText": "题库管理" } },
+				{ "path": "detail", "style": { "navigationBarTitleText": "题库" } }
+			]
+		}
+	],
+	"globalStyle": {
+		"navigationBarTextStyle": "black",
+		"navigationBarTitleText": "破冰局",
+		"navigationBarBackgroundColor": "#F8F8F8",
+		"backgroundColor": "#F8F8F8"
+	}
+}
