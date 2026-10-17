@@ -267,6 +267,19 @@ async function ucAct(userId: string, gameId: string, clientAction: UcClientActio
 - `.env.local` 不提交。`npm run verify` 里的密钥扫描（`scripts/check-secrets.mjs`）会检查代码和打包产物，发现 service_role JWT、Supabase secret key、`sk-` 密钥、私钥就报错。
 - 环境：开发用一个 Supabase 项目，演示 / 正式用另一个，迁移先在开发库跑通再推正式库。
 
+### 依赖安全（npm audit）
+
+`npm install` 会报大约 25 个漏洞（0 个严重），**不要运行 `npm audit fix --force`**：它会把 `@dcloudio/*` 降到几年前的 0.x 版本，项目直接坏掉。
+
+- 已处理：uni-app 升到最新正式版；删掉没用到的 `vue-i18n`、`@dcloudio/uni-app-plus`；vitest 升到 3.2.7；`app/package.json` 的 `overrides` 把 DCloud 锁死的旧依赖（express、qs、ws、postcss、babel、vue-i18n 内部包等）换成已修复的版本。换之前和换之后打出来的小程序包和 H5 包逐字节一致。
+- 剩下的都在 DCloud 锁死的构建工具里，修不了也不会进手机：
+  - `vite` 5.2.8、`esbuild`：只影响本机的开发服务器（`npm run dev:*`），不要把开发服务器暴露到公网
+  - `@vue/server-renderer`：只用于服务端渲染（SSR），小程序不用
+  - `braces`：目前没有修复版本
+  - `vitest`、`@vitest/mocker`：只影响 Vitest 的网页界面和浏览器模式，我们不用；修复要 vitest 4，而 vitest 4 需要 vite 6，和 uni-app 冲突
+  - 上面这些会让依赖它们的 `@dcloudio/*` 包也显示为有漏洞
+- 以后 DCloud 发新版时：把 `@dcloudio/*` 全部升到同一个新版本，删掉 `overrides` 里已经不需要的条目，跑 `npm run verify` 确认。
+
 ## 9. 合并步骤（按顺序）
 
 | 步骤 | 内容 | 前提 | 完成标志 |
