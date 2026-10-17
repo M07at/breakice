@@ -227,13 +227,84 @@ describe('题库仓库', () => {
   })
 })
 
-describe('系统词库', () => {
-  it('预置词对全部通过校验，大部分能画', async () => {
-    const [bank] = loadSystemBanks()
-    expect(bank.drafts.length).toBeGreaterThanOrEqual(60)
-    const drawable = bank.drafts.filter((d) => (d.content as { drawable?: boolean }).drawable)
-    expect(drawable.length).toBeGreaterThanOrEqual(40)
+describe('系统题库（原创数据集）', () => {
+  const banks = loadSystemBanks()
+  const byType = Object.fromEntries(banks.map((b) => [b.meta.gameType, b]))
+
+  it('四个游戏各有一套，条数够玩，每档难度都有', () => {
+    expect(banks.map((b) => b.meta.gameType).sort()).toEqual([...GAME_TYPES].sort())
+    const minimum = { undercover: 150, draw: 200, truth: 60, dare: 50 }
+    for (const b of banks) {
+      expect(b.drafts.length).toBeGreaterThanOrEqual(minimum[b.meta.gameType])
+      expect(new Set(b.drafts.map((d) => d.difficulty))).toEqual(new Set([1, 2, 3]))
+    }
+  })
+
+  it('卧底词对大部分能画，融合玩法有足够的词', () => {
+    const drawable = byType.undercover.drafts.filter((d) => (d.content as { drawable?: boolean }).drawable)
+    expect(drawable.length).toBeGreaterThanOrEqual(100)
+  })
+
+  it('真心话和大冒险不含不适合陌生人破冰的内容', () => {
+    const banned = /喝酒|酒精|抽烟|吸烟|亲吻|亲一下|拥抱|前任|恋爱|表白|裸|脱衣|赌|工资|体重/
+    for (const t of ['truth', 'dare'] as const) {
+      for (const d of byType[t].drafts) expect((d.content as { text: string }).text).not.toMatch(banned)
+    }
+  })
+
+  it('系统题库 ID 固定，融合玩法能从里面抽到能画的词', async () => {
     const repo = createSeededRepository()
-    expect((await repo.listBanks(null, 'undercover'))[0].visibility).toBe('system')
+    const all = await repo.listBanks(null)
+    expect(all.map((b) => b.id).sort()).toEqual(['sys_dare', 'sys_draw', 'sys_truth', 'sys_undercover'])
+    expect(all.every((b) => b.visibility === 'system')).toBe(true)
+    const pool = (await repo.listItems('sys_undercover')) as BankItem<'undercover'>[]
+    const picked = pickUndercoverPair(pool, new Set(), createRng(7), { drawableOnly: true })
+    expect(picked?.item.content.drawable).toBe(true)
+  })
+})
+
+describe('自建题库保存到手机', () => {
+  it('每次改动都会通知保存；存档只含自建题库，恢复后 ID 和内容一致', async () => {
+    let saves = 0
+    const repo = createSeededRepository({ onChange: () => saves++ })
+    const bank = await repo.createBank({ name: '社团专用', gameType: 'truth', description: '' }, 'u1')
+    const { added } = await repo.addItems(bank.id, [{ content: { text: '你为什么想加入我们？' }, tags: [], difficulty: 1 }], 'u1')
+    await repo.updateItem(added[0].id, { content: { text: '你为什么想加入社团？' }, tags: ['破冰'], difficulty: 2 }, 'u1')
+    expect(saves).toBe(3)
+
+    const snap = JSON.parse(JSON.stringify(repo.snapshot()))
+    expect(snap.banks.map((b: { id: string }) => b.id)).toEqual([bank.id])
+
+    const reopened = createSeededRepository()
+    expect(reopened.restore(snap)).toBe(1)
+    expect(await reopened.listItems(bank.id)).toEqual(await repo.listItems(bank.id))
+    expect((await reopened.listBanks('u1', 'truth')).map((b) => b.id)).toEqual(['sys_truth', bank.id])
+
+    // 恢复后新建的题库不会和旧的撞 ID
+    const another = await reopened.createBank({ name: '第二个', gameType: 'truth', description: '' }, 'u1')
+    expect([bank.id, added[0].id]).not.toContain(another.id)
+  })
+
+  it('存档坏了就忽略，系统题库不受影响', async () => {
+    const repo = createSeededRepository()
+    expect(repo.restore(null)).toBe(0)
+    expect(repo.restore({ version: 2, banks: [], items: [] })).toBe(0)
+    expect(
+      repo.restore({
+        version: 1,
+        seq: 5,
+        banks: [
+          { id: 'bank_1', name: '', gameType: 'truth', visibility: 'private', ownerId: 'u1' },
+          { id: 'sys_truth', name: '冒充系统', gameType: 'truth', visibility: 'private', ownerId: 'u1' },
+          { id: 'bank_2', name: '正常', gameType: 'truth', visibility: 'private', ownerId: 'u1', description: '' },
+        ],
+        items: [
+          { id: 'item_3', bankId: 'bank_2', content: { text: '嗯' }, tags: [], difficulty: 1 },
+          { id: 'item_4', bankId: 'bank_2', content: { text: '最喜欢的歌？' }, tags: [], difficulty: 1 },
+        ],
+      }),
+    ).toBe(1)
+    expect((await repo.listItems('bank_2')).map((i) => i.id)).toEqual(['item_4'])
+    expect((await repo.getBank('sys_truth')).visibility).toBe('system')
   })
 })

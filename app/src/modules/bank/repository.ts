@@ -1,3 +1,4 @@
+import { GAME_TYPES } from './types'
 import type { Bank, BankItem, BankMeta, GameType, ItemDraft } from './types'
 import { itemKey, validateBankMeta, validateDraft } from './validate'
 
@@ -31,18 +32,68 @@ export interface BankRepository {
   deleteItem(itemId: string, actorId: string): Promise<void>
 }
 
+export interface MemoryRepositoryOptions {
+  clock?: () => Date
+  /** 自建题库有任何改动后调用，单机模式用它把题库存到手机上 */
+  onChange?: () => void
+}
+
+/** 自建题库的存档（系统题库不存，每次从代码加载） */
+export interface BankSnapshot {
+  version: 1
+  seq: number
+  banks: Bank[]
+  items: BankItem[]
+}
+
 export class MemoryBankRepository implements BankRepository {
   private banks = new Map<string, Bank>()
   private items = new Map<string, BankItem>()
   private seq = 1
+  private readonly clock: () => Date
+  private readonly onChange?: () => void
 
-  constructor(private readonly clock: () => Date = () => new Date()) {}
+  constructor(options: MemoryRepositoryOptions = {}) {
+    this.clock = options.clock ?? (() => new Date())
+    this.onChange = options.onChange
+  }
 
-  /** 预置系统题库（真实环境由迁移脚本写入） */
+  /** 预置系统题库（真实环境由迁移脚本写入）。ID 固定为 sys_<游戏>，和自建题库永不冲突 */
   seedSystemBank(meta: BankMeta, drafts: ItemDraft[]): Bank {
-    const bank = this.insertBank(meta, 'system', null)
-    for (const d of drafts) this.insertItem(bank, d)
+    let id = `sys_${meta.gameType}`
+    for (let n = 2; this.banks.has(id); n++) id = `sys_${meta.gameType}_${n}`
+    const now = this.now()
+    const bank: Bank = { id, ...meta, visibility: 'system', ownerId: null, createdAt: now, updatedAt: now }
+    this.banks.set(id, bank)
+    drafts.forEach((d, i) => this.items.set(`${id}_${i + 1}`, { id: `${id}_${i + 1}`, bankId: id, ...d }))
     return bank
+  }
+
+  snapshot(): BankSnapshot {
+    const banks = [...this.banks.values()].filter((b) => b.visibility === 'private')
+    const ids = new Set(banks.map((b) => b.id))
+    return { version: 1, seq: this.seq, banks, items: [...this.items.values()].filter((i) => ids.has(i.bankId)) }
+  }
+
+  /** 恢复自建题库；数据不对的条目直接跳过，不影响系统题库。返回恢复了几个题库 */
+  restore(raw: unknown): number {
+    const snap = raw as Partial<BankSnapshot> | null
+    if (!snap || snap.version !== 1 || !Array.isArray(snap.banks) || !Array.isArray(snap.items)) return 0
+    const restored = new Set<string>()
+    for (const b of snap.banks) {
+      if (!b || b.visibility !== 'private' || !GAME_TYPES.includes(b.gameType) || this.banks.has(b.id)) continue
+      if (!validateBankMeta(b).ok || typeof b.ownerId !== 'string') continue
+      this.banks.set(b.id, { ...b })
+      restored.add(b.id)
+    }
+    for (const it of snap.items) {
+      const bank = it && this.banks.get(it.bankId)
+      if (!bank || !restored.has(bank.id) || this.items.has(it.id)) continue
+      const r = validateDraft(bank.gameType, it)
+      if (r.ok) this.items.set(it.id, { id: it.id, bankId: bank.id, ...r.value })
+    }
+    this.seq = Math.max(this.seq, Number(snap.seq) || 0)
+    return restored.size
   }
 
   async listBanks(viewerId: string | null, gameType?: GameType) {
@@ -65,7 +116,18 @@ export class MemoryBankRepository implements BankRepository {
   async createBank(meta: BankMeta, ownerId: string) {
     const r = validateBankMeta(meta)
     if (!r.ok) throw new BankError('INVALID', r.error)
-    return this.insertBank(r.value, 'private', ownerId)
+    const now = this.now()
+    const bank: Bank = {
+      id: `bank_${this.seq++}`,
+      ...r.value,
+      visibility: 'private',
+      ownerId,
+      createdAt: now,
+      updatedAt: now,
+    }
+    this.banks.set(bank.id, bank)
+    this.changed()
+    return bank
   }
 
   async updateBank(bankId: string, patch: { name?: string; description?: string }, actorId: string) {
@@ -78,6 +140,7 @@ export class MemoryBankRepository implements BankRepository {
     if (!r.ok) throw new BankError('INVALID', r.error)
     const updated: Bank = { ...bank, name: r.value.name, description: r.value.description, updatedAt: this.now() }
     this.banks.set(bankId, updated)
+    this.changed()
     return updated
   }
 
@@ -85,6 +148,7 @@ export class MemoryBankRepository implements BankRepository {
     await this.writable(bankId, actorId)
     this.banks.delete(bankId)
     for (const [id, item] of this.items) if (item.bankId === bankId) this.items.delete(id)
+    this.changed()
   }
 
   async addItems(bankId: string, drafts: ItemDraft[], actorId: string) {
@@ -101,8 +165,11 @@ export class MemoryBankRepository implements BankRepository {
         continue
       }
       keys.add(key)
-      added.push(this.insertItem(bank, r.value))
+      const item: BankItem = { id: `item_${this.seq++}`, bankId, ...r.value }
+      this.items.set(item.id, item)
+      added.push(item)
     }
+    if (added.length > 0) this.changed()
     return { added, duplicates }
   }
 
@@ -114,6 +181,7 @@ export class MemoryBankRepository implements BankRepository {
     if (!r.ok) throw new BankError('INVALID', r.error)
     const updated: BankItem = { ...item, ...r.value }
     this.items.set(itemId, updated)
+    this.changed()
     return updated
   }
 
@@ -122,6 +190,7 @@ export class MemoryBankRepository implements BankRepository {
     if (!item) throw new BankError('NOT_FOUND', '题目不存在或已删除')
     await this.writable(item.bankId, actorId)
     this.items.delete(itemId)
+    this.changed()
   }
 
   private async writable(bankId: string, actorId: string) {
@@ -131,17 +200,8 @@ export class MemoryBankRepository implements BankRepository {
     return bank
   }
 
-  private insertBank(meta: BankMeta, visibility: Bank['visibility'], ownerId: string | null): Bank {
-    const now = this.now()
-    const bank: Bank = { id: `bank_${this.seq++}`, ...meta, visibility, ownerId, createdAt: now, updatedAt: now }
-    this.banks.set(bank.id, bank)
-    return bank
-  }
-
-  private insertItem(bank: Bank, draft: ItemDraft): BankItem {
-    const item: BankItem = { id: `item_${this.seq++}`, bankId: bank.id, ...draft }
-    this.items.set(item.id, item)
-    return item
+  private changed() {
+    this.onChange?.()
   }
 
   private now() {

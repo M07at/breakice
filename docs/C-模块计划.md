@@ -21,10 +21,11 @@ C 的代码分两层：
 | 公开视图 / 私密视图（广播里不含任何人的词） | `app/src/modules/undercover/view.ts` | 单测 |
 | 融合玩法：轮流画、画作提交（可补交）、AI 分数结束前隐藏、AI 奖励分 | 同一个引擎，`variant: 'draw'` | 单测 |
 | 单机后端：一部手机轮流扮演所有玩家 | `app/src/modules/undercover/backend.ts`、`app/src/modules/local/session.ts` | 单测 + 页面实测 |
-| 题库：数据模型、校验、CSV（中文列名、Excel BOM、防公式注入）、JSON 导入导出、去重、逐行报错 | `app/src/modules/bank/` | 28 个单测 |
+| 题库：数据模型、校验、CSV（中文列名、Excel BOM、防公式注入）、JSON 导入导出、去重、逐行报错 | `app/src/modules/bank/` | 33 个单测 |
 | 抽题：同一房间不重复；融合玩法只抽能画的词 | `app/src/modules/bank/picker.ts` | 单测 |
 | 题库仓库接口 + 内存实现（系统题库只读、私有题库只有创建者能改） | `app/src/modules/bank/repository.ts` | 单测 |
-| 系统词库：70 对卧底词，60 对标了可画 | `app/src/modules/bank/seed/undercover-pairs.json` | 单测 |
+| **原创系统题库（4 个游戏共 488 条）**：谁是卧底 157 对（127 对可画）、你画我猜 210 个词（带分类提示和 emoji）、真心话 69 题、大冒险 52 题；都分三档难度，真心话大冒险适合陌生人、不涉及身体接触和隐私 | `app/src/modules/bank/seed/`（格式说明见同目录 README.md） | 单测检查条数、难度、重复、敏感内容 |
+| 自建题库保存在手机上（单机模式），关掉小程序再打开还在；玩的时候系统题库和自建题库可以一起选 | `repository.ts` 的 snapshot / restore、`local/session.ts` | 单测 + 页面实测 |
 | 文件导入导出：微信从聊天记录选文件 / 分享文件到聊天；H5 选文件 / 下载；都失败时可复制 | `app/src/modules/bank/file-io.ts` | H5 实测；微信端待真机 |
 | 谁是卧底页面：设置（玩法、人数、白板、词库）、看词、描述/作画、投票、揭晓、加赛、结算、再来一局 | `app/src/pages-uc/` | H5 实测 |
 | 题库页面：按游戏分类列表、新建、增删改题目、粘贴导入、文件导入、导出 CSV/JSON、下载模板、改名、删除 | `app/src/pages-bank/` | H5 实测 |
@@ -51,7 +52,7 @@ C 的代码分两层：
 | C 的数据库迁移（题库表、谁是卧底表、RLS） | A 的用户表、房间表、命名规范 | A1、A2、A8 |
 | 服务端函数 `uc_start` / `uc_act` / `uc_tick` / `uc_my_word`（放 `supabase/functions/`） | A 的服务端环境、频道广播、RPC 规范 | A3、A4、A5 |
 | `RemoteUcBackend`、`SupabaseBankRepository`，配置齐了自动替换单机实现 | 上面两项 | — |
-| 系统词库生成 SQL 种子数据 | C 的迁移 | — |
+| 系统题库生成 SQL 种子数据（从 `seed/*.json` 生成，ID 用固定的 `sys_<游戏>_<序号>`） | C 的迁移 | — |
 | 从大厅开始游戏、页面用 D 的自我介绍卡和设计系统 | D | D1–D3 |
 | 融合玩法换成 B 的画布、画作上传、A 的 AI 评分 | B、A | B1、A6、A9 |
 | 计分事件接 B 的统一计分 | B | B2 |

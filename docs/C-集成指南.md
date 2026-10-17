@@ -89,7 +89,7 @@ scripts/                 C：包体积检查、密钥扫描
 | `uc_start(room_id, variant, bank_ids?, config?)` → `{ game_id }` | 大厅里主持人选「谁是卧底」或「你画我猜谁是卧底」后调用。`variant` 是 `classic` 或 `draw` |
 | 页面路由 `/pages-uc/play?roomId=&gameId=` | 开始后所有人跳到这里（D 收到开始广播后跳转） |
 | 页面路由 `/pages-bank/index` | 题库管理入口，主持人可以从大厅或「我的」进入 |
-| `qb_pick_items(room_id, game_type, bank_ids, n)` | 真心话大冒险抽题（`truth` / `dare`），同一房间不重复 |
+| `qb_pick_items(room_id, game_type, bank_ids, n)` | 真心话大冒险抽题（`truth` / `dare`），同一房间不重复。默认用系统题库 `sys_truth`（69 题）/ `sys_dare`（52 题），主持人可以再加选自建题库 |
 | 人数限制 | 谁是卧底 4–20 人，你画我猜谁是卧底 4–12 人，大厅可以据此禁用按钮（`PLAYER_LIMITS`） |
 
 ### 给 B（计分、你画我猜）
@@ -108,7 +108,7 @@ scripts/                 C：包体积检查、密钥扫描
 | `uc_correct_vote` | 投中了被淘汰的卧底 | 1 |
 | `uc_ai_bonus` | 融合玩法 AI 分数 ≥60 得 1 倍、≥80 得 2 倍 | 1 |
 
-B 可以按自己的权重配置重新算分，`points` 只是建议值。你画我猜的抽词用 `qb_pick_items(room_id, 'draw', bank_ids, n)`。
+B 可以按自己的权重配置重新算分，`points` 只是建议值。你画我猜的抽词用 `qb_pick_items(room_id, 'draw', bank_ids, n)`，默认系统词库 `sys_draw`（210 个词，其中 164 个带 emoji，可用于 Emoji 版），主持人可以再加选自建词库。
 
 ### 给 A
 
@@ -134,7 +134,7 @@ C 的表、RLS 和服务端函数草案见第 7 节，请 A 按统一规范 revi
 |---|---|---|
 | B1 | 画布组件：`mode`（作画 / 观看 / 只读）、绑定房间频道做笔画同步、`export()` 返回图片引用；倒计时结束前自动导出 | 第 6 周 |
 | B2 | 统一计分入口：接收第 3 节的计分事件 | 第 7 周 |
-| B3 | 你画我猜的词库内容按 C 的 JSON 格式提供，C 放进系统题库 | 第 5 周 |
+| B3 | 看一遍 C 准备的你画我猜系统词库（210 个词，`app/src/modules/bank/seed/draw-words.json`），要增删直接改这个文件 | 第 5 周 |
 
 融合玩法里画作提交和结束回合是分开的（`drawingSubmitted` 和 `turnDone`），导出上传慢一点也没关系，回合结束后还能补交。
 
@@ -145,7 +145,7 @@ C 的表、RLS 和服务端函数草案见第 7 节，请 A 按统一规范 revi
 | D1 | 大厅选游戏后调用 `uc_start`，收到开始广播后所有人跳转到 C 的页面 | 第 5 周 |
 | D2 | 设计系统定下来（Vant Weapp 或 TDesign），C 的页面用同一套 | 第 2 周 |
 | D3 | 自我介绍卡组件（按用户 ID 显示头像、昵称、MBTI、一句话介绍） | 第 3 周 |
-| D4 | 真心话大冒险的题目按 C 的 JSON 格式提供，C 放进系统题库 | 第 5 周 |
+| D4 | 看一遍 C 准备的真心话（69 题）和大冒险（52 题）系统题库（`seed/truth.json`、`seed/dare.json`），要增删直接改 | 第 5 周 |
 
 ## 7. C 的数据库和服务端草案（请 A review）
 
