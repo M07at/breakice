@@ -21,6 +21,14 @@ const PLAYER = { now: 0 }
 const ids = (n: number) => Array.from({ length: n }, (_, i) => `p${i + 1}`)
 
 function newGame(n: number, config: Partial<UcConfig> = {}, seed = 1, now = 0) {
+  let result = waitingGame(n, config, seed, now)
+  if (result.state.phase === 'word') {
+    for (const by of ids(n)) result = applyAction(result.state, { type: 'acknowledgeWord', by }, { now })
+  }
+  return result
+}
+
+function waitingGame(n = 6, config: Partial<UcConfig> = {}, seed = 1, now = 0) {
   return createGame({ playerIds: ids(n), pair: PAIR, config: { swapWords: false, ...config }, now, rng: createRng(seed) })
 }
 
@@ -48,6 +56,7 @@ function act(s: UcState, action: UcAction, ctx = PLAYER) {
 
 function finishDescribe(s: UcState): UcState {
   while (s.phase === 'describe') s = act(s, { type: 'turnDone', by: currentSpeaker(s)! })
+  if (s.phase === 'review') s = tick(s, s.phaseDeadline).state
   return s
 }
 
@@ -121,6 +130,50 @@ describe('开局', () => {
       [1, 2, 3, 4, 5, 6, 7, 8].map((seed) => newGame(5, { swapWords: true }, seed).state.pair.civilian),
     )
     expect(civilianWords).toEqual(new Set(['苹果', '梨']))
+  })
+})
+
+describe('经典模式私密领词', () => {
+  it('所有人确认前无发言计时，不能越阶段发言或投票', () => {
+    const s = waitingGame().state
+    expect(s.phase).toBe('word')
+    expect(s.phaseDeadline).toBe(0)
+    expect(currentSpeaker(s)).toBeNull()
+    expect(tick(s, 1_000_000)).toEqual({ state: s, events: [] })
+    expect(codeOf(() => applyAction(s, { type: 'turnDone', by: 'p1' }, PLAYER))).toBe('WRONG_PHASE')
+    expect(codeOf(() => applyAction(s, { type: 'vote', by: 'p1', targetId: 'p2' }, PLAYER))).toBe('WRONG_PHASE')
+    expect(codeOf(() => applyAction(s, { type: 'next' }, HOST))).toBe('WRONG_PHASE')
+    expect(codeOf(() => applyAction(s, { type: 'acknowledgeWord', by: 'stranger' }, PLAYER))).toBe('UNKNOWN_PLAYER')
+  })
+
+  it('确认只公开进度；最后一次确认启动计时，重试不推进或重新计时', () => {
+    let s = waitingGame().state
+    for (const by of ids(6).slice(0, 5)) s = act(s, { type: 'acknowledgeWord', by })
+    const publicView = toPublicView(s)
+    expect(publicView.players.filter((p) => p.wordConfirmed)).toHaveLength(5)
+    expect(publicView.players.every((p) => p.role === null && p.word === undefined)).toBe(true)
+    expect(JSON.stringify(publicView)).not.toContain('苹果')
+    expect(JSON.stringify(publicView)).not.toContain('梨')
+    expect(applyAction(s, { type: 'acknowledgeWord', by: 'p1' }, { now: 90_000 }).state).toBe(s)
+    const started = applyAction(s, { type: 'acknowledgeWord', by: 'p6' }, { now: 100_000 })
+    expect(started.state.phase).toBe('describe')
+    expect(started.state.phaseDeadline).toBe(140_000)
+    expect(applyAction(started.state, { type: 'acknowledgeWord', by: 'p6' }, { now: 110_000 }))
+      .toEqual({ state: started.state, events: [] })
+  })
+
+  it('六人完整领词、发言、投票、平民胜利，只产生一次结束事件', () => {
+    let s = waitingGame().state
+    const originalAssignments = s.players.map(({ id, role, word }) => ({ id, role, word }))
+    for (const by of ids(6)) s = act(s, { type: 'acknowledgeWord', by })
+    expect(s.players.map(({ id, role, word }) => ({ id, role, word }))).toEqual(originalAssignments)
+    s = finishDescribe(s)
+    const undercover = bad(s)[0]
+    const result = voteAll(s, (id) => id === undercover ? good(s)[0] : undercover)
+    expect(result.state.winner).toBe('civilian')
+    expect(result.events.filter((e) => e.type === 'ended')).toHaveLength(1)
+    expect(tick(result.state, 1_000_000).events).toEqual([])
+    expect(codeOf(() => applyAction(result.state, { type: 'vote', by: 'p1', targetId: 'p2' }, PLAYER))).toBe('WRONG_PHASE')
   })
 })
 
@@ -429,6 +482,10 @@ describe('LocalUcBackend 单机模式', () => {
     await expect(backend.act(gameId, { type: 'skipTurn' })).rejects.toMatchObject({ code: 'HOST_ONLY' })
 
     let view = await backend.getView(gameId)
+    for (const player of view.players) {
+      backend.me = player.id
+      view = await backend.act(gameId, { type: 'acknowledgeWord' })
+    }
     while (view.phase === 'describe') {
       backend.me = view.currentSpeakerId!
       view = await backend.act(gameId, { type: 'turnDone' })

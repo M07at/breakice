@@ -4,8 +4,9 @@
     <text class="title">破冰局</text>
     <!-- 开发入口：D 的大厅做好后删掉，改由大厅进入各个游戏 -->
     <view class="dev">
-      <text class="dev-title">开发入口（单机模式）</text>
-      <button class="dev-btn" @tap="go('/pages-uc/setup')">谁是卧底 / 你画我猜谁是卧底</button>
+      <text class="dev-title">开发测试入口</text>
+      <button class="dev-btn" @tap="go('/pages-uc/setup')">谁是卧底</button>
+      <button class="dev-btn" @tap="go('/pages-uc/hybrid')">你画我猜谁是卧底</button>
       <button class="dev-btn" @tap="go('/pages-bank/index')">题库管理</button>
     </view>
   </view>

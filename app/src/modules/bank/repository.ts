@@ -156,6 +156,7 @@ export class MemoryBankRepository implements BankRepository {
     const keys = new Set((await this.listItems(bankId)).map((i) => itemKey(bank.gameType, i.content)))
     const added: BankItem[] = []
     let duplicates = 0
+    for (const draft of drafts) { const checked = validateDraft(bank.gameType, draft); if (!checked.ok) throw new BankError('INVALID', checked.error) }
     for (const d of drafts) {
       const r = validateDraft(bank.gameType, d)
       if (!r.ok) throw new BankError('INVALID', r.error)
@@ -179,6 +180,7 @@ export class MemoryBankRepository implements BankRepository {
     const bank = await this.writable(item.bankId, actorId)
     const r = validateDraft(bank.gameType, draft)
     if (!r.ok) throw new BankError('INVALID', r.error)
+    if ([...this.items.values()].some(other => other.bankId === item.bankId && other.id !== itemId && itemKey(bank.gameType, other.content) === itemKey(bank.gameType, r.value.content))) throw new BankError('INVALID', '这道题已经有了')
     const updated: BankItem = { ...item, ...r.value }
     this.items.set(itemId, updated)
     this.changed()

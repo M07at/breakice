@@ -40,6 +40,7 @@ export interface CreateGameInput {
 
 export function createGame(input: CreateGameInput): Transition {
   const config: UcConfig = { ...DEFAULT_CONFIG, ...input.config }
+  validateConfig(config)
   const ids = input.playerIds
   const limits = PLAYER_LIMITS[config.variant]
   if (ids.length < limits.min || ids.length > limits.max) {
@@ -50,6 +51,9 @@ export function createGame(input: CreateGameInput): Transition {
   }
   if (new Set(ids).size !== ids.length) {
     throw new UcError('DUPLICATE_PLAYER', '玩家列表里有重复的人')
+  }
+  if (ids.some((id) => typeof id !== 'string' || !id.trim() || ['__proto__', 'constructor', 'prototype'].includes(id))) {
+    throw new UcError('BAD_CONFIG', '玩家标识不能为空或使用保留名称')
   }
   const civilianWord = input.pair.civilian.trim()
   const undercoverWord = input.pair.undercover.trim()
@@ -85,7 +89,8 @@ export function createGame(input: CreateGameInput): Transition {
     pair,
     players,
     round: 1,
-    phase: 'describe',
+    phase: 'word',
+    wordConfirmedIds: [],
     pkCandidates: null,
     pendingPk: null,
     speakOrder: [],
@@ -100,15 +105,40 @@ export function createGame(input: CreateGameInput): Transition {
     endedReason: null,
   }
   const events: UcEvent[] = []
-  startDescribe(state, events, input.now)
+  if (state.phase === 'word') {
+    events.push({ type: 'phase', phase: 'word', round: 1, deadline: 0 })
+  } else {
+    startDescribe(state, events, input.now)
+  }
   return { state, events }
 }
 
 /** 所有玩家和主持人的操作都走这里；不合法直接抛 UcError，原局面不变 */
 export function applyAction(prev: UcState, action: UcAction, ctx: UcContext): Transition {
+  // 网络重试或双击确认不会重启发言计时，也不会再次分配词语。
+  if (action.type === 'acknowledgeWord' && prev.wordConfirmedIds.includes(action.by)) {
+    return { state: prev, events: [] }
+  }
+  if (['turnDone', 'skipTurn', 'vote', 'next'].includes(action.type) && prev.phaseDeadline > 0 && ctx.now >= prev.phaseDeadline) {
+    throw new UcError('DEADLINE_PASSED', '本阶段已到时，请刷新后继续')
+  }
+  if (action.type === 'playerLeft') {
+    const player = findPlayer(prev, action.playerId)
+    if (prev.phase === 'ended' || !player.alive) return { state: prev, events: [] }
+  }
   const s = clone(prev)
   const events: UcEvent[] = []
   switch (action.type) {
+    case 'acknowledgeWord': {
+      requirePhase(s, 'word')
+      const player = findPlayer(s, action.by)
+      if (!player.alive) throw new UcError('NOT_ELIGIBLE', '已离开的玩家不能确认词语')
+      s.wordConfirmedIds.push(action.by)
+      if (s.players.filter((p) => p.alive).every((p) => s.wordConfirmedIds.includes(p.id))) {
+        startDescribe(s, events, ctx.now)
+      }
+      break
+    }
     case 'turnDone':
       requirePhase(s, 'describe')
       if (action.by !== currentSpeaker(s)) throw new UcError('NOT_YOUR_TURN', '还没轮到你')
@@ -151,12 +181,15 @@ export function applyAction(prev: UcState, action: UcAction, ctx: UcContext): Tr
 
 /** 到点推进：客户端倒计时归零时调用。没到点或已结束时原样返回，重复调用安全 */
 export function tick(prev: UcState, now: number): Transition {
-  if (prev.phase === 'ended' || now < prev.phaseDeadline) return { state: prev, events: [] }
+  if (prev.phase === 'word' || prev.phase === 'ended' || now < prev.phaseDeadline) return { state: prev, events: [] }
   const s = clone(prev)
   const events: UcEvent[] = []
-  if (s.phase === 'describe') finishTurn(s, events, now)
-  else if (s.phase === 'vote') closeVote(s, events, now)
-  else afterReveal(s, events, now)
+  // 用计划截止时间推进；后台恢复时重复 tick 可追上已过去的所有阶段。
+  const deadline = prev.phaseDeadline
+  if (s.phase === 'describe') finishTurn(s, events, deadline)
+  else if (s.phase === 'review') startVote(s, events, deadline)
+  else if (s.phase === 'vote') closeVote(s, events, deadline)
+  else afterReveal(s, events, deadline)
   s.version = prev.version + 1
   return { state: s, events }
 }
@@ -200,7 +233,10 @@ function beginTurn(s: UcState, events: UcEvent[], now: number): void {
     s.speakerIndex++
   }
   if (s.speakerIndex >= s.speakOrder.length) {
-    startVote(s, events, now)
+    if (s.config.variant === 'draw') {
+      s.phase = 'review'; s.phaseDeadline = now + 10_000
+      events.push({ type: 'phase', phase: 'review', round: s.round, deadline: s.phaseDeadline })
+    } else startVote(s, events, now)
     return
   }
   const id = s.speakOrder[s.speakerIndex]
@@ -310,6 +346,12 @@ function playerLeft(s: UcState, events: UcEvent[], now: number, id: string): voi
     endGame(s, events, winner, 'win')
     return
   }
+  if (s.phase === 'word') {
+    if (s.players.filter((p) => p.alive).every((p) => s.wordConfirmedIds.includes(p.id))) {
+      startDescribe(s, events, now)
+    }
+    return
+  }
   if (s.pkCandidates && s.pkCandidates.length < 2 && s.phase !== 'reveal') {
     // 加赛只剩一个人，取消加赛直接进下一轮
     afterReveal(s, events, now)
@@ -402,4 +444,21 @@ function repeat<T>(value: T, n: number): T[] {
 /** 局面必须能存成 JSON（jsonb），所以用 JSON 深拷贝，顺便保证没混进不能序列化的东西 */
 function clone(s: UcState): UcState {
   return JSON.parse(JSON.stringify(s)) as UcState
+}
+
+function validateConfig(config: UcConfig): void {
+  if (!['classic', 'draw'].includes(config.variant) || typeof config.blankEnabled !== 'boolean' || typeof config.swapWords !== 'boolean') {
+    throw new UcError('BAD_CONFIG', '玩法或开关配置无效')
+  }
+  for (const key of ['describeSeconds', 'drawSeconds', 'voteSeconds', 'revealSeconds'] as const) {
+    if (!Number.isInteger(config[key]) || config[key] < 1 || config[key] > 3600) {
+      throw new UcError('BAD_CONFIG', '阶段时长必须为1–3600秒的整数')
+    }
+  }
+  if (!Number.isInteger(config.maxRounds) || config.maxRounds < 1 || config.maxRounds > 100) {
+    throw new UcError('BAD_CONFIG', '最大轮数必须为1–100的整数')
+  }
+  if (config.undercoverCount !== undefined && (!Number.isInteger(config.undercoverCount) || config.undercoverCount < 1)) {
+    throw new UcError('BAD_CONFIG', '卧底人数必须为正整数')
+  }
 }

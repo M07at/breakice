@@ -126,6 +126,13 @@ export function validateDraft<T extends GameType>(
   if (!content.ok) return content
   const tags = parseTags(raw.tags)
   if (!tags.ok) return tags
+  if (gameType === 'undercover' && tags.value.some(t => t === 'lang:en' || t === 'lang:zh')) {
+    if (tags.value.includes('lang:en') && tags.value.includes('lang:zh')) return fail('同一词对只能指定一种语言')
+    const pair = content.value as { civilian: string; undercover: string }
+    const han = (text: string) => /[\u3400-\u9fff]/.test(text)
+    if (tags.value.includes('lang:en') && (han(pair.civilian) || han(pair.undercover))) return fail('English词对不能包含中文')
+    if (tags.value.includes('lang:zh') && (!han(pair.civilian) || !han(pair.undercover))) return fail('中文词对的两端都应包含中文')
+  }
   const difficulty = parseDifficulty(raw.difficulty)
   if (!difficulty.ok) return difficulty
   return ok({ content: content.value, tags: tags.value, difficulty: difficulty.value })

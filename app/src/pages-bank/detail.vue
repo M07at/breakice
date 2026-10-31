@@ -53,6 +53,7 @@
         <input v-model="form.emoji" class="input" placeholder="emoji（可选）" />
       </block>
       <textarea v-else v-model="form.text" class="textarea short" placeholder="题目内容" />
+      <view v-if="bank.gameType === 'undercover'" class="row"><text>词语语言</text><button size="mini" @tap="form.language = 'zh'">{{ form.language === 'zh' ? '✓ ' : '' }}中文</button><button size="mini" @tap="form.language = 'en'">{{ form.language === 'en' ? '✓ ' : '' }}English</button></view>
       <input v-model="form.tags" class="input" placeholder="标签，用 | 分隔（可选）" />
       <view class="row">
         <text>难度</text>
@@ -74,10 +75,12 @@
       </view>
     </view>
 
+    <view class="section"><view class="section-title">筛选题目</view><input v-model="search" class="input" placeholder="搜索词语或分类标签" /><view class="row"><button size="mini" @tap="languageFilter=''">全部语言</button><button size="mini" @tap="languageFilter='zh'">中文</button><button size="mini" @tap="languageFilter='en'">English</button></view><view class="row"><button size="mini" @tap="difficultyFilter=0">全部难度</button><button v-for="d in difficulties" :key="d" size="mini" @tap="difficultyFilter=d">{{ DIFFICULTY_LABEL[d] }}</button></view><text class="hint">{{ filteredItems.length }} 条匹配 · {{ languageFilter || '全部语言' }} · 难度 {{ difficultyFilter || '全部' }}</text></view>
     <view class="section">
       <view class="section-title">题目</view>
-      <view v-if="items.length === 0" class="empty">还没有题目</view>
-      <view v-for="it in items" :key="it.id" class="item">
+      <button v-if="filteredItems.length > visibleCount" size="mini" @tap="visibleCount += 60">显示更多</button>
+      <view v-if="filteredItems.length === 0" class="empty">还没有题目</view>
+      <view v-for="it in filteredItems.slice(0, visibleCount)" :key="it.id" class="item">
         <view class="item-main" @tap="edit(it)">
           <text>{{ summary(it) }}</text>
           <text class="hint">{{ meta(it) }}</text>
@@ -101,6 +104,7 @@ import {
 } from '@/modules/bank'
 import type { Bank, BankItem, ContentByType, Difficulty, FileFormat, ImportReport } from '@/modules/bank'
 import { CANCELLED, copyText, pickTextFile, saveTextFile } from '@/modules/bank/file-io'
+import { languageOf } from '@/modules/bank/language'
 import { switchValue } from '@/modules/local/events'
 import { LOCAL_USER_ID, bankRepo } from '@/modules/local/session'
 
@@ -109,11 +113,17 @@ const difficulties: Difficulty[] = [1, 2, 3]
 const bankId = ref('')
 const bank = ref<Bank | null>(null)
 const items = ref<BankItem[]>([])
+const search = ref('')
+const languageFilter = ref('')
+const difficultyFilter = ref(0)
+const visibleCount = ref(60)
+const filteredItems = computed(() => items.value.filter(it => (!languageFilter.value || languageOf(it) === languageFilter.value) && (!difficultyFilter.value || it.difficulty === difficultyFilter.value) && (summary(it) + ' ' + it.tags.join(' ')).toLowerCase().includes(search.value.toLowerCase())))
 const report = ref<(ImportReport & { added: number }) | null>(null)
 const showPaste = ref(false)
 const pasteText = ref('')
 const editingId = ref<string | null>(null)
 const form = reactive({
+  language: 'zh',
   civilian: '',
   undercover: '',
   drawable: true,
@@ -178,6 +188,7 @@ function edit(it: BankItem) {
   const c = it.content as Partial<ContentByType['draw'] & ContentByType['undercover'] & ContentByType['truth']>
   editingId.value = it.id
   Object.assign(form, {
+    language: languageOf(it),
     civilian: c.civilian ?? '',
     undercover: c.undercover ?? '',
     drawable: c.drawable ?? false,
@@ -185,7 +196,7 @@ function edit(it: BankItem) {
     hint: c.hint ?? '',
     emoji: c.emoji ?? '',
     text: c.text ?? '',
-    tags: it.tags.join('|'),
+    tags: it.tags.filter(t=>!t.startsWith('lang:')).join('|'),
     difficulty: it.difficulty,
   })
 }
@@ -203,7 +214,7 @@ function formContent() {
 
 async function save() {
   if (!bank.value) return
-  const r = validateDraft(bank.value.gameType, { content: formContent(), tags: form.tags, difficulty: form.difficulty })
+  const r = validateDraft(bank.value.gameType, { content: formContent(), tags: bank.value.gameType === 'undercover' ? [...form.tags.split('|').filter(t=>t.trim() && !t.trim().startsWith('lang:')), 'lang:' + form.language] : form.tags, difficulty: form.difficulty })
   if (!r.ok) return toast(r.error)
   try {
     if (editingId.value) {

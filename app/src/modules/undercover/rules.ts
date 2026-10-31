@@ -2,8 +2,10 @@ import { UcError } from './errors'
 import type { Ballot, EndReason, Phase, Role, ScoreReason, Side, UcConfig, UcPlayer, Variant } from './types'
 
 export const PHASE_LABEL: Record<Phase, string> = {
+  word: '私密领词',
   describe: '描述',
   vote: '投票',
+  review: '作品回顾',
   reveal: '揭晓',
   ended: '已结束',
 }

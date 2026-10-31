@@ -18,8 +18,8 @@ export {
 export { toPublicView, toSecretView } from './view'
 export type { UcPublicView, UcPublicPlayer, UcSecretView } from './view'
 export { LocalUcBackend } from './backend'
-export type { UcBackend, UcClientAction, UcStartOptions, LocalBackendOptions } from './backend'
-export { UcError } from './errors'
+export type { UcBackend, UcClientAction, UcStartOptions, UcCommandMeta, LocalBackendOptions } from './backend'
+export { UcError, isUcError } from './errors'
 export type { UcErrorCode } from './errors'
 export type {
   Variant,

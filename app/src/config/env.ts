@@ -16,5 +16,5 @@ export const env: AppEnv = {
   wxCloudEnv: import.meta.env.VITE_WX_CLOUD_ENV ?? '',
 }
 
-/** 后端还没配好时，C 的页面用单机实现（LocalUcBackend / MemoryBankRepository） */
+/** 仅表示公开配置齐全；不表示真实后端适配器已安装。开发联调使用独立的预览服务。 */
 export const backendConfigured = Boolean(env.supabaseUrl && env.supabaseAnonKey)

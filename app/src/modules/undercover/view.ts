@@ -13,6 +13,7 @@ export interface UcPublicPlayer {
   out?: { round: number; reason: 'voted' | 'left' }
   canVote: boolean
   hasVoted: boolean
+  wordConfirmed: boolean
 }
 
 /** 广播给房间里所有人的内容，不含任何人的词 */
@@ -20,6 +21,7 @@ export interface UcPublicView {
   version: number
   variant: Variant
   round: number
+  maxRounds: number
   phase: Phase
   pkCandidates: string[] | null
   speakOrder: string[]
@@ -51,10 +53,12 @@ export function toPublicView(s: UcState): UcPublicView {
   const voters = s.phase === 'vote' ? eligibleVoterIds(s) : []
   const roleCounts: Record<Role, number> = { civilian: 0, undercover: 0, blank: 0 }
   for (const p of s.players) roleCounts[p.role]++
-  return {
+  // 返回的公开快照不能与权威状态共享数组/对象，避免调用者或监听器修改局面。
+  return JSON.parse(JSON.stringify({
     version: s.version,
     variant: s.config.variant,
     round: s.round,
+    maxRounds: s.config.maxRounds,
     phase: s.phase,
     pkCandidates: s.pkCandidates,
     speakOrder: s.speakOrder,
@@ -71,6 +75,7 @@ export function toPublicView(s: UcState): UcPublicView {
       ...(p.out ? { out: p.out } : {}),
       canVote: voters.includes(p.id),
       hasVoted: Object.prototype.hasOwnProperty.call(s.votes, p.id),
+      wordConfirmed: s.wordConfirmedIds.includes(p.id),
     })),
     lastResult: s.lastResult,
     drawings: s.drawings,
@@ -78,7 +83,7 @@ export function toPublicView(s: UcState): UcPublicView {
     endedReason: s.endedReason,
     pair: ended ? s.pair : null,
     aiScores: ended ? s.aiScores : null,
-  }
+  })) as UcPublicView
 }
 
 export function toSecretView(s: UcState, playerId: string): UcSecretView {

@@ -2,6 +2,7 @@ import { importJson } from '../importer'
 import { MemoryBankRepository } from '../repository'
 import type { MemoryRepositoryOptions } from '../repository'
 import type { BankMeta, GameType, ItemDraft } from '../types'
+import english from './english-pairs.json'
 import dare from './dare.json'
 import drawWords from './draw-words.json'
 import truth from './truth.json'
@@ -22,7 +23,8 @@ const SOURCES: [GameType, unknown][] = [
 
 export function loadSystemBanks(): SeedBank[] {
   return SOURCES.map(([gameType, doc]) => {
-    const r = importJson(gameType, JSON.stringify(doc))
+    const source = gameType === 'undercover' ? { ...(doc as object), items: [...undercoverPairs.items, ...english.items] } : doc
+    const r = importJson(gameType, JSON.stringify(source))
     if (r.fatal || r.errors.length > 0 || r.duplicates > 0) {
       const detail = r.fatal ?? r.errors.map((e) => `第 ${e.row} 条 ${e.message}`).join('；')
       throw new Error(`系统题库「${gameType}」有问题：${detail || `${r.duplicates} 条重复`}`)

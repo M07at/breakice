@@ -4,7 +4,7 @@
 import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs'
 import { basename, extname, join } from 'node:path'
 
-const SKIP_DIRS = new Set(['node_modules', '.git', 'unpackage'])
+const SKIP_DIRS = new Set(['node_modules', '.git', 'unpackage', '.c3-data', 'reports'])
 const TEXT_EXT = new Set(['.js', '.mjs', '.cjs', '.ts', '.vue', '.json', '.wxml', '.wxss', '.wxs', '.html', '.css', '.sql', '.yml', '.yaml', '.md'])
 const SECRET_VAR = /^\s*(VITE_[A-Z0-9_]*(SECRET|SERVICE_ROLE|PRIVATE|PASSWORD|API_KEY|AI_KEY|TOKEN)[A-Z0-9_]*)\s*=\s*(\S+)/im
 const PATTERNS = [
@@ -57,7 +57,7 @@ for (const t of targets.length ? targets : ['.']) if (existsSync(t)) walk(t)
 
 if (problems.length) {
   console.error(problems.join('\n'))
-  console.error(`\n发现 ${problems.length} 处疑似密钥。密钥只放 GitHub Secrets 或云函数环境变量。`)
+  console.error(`\n发现 ${problems.length} 处疑似密钥。密钥只放 CI受保护变量或云函数环境变量。`)
   process.exit(1)
 }
 console.log('没有发现密钥')

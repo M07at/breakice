@@ -3,7 +3,7 @@ export type Variant = 'classic' | 'draw'
 export type Role = 'civilian' | 'undercover' | 'blank'
 /** 白板算卧底阵营 */
 export type Side = 'civilian' | 'undercover'
-export type Phase = 'describe' | 'vote' | 'reveal' | 'ended'
+export type Phase = 'word' | 'describe' | 'vote' | 'review' | 'reveal' | 'ended'
 
 export interface WordPair {
   civilian: string
@@ -63,6 +63,8 @@ export interface UcState {
   players: UcPlayer[]
   round: number
   phase: Phase
+  /** 已私密查看并确认词语的玩家；经典模式全部确认后才开始发言 */
+  wordConfirmedIds: string[]
   /** 平票加赛的候选人；不在加赛中为 null */
   pkCandidates: string[] | null
   /** 揭晓后要进入的加赛候选人 */
@@ -83,6 +85,7 @@ export interface UcState {
 }
 
 export type UcAction =
+  | { type: 'acknowledgeWord'; by: string }
   | { type: 'turnDone'; by: string }
   /** 画作导出上传比结束回合慢，所以单独提交，回合结束后也能补交 */
   | { type: 'drawingSubmitted'; by: string; turnKey: string; drawingRef: string }

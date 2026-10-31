@@ -43,11 +43,11 @@ console.log(`${'(总计)'.padEnd(24)} ${fmt(total)}`)
 
 const main = sizes.get('(主包)')
 let failed = false
-if (main > MAIN_LIMIT) {
+if (main >= MAIN_LIMIT) {
   console.error(`主包 ${fmt(main)} 超过 2MB：把页面和大文件挪进分包`)
   failed = true
 }
-if (total > TOTAL_LIMIT) {
+if (total >= TOTAL_LIMIT) {
   console.error(`总包 ${fmt(total)} 超过 20MB`)
   failed = true
 }

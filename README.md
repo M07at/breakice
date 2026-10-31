@@ -1,54 +1,74 @@
-# Ice-breaking hall（破冰局）
+# 破冰局 / Break Ice Hall
 
-#### 介绍
+A WeChat mini-program project for face-to-face icebreaker games. **Each participant uses their own phone.** The host is also a player; the game controls turns, voting and results.
 
-线下面对面多人破冰游戏小程序，支持你画我猜、谁是卧底、你画我猜谁是卧底、真心话大冒险和 AI 评分。
-一部手机就够：主持人创建房间，大家扫码或从微信群加入；谁是卧底由程序当法官。
+**For the next developer or AI: read [README-C-HANDOFF.md](README-C-HANDOFF.md) before integrating member C's work.** It records the actual interfaces, shared data model, mock boundaries, CI activation steps and acceptance checks. Some older planning documents describe superseded single-device prototypes; the current code and handoff take precedence for implementation status.
 
-#### 软件架构
+## Current member C delivery
 
-uni-app（Vue 3 + TypeScript + Vite）+ 微信小程序 + Supabase + 微信云开发。
+- 谁是卧底: fixed-player private words, speaking turns, timers, voting, elimination, results and replay.
+- 你画我猜谁是卧底: separate pages, synchronized mock drawing submission, artwork review, voting and scoring failure/timeout paths. B's real canvas and A's real AI are still integration work.
+- Shared question bank: 157 Chinese and 60 English default pairs, word-language selection, custom-bank CRUD, filtering and JSON/CSV import/export. Both games use one `undercover` collection; hybrid additionally filters drawable pairs.
+- Engineering: environment checks, fail-fast verification, JUnit/JSON reports, WeChat and H5 builds, package limits, secret scanning and release hashes.
 
-| 目录 | 内容 | 负责 |
-|---|---|---|
-| `app/src/pages/`、`app/src/components/` | 大厅、房间、公共组件 | D |
-| `app/src/pages-uc/`、`app/src/modules/undercover/` | 谁是卧底、你画我猜谁是卧底 | C |
-| `app/src/pages-bank/`、`app/src/modules/bank/` | 题库管理 | C |
-| `app/src/pages-draw/`、`app/src/modules/draw/`、`app/src/modules/score/` | 你画我猜、计分排行榜 | B |
-| `app/src/pages-truth/`、`app/src/modules/truth/` | 真心话大冒险 | D |
-| `app/src/platform/`、`supabase/`、`cloudfunctions/` | 登录、数据库、RLS、频道、RPC、AI 评分 | A |
-| `scripts/`、`app/src/config/`、`app/.env.example` | 构建检查、环境变量 | C |
-| `docs/` | 文档和会议记录 | 全组 |
+The development server synchronizes separate browser/phone clients. Custom banks persist in `app/.c3-data/banks.json`. This is a **local development data source**, not an implemented Supabase production database or WeChat login service. Game sessions are in memory and expire when the preview server restarts.
 
-#### 安装教程
+## Quick start
 
-需要 Node.js 22 和微信开发者工具。
+Use Node.js 22 as the team's CI baseline. From the repository root:
 
-```bash
-cd app
-npm install
-cp .env.example .env.local   # 填 A 提供的开发配置；不填也能跑单机模式
-npm run dev:mp-weixin        # 用微信开发者工具导入 app/dist/dev/mp-weixin
+```powershell
+Set-Location app
+npm ci
+npm run doctor
+npm run dev:players
 ```
 
-没装微信开发者工具时可以先用 H5 看页面：`npm run dev:h5`。
+For phones, open the **Network address** printed by Vite while connected to the same reachable network as the computer. The home has separate entries for the two games. Create a test game, then distribute a different seat invitation to each participant. A localhost link works only on that same computer.
 
-#### 使用说明
+No real credentials are required for this preview. If configuring public platform values, copy `app/.env.example` to `app/.env.local`. Public configuration alone does not install a real platform adapter. Never put service-role, AI, AppSecret or upload credentials in frontend variables.
 
-首页有「开发入口」（D 的大厅做好后删除）：
+## Independent game routes
 
-- 谁是卧底 / 你画我猜谁是卧底：单机模式，一部手机切换扮演所有玩家
-- 题库管理：增删改查，CSV / JSON 导入导出
+- Classic setup: `/pages-uc/setup`; personal game: `/pages-uc/player`.
+- Hybrid setup: `/pages-uc/hybrid`; personal game: `/pages-uc/hybrid-player`.
+- Shared bank management: `/pages-bank/index` and `/pages-bank/detail`.
 
-#### 参与贡献
+The separate routes reuse internal components and one bank repository. There is no phone-handoff mode or player switcher.
 
-1. 从最新的 `master` 新建自己的分支，名字带成员字母，例如 `c/feat-uc-vote`
-2. 提交前在 `app/` 里运行 `npm run verify`（类型检查、单测、构建、包体积、密钥扫描）
-3. 推送分支，新建 Pull Request，请改到的模块负责人 review
-4. 详细规则见 [C 集成指南](docs/C-集成指南.md) 第 2 节
+## Verification
 
-#### 文档
+```powershell
+npm --prefix app run verify
+```
 
-- [项目开发顺序](docs/项目开发顺序.md)：全组谁先做什么
-- [C 模块计划](docs/C-模块计划.md)
-- [C 集成指南](docs/C-集成指南.md)：合并规则、C 和 A/B/D 的接口、环境变量和密钥
+This runs environment checks, TypeScript, application tests, quality-gate tests, both production builds, package-size and secret checks, and a release manifest. Any failed stage stops the pipeline and returns a nonzero exit code.
+
+Reports: `app/reports/verify.json`, `tests.xml`, `release-manifest.json`. Builds: `app/dist/build/mp-weixin` and `app/dist/build/h5`. Reports, builds and local bank data are not committed.
+
+Latest recorded local evidence: 117 application tests and 3 quality-gate tests passed, with both builds and all verification stages passing. That run used Node v25.8.1; a hosted Node 22 job and real WeChat device integration have not been verified here.
+
+## Remaining CI activation
+
+The repository is hosted on Gitee. `scripts/ci.sh` is runnable; `.gitee/ci-job.json` is a setup recipe, **not an automatically loaded workflow**. A repository administrator must activate the job, configure triggers and require its result before merge. See the exact checklist in [the handoff](README-C-HANDOFF.md) and [engineering guide](docs/c/engineering.md). Hosted CI status has not been inspected or changed by this work.
+
+## Ownership and integration
+
+- **A:** production database, login/authentication, RLS, room membership, private channels, RPC and AI service.
+- **B:** real drawing canvas/stroke synchronization, AI presentation, unified scoring and rankings.
+- **C:** both undercover game flows and specific pages, question-bank management, engineering scripts and contracts.
+- **D:** lobby/room UI, shared design system, host/player shells, Truth or Dare and sharing.
+
+Replace C's development adapters at their boundaries; preserve the game rules, per-user privacy and shared bank semantics. Follow [the handoff](README-C-HANDOFF.md) for the integration order and concrete files.
+
+## Current documentation
+
+- [C integration handoff](README-C-HANDOFF.md)
+- [Classic rules](docs/c/undercover-rules.md)
+- [Hybrid rules and mock adapter](docs/c/hybrid-rules.md)
+- [Fixed-player backend contract](docs/c/undercover-backend-contract.md)
+- [Shared bank model and pages](docs/c/shared-question-bank.md)
+- [Multi-device preview](docs/c/fixed-player-preview.md)
+- [Engineering and CI](docs/c/engineering.md)
+- [Release checklist](docs/c/release-checklist.md)
+- [Changelog](CHANGELOG.md)
