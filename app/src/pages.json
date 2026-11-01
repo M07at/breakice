@@ -1,0 +1,45 @@
+{
+  "pages": [
+    {
+      "path": "pages/home/index",
+      "style": {
+        "navigationBarTitleText": "破冰局",
+        "navigationStyle": "custom"
+      }
+    },
+    {
+      "path": "pages/create/index",
+      "style": {
+        "navigationBarTitleText": "创建房间",
+        "navigationBarBackgroundColor": "#f6f8fb"
+      }
+    },
+    {
+      "path": "pages/join/index",
+      "style": {
+        "navigationBarTitleText": "加入房间",
+        "navigationBarBackgroundColor": "#f6f8fb"
+      }
+    },
+    {
+      "path": "pages/room/index",
+      "style": {
+        "navigationBarTitleText": "房间大厅",
+        "navigationBarBackgroundColor": "#f6f8fb"
+      }
+    },
+    {
+      "path": "pages/game/index",
+      "style": {
+        "navigationBarTitleText": "真心话大冒险",
+        "navigationBarBackgroundColor": "#f6f8fb"
+      }
+    }
+  ],
+  "globalStyle": {
+    "navigationBarTextStyle": "black",
+    "navigationBarTitleText": "破冰局",
+    "navigationBarBackgroundColor": "#f6f8fb",
+    "backgroundColor": "#f6f8fb"
+  }
+}

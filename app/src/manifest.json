@@ -1,0 +1,17 @@
+{
+  "name": "破冰局",
+  "appid": "__UNI__BREAKICEHALL",
+  "description": "线下面对面多人破冰游戏大厅",
+  "versionName": "0.1.0",
+  "versionCode": "100",
+  "transformPx": false,
+  "mp-weixin": {
+    "appid": "",
+    "setting": {
+      "urlCheck": false,
+      "es6": true,
+      "minified": false
+    },
+    "usingComponents": true
+  }
+}
