@@ -1,0 +1,139 @@
+/* C 页面的临时样式。D 的设计系统（Vant Weapp / TDesign）定下来后换掉，删除这个文件。 */
+.page {
+  min-height: 100vh;
+  padding: 24rpx 24rpx 48rpx;
+  box-sizing: border-box;
+  background: #f5f6fa;
+  color: #1f2330;
+  font-size: 28rpx;
+}
+.section,
+.card {
+  margin-bottom: 24rpx;
+  padding: 24rpx;
+  border-radius: 16rpx;
+  background: #fff;
+}
+.section-title {
+  margin-bottom: 16rpx;
+  font-size: 30rpx;
+  font-weight: 600;
+}
+.card-head,
+.row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.row {
+  min-height: 72rpx;
+}
+.card-title {
+  font-size: 32rpx;
+  font-weight: 600;
+}
+.hint {
+  display: block;
+  margin-top: 8rpx;
+  color: #8a8f9c;
+  font-size: 24rpx;
+}
+.notice {
+  margin-bottom: 24rpx;
+  padding: 16rpx 20rpx;
+  border-radius: 12rpx;
+  background: #fff7e6;
+  color: #8a5a00;
+  font-size: 24rpx;
+}
+.error {
+  display: block;
+  margin-top: 8rpx;
+  color: #d93025;
+  font-size: 24rpx;
+}
+.empty {
+  padding: 32rpx 0;
+  color: #8a8f9c;
+  text-align: center;
+}
+.badge {
+  padding: 4rpx 12rpx;
+  border-radius: 8rpx;
+  font-size: 22rpx;
+}
+.badge.system {
+  background: #eef1ff;
+  color: #3a55e6;
+}
+.badge.private {
+  background: #e8f7ee;
+  color: #1e8e4a;
+}
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16rpx;
+  margin-top: 16rpx;
+}
+.actions button {
+  margin: 0;
+}
+button.primary {
+  background: #3a55e6;
+  color: #fff;
+}
+button.danger {
+  color: #d93025;
+}
+.input,
+.textarea {
+  box-sizing: border-box;
+  width: 100%;
+  margin-bottom: 16rpx;
+  padding: 16rpx;
+  border: 1rpx solid #dfe2ea;
+  border-radius: 12rpx;
+  background: #fafbfd;
+}
+.input {
+  height: 80rpx;
+}
+.textarea {
+  height: 300rpx;
+}
+.textarea.short {
+  height: 160rpx;
+}
+.chips {
+  white-space: nowrap;
+}
+.chip {
+  display: inline-block;
+  margin-right: 12rpx;
+  padding: 10rpx 20rpx;
+  border-radius: 999rpx;
+  background: #eef0f5;
+  font-size: 24rpx;
+}
+.chip.active {
+  background: #3a55e6;
+  color: #fff;
+}
+.chip.out {
+  opacity: 0.45;
+  text-decoration: line-through;
+}
+.seg {
+  display: flex;
+  gap: 12rpx;
+}
+.seg-item {
+  padding: 8rpx 24rpx;
+  border-radius: 999rpx;
+  background: #eef0f5;
+}
+.seg-item.active {
+  background: #3a55e6;
+  color: #fff;
+}

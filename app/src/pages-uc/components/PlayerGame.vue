@@ -1,0 +1,253 @@
+<template>
+  <view class="uc-page">
+    <view class="uc-header"><text class="uc-eyebrow">破冰局 / {{ snapshot?.view.variant === 'draw' ? '你画我猜谁是卧底' : '谁是卧底' }}</text><view class="uc-row"><text class="uc-title">{{ title }}</text><text v-if="snapshot?.view.phaseDeadline" class="player-clock">{{ remaining }}秒</text></view><text class="uc-subtitle">{{ port?.label ?? '个人游戏界面' }}</text></view>
+    <view v-if="snapshot" class="uc-note identity">你是 {{ seatOf(snapshot.playerId) }} 号 · {{ nameOf(snapshot.playerId) }} <text v-if="rights?.isHost">（主持人）</text></view>
+    <view v-if="!connected" class="uc-note" role="status">{{ snapshot ? '连接暂时中断，显示的是上次进度；正在重试连接…' : '正在连接游戏…' }}</view>
+    <view v-if="busy" class="uc-note" role="status">正在提交，请稍候…</view>
+    <view v-if="notice" class="uc-note" role="status">{{ notice }}</view>
+    <view v-if="error" class="uc-error" role="alert"><text>{{ error }}</text><button v-if="retry" class="uc-button" :disabled="busy || !connected" @tap="retryCommand">重试上次提交</button><button class="uc-button uc-secondary" :disabled="busy" @tap="refresh">刷新当前进度</button></view>
+    <template v-if="snapshot && rights"><view v-if="snapshot.bankNotice" class="uc-note">{{ snapshot.bankNotice }}</view>
+      <view v-if="snapshot.view.phase !== 'ended' && !rights.me?.alive" class="uc-note">你已出局，可以继续旁观。当前无法发言或投票。</view>
+
+      <view v-if="snapshot.view.phase === 'word'" class="uc-card personal-word">
+        <text class="uc-badge">{{ confirmedCount }} / {{ aliveCount }} 人已确认</text>
+        <text class="person">这是你自己的词卡</text>
+        <text class="uc-muted">请遮好屏幕。其他玩家只会看到他们自己的词。</text>
+        <text v-if="secret" class="secret-word">{{ secret.isBlank ? '你是白板' : secret.word }}</text>
+        <view v-else class="sealed">秘密词语已遮住</view>
+        <button v-if="!secret && rights.me?.alive" class="uc-button uc-secondary" :disabled="locked" @tap="reveal">查看我的词语</button>
+        <button v-if="secret && rights.canAcknowledge" class="uc-button" :disabled="locked" @tap="acknowledge">我记住了，确认并遮住</button>
+        <button v-if="secret" class="uc-link" @tap="hideSecret">遮住词语</button>
+        <view v-if="rights.me?.wordConfirmed" class="uc-note personal-wait">你已确认。等待其他玩家在各自手机上领词。</view>
+        <text class="uc-muted">全部确认后，程序自动开始第一轮。</text>
+      </view>
+
+      <template v-if="snapshot.view.phase === 'describe'">
+        <view class="uc-card">
+          <text class="uc-badge">第 {{ snapshot.view.round }} 轮{{ snapshot.view.pkCandidates ? ' · 平票加赛' : '' }}</text>
+          <text class="person">{{ seatOf(snapshot.view.currentSpeakerId) }} 号 · {{ nameOf(snapshot.view.currentSpeakerId) }}</text>
+          <text class="uc-label">{{ snapshot.view.variant === 'draw' ? rights.canFinish ? '轮到你作画了' : '正在作画，请等待回顾' : rights.canFinish ? '轮到你发言了' : '正在发言，请认真听' }}</text>
+          <text class="uc-muted">{{ snapshot.view.variant === 'draw' ? '当前画手用图形表达自己的词。提交后自动轮到下一位，所有作品在回顾阶段展示。' : rights.canFinish ? '先介绍一下名字，再描述自己的词，不要直接念出词语。' : '在自己的手机上等待。倒计时结束自动轮到下一位。' }}</text>
+          <button v-if="rights.canFinish && snapshot.view.variant === 'classic'" class="uc-button" :disabled="locked" @tap="send({ type: 'turnDone' })">我说完了 →</button>
+          <text v-if="!rights.canFinish" class="uc-note personal-wait">{{ rights.me?.alive ? '等待你的发言回合' : '你正在旁观' }}</text>
+        </view>
+        <MockDrawingAdapter v-if="snapshot.view.variant === 'draw' && rights.canFinish" :key="snapshot.gameId + snapshot.view.turnKey + snapshot.playerId" :editable="!locked" @submit="submitDrawing" />
+        <view v-if="rights.me?.alive" class="uc-card"><text class="uc-label">我的词卡</text><text v-if="secret" class="secret-word small">{{ secret.isBlank ? '你是白板' : secret.word }}</text><button class="uc-button uc-secondary" :disabled="locked" @tap="secret ? hideSecret() : reveal()">{{ secret ? '遮住我的词语' : '私密查看我的词语' }}</button></view>
+        <view class="uc-card"><text class="uc-label">发言顺序</text><view v-for="(id, i) in snapshot.view.speakOrder" :key="id" class="player-line"><text>{{ seatOf(id) }} 号 · {{ nameOf(id) }}</text><text class="uc-muted">{{ i < speakerIndex ? '已发言' : id === snapshot.view.currentSpeakerId ? '正在发言' : '等待' }}</text></view></view>
+      </template>
+
+      <view v-if="snapshot.view.variant === 'draw' && ['review', 'vote', 'reveal', 'ended'].includes(snapshot.view.phase)" class="uc-card">
+        <text class="uc-label">{{ snapshot.view.phase === 'review' ? '作品回顾 · 倒计时后自动投票' : '本轮画作' }}</text>
+        <text class="uc-muted">作品为模拟图形；缺席或超时未交的画手没有作品。评分失败或超时不会阻塞投票。</text>
+        <view v-for="art in (snapshot.artworks ?? []).filter(a => snapshot!.view.phase === 'ended' || a.turnKey === snapshot!.view.turnKey)" :key="art.id" class="final-player"><text>{{ nameOf(art.playerId) }}</text><text class="gallery-picture">{{ art.preview }}</text><text class="uc-muted">{{ art.status === 'pending' ? '模拟评分等待中' : art.status === 'success' ? '模拟评分完成' : art.status === 'failed' ? '评分失败，已跳过' : '评分超时，已跳过' }}{{ art.score !== undefined ? ' · ' + art.score + '分' : '' }}</text></view>
+        <text v-if="!snapshot.artworks?.length" class="uc-muted">本轮暂无已提交画作，仍会按时进入投票。</text>
+      </view>
+      <view v-if="snapshot.view.phase === 'vote'" class="uc-card">
+        <view class="uc-row"><text class="uc-label">投出你认为的卧底</text><text class="uc-badge">{{ votedCount }} / {{ voterCount }} 人已投</text></view>
+        <template v-if="rights.canVote">
+          <text class="uc-muted">{{ snapshot.view.pkCandidates ? '只能投平票加赛玩家。' : '请选择一位存活玩家。' }}不能自投，也可以弃权。各位玩家可在各自手机上投票。</text>
+          <view class="uc-grid vote-options"><button v-for="p in candidates" :key="p.id" class="uc-choice" :class="{ active: selected === p.id }" :disabled="locked" @tap="selected = p.id"><text class="uc-muted">{{ p.seat + 1 }} 号</text>{{ nameOf(p.id) }}</button><button class="uc-choice" :class="{ active: selected === null }" :disabled="locked" @tap="selected = null">这一票弃权</button></view>
+          <button class="uc-button" :disabled="locked || confirming || selected === undefined" @tap="confirmVote">{{ selected === undefined ? '先选择，再确认' : selected === null ? '确认弃权' : `确认投给 ${nameOf(selected)}` }}</button>
+        </template>
+        <view v-else class="uc-note personal-wait">{{ rights.me?.hasVoted ? '你的票已提交。等待其他玩家投票。' : rights.me?.alive ? '你是本次加赛候选人，这次不参与投票。' : '你已出局，本轮旁观投票。' }}</view>
+        <view v-for="p in snapshot.view.players.filter(p => p.canVote)" :key="p.id" class="player-line"><text>{{ p.seat + 1 }} 号 · {{ nameOf(p.id) }}</text><text class="uc-muted">{{ p.hasVoted ? '已提交' : '等待投票' }}</text></view>
+      </view>
+
+      <view v-if="snapshot.view.phase === 'reveal' && snapshot.view.lastResult" class="uc-card">
+        <text class="uc-badge">第 {{ snapshot.view.round }} 轮结果</text><text class="person">{{ roundResult }}</text>
+        <text v-if="snapshot.view.lastResult.eliminatedId" class="uc-muted">身份：{{ roleOf(snapshot.view.lastResult.eliminatedId) }}。词语在终局揭晓。</text>
+        <view v-for="p in snapshot.view.players.filter(p => (snapshot!.view.lastResult!.tally[p.id] ?? 0) > 0)" :key="p.id" class="player-line"><text>{{ nameOf(p.id) }}</text><text>{{ snapshot.view.lastResult.tally[p.id] }} 票</text></view>
+        <text class="uc-note personal-wait">{{ snapshot.view.lastResult.tied && !snapshot.view.lastResult.pk ? '接下来平票玩家加赛。' : snapshot.view.round >= snapshot.view.maxRounds ? '轮数已到上限，接下来结算。' : '接下来存活玩家进入下一轮。' }}程序自动推进，大家留在自己的界面即可。</text>
+      </view>
+
+      <template v-if="snapshot.view.phase === 'ended'">
+        <view class="uc-card"><text class="uc-badge">第 {{ snapshot.view.round }} 轮 · 本局结束</text><text class="person">{{ ending }}</text><text v-if="snapshot.view.endedReason === 'max_rounds'" class="uc-muted">已达到轮数上限。</text><text v-if="snapshot.view.pair" class="uc-note personal-wait">平民词：{{ snapshot.view.pair.civilian }} / 卧底词：{{ snapshot.view.pair.undercover }}</text></view>
+        <view class="uc-card"><text class="uc-label">揭晓所有人的词</text><view v-for="p in snapshot.view.players" :key="p.id" class="final-player"><view class="uc-row"><text>{{ p.seat + 1 }} 号 · {{ nameOf(p.id) }}</text><text class="uc-badge">{{ p.role ? ROLE_LABEL[p.role] : '' }}</text></view><text class="uc-muted">{{ p.word === null ? '没有词语' : p.word }} · {{ p.alive ? '存活到最后' : '已出局' }}</text></view></view>
+        <button v-if="rights.isHost" class="uc-button" :disabled="locked" @tap="replay">原班人马，再来一局 →</button><view v-else class="uc-note">等待主持人开始下一局，你会自动进入新局。</view>
+      </template>
+
+      <button v-if="rights.canEnd" class="uc-link uc-warning" :disabled="locked || confirming" @tap="confirmEnd">主持人提前结束</button>
+      <template v-if="rights.isHost && port?.getInvites">
+        <button class="uc-link" :disabled="busy" @tap="toggleInvites">{{ showInvites ? '收起联调邀请链接' : '分发每位玩家的联调邀请链接' }}</button>
+        <view v-if="showInvites" class="uc-card"><text class="uc-label">每位玩家打开自己的链接</text><text class="uc-muted">这是本地测试入口。请将不同座位链接分别发给对应玩家，勿把同一链接发给多人。手机与电脑使用同一网络。</text><view v-for="(invite, i) in invites" :key="invite.url" class="player-line"><text>{{ i + 1 }} 号 · {{ invite.name }}</text><button class="uc-small" @tap="copyInvite(invite.url)">复制链接</button></view></view>
+      </template>
+    </template>
+    <button v-if="!snapshot" class="uc-link" @tap="settings">返回游戏测试入口</button>
+  </view>
+</template>
+
+<script setup lang="ts">
+import MockDrawingAdapter from './MockDrawingAdapter.vue'
+import { computed, onMounted, onUnmounted, ref } from 'vue'
+import { onHide, onLoad, onShow } from '@dcloudio/uni-app'
+import { isUcError, ROLE_LABEL } from '@/modules/undercover'
+import type { UcClientAction, UcCommandMeta, UcSecretView } from '@/modules/undercover'
+import { getPlayerPort, installPlayerPort, playerPermissions, shouldAcceptPlayerSnapshot } from '@/modules/undercover/player'
+import type { DrawingSubmission, UcPlayerPort, UcPlayerSnapshot } from '@/modules/undercover/player'
+import { createPlayerPreviewPort, previewOrigin } from '@/modules/local/player-preview'
+
+const props = defineProps<{ query: Record<string,string|undefined>; variant: 'classic' | 'draw' }>()
+const port = ref<UcPlayerPort | null>(null)
+const snapshot = ref<UcPlayerSnapshot | null>(null)
+const secret = ref<UcSecretView | null>(null)
+const selected = ref<string | null | undefined>()
+const busy = ref(false)
+const connected = ref(false)
+const confirming = ref(false)
+const error = ref('')
+const notice = ref('')
+const showInvites = ref(false)
+const invites = ref<{ name: string; url: string }[]>([])
+const retry = ref<{ gameId: string; action?: UcClientAction; drawing?: DrawingSubmission; replayId?: string; meta?: UcCommandMeta } | null>(null)
+const clock = ref(Date.now())
+let serverOffset = 0
+let timer: ReturnType<typeof setInterval> | undefined
+let polling = false
+let active = true
+let disposed = false
+let secretRequest = 0
+let sequence = 0
+const requestPrefix = `player-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+const rights = computed(() => snapshot.value ? playerPermissions(snapshot.value) : null)
+const locked = computed(() => busy.value || !connected.value || !!retry.value)
+const aliveCount = computed(() => snapshot.value?.view.players.filter(p => p.alive).length ?? 0)
+const confirmedCount = computed(() => snapshot.value?.view.players.filter(p => p.alive && p.wordConfirmed).length ?? 0)
+const voterCount = computed(() => snapshot.value?.view.players.filter(p => p.canVote).length ?? 0)
+const votedCount = computed(() => snapshot.value?.view.players.filter(p => p.canVote && p.hasVoted).length ?? 0)
+const remaining = computed(() => Math.max(0, Math.ceil(((snapshot.value?.view.phaseDeadline ?? 0) - clock.value - serverOffset) / 1000)))
+const speakerIndex = computed(() => snapshot.value?.view.speakOrder.indexOf(snapshot.value.view.currentSpeakerId ?? '') ?? -1)
+const candidates = computed(() => snapshot.value?.view.players.filter(p => p.alive && p.id !== snapshot.value!.playerId && (!snapshot.value!.view.pkCandidates || snapshot.value!.view.pkCandidates.includes(p.id))) ?? [])
+const title = computed(() => ({ word: '领好你的秘密词', describe: '认真听，慢慢猜', review: '一起看看画作', vote: '你觉得会是谁？', reveal: '这一轮，揭晓', ended: '秘密终于揭晓' })[snapshot.value?.view.phase ?? 'word'])
+const nameOf = (id: string | null) => snapshot.value?.players.find(p => p.id === id)?.name ?? ''
+const seatOf = (id: string | null) => (snapshot.value?.view.players.find(p => p.id === id)?.seat ?? 0) + 1
+const roleOf = (id: string) => { const role = snapshot.value?.view.players.find(p => p.id === id)?.role; return role ? ROLE_LABEL[role] : '' }
+const roundResult = computed(() => {
+  const result = snapshot.value?.view.lastResult
+  if (!result) return ''
+  if (result.eliminatedId) return `${nameOf(result.eliminatedId)} 出局`
+  return result.tied ? result.pk ? '再次平票，无人出局' : '平票！进入加赛' : '全部弃权，无人出局'
+})
+const ending = computed(() => snapshot.value?.view.winner === 'civilian' ? '平民阵营获胜！' : snapshot.value?.view.winner === 'undercover' ? '卧底阵营获胜！' : '主持人结束了本局')
+
+function hideSecret() { secretRequest++; secret.value = null }
+function receive(next: UcPlayerSnapshot) {
+  if (disposed) return
+  if (next.view.variant !== props.variant) throw new Error('游戏类型与当前页面不匹配，请打开对应游戏的加入链接。')
+  const previous = snapshot.value
+  if (!shouldAcceptPlayerSnapshot(next, previous)) return
+  if (!previous || previous.gameId !== next.gameId || previous.view.phase !== next.view.phase) { hideSecret(); selected.value = undefined }
+  if (previous && previous.gameId !== next.gameId) { retry.value = null; error.value = ''; notice.value = '主持人已开始新局，你仍使用自己的身份参加。' }
+  snapshot.value = next
+  serverOffset = next.serverNow - Date.now()
+  clock.value = Date.now()
+  connected.value = true
+  if (rights.value?.me?.hasVoted || (selected.value && !candidates.value.some(p => p.id === selected.value))) selected.value = undefined
+}
+async function load() {
+  if (!port.value || polling || disposed) return
+  polling = true
+  try { receive(await port.value.load()) }
+  catch (e) { connected.value = false; if (!snapshot.value) error.value = isUcError(e) || e instanceof Error ? e.message : '读取游戏失败' }
+  finally { polling = false }
+}
+async function refresh() { hideSecret(); await load() }
+async function perform(operation: () => Promise<void>) {
+  if (busy.value) return
+  busy.value = true; error.value = ''
+  try { await operation() }
+  catch (e) { error.value = isUcError(e) || e instanceof Error ? e.message : '操作失败，请重试' }
+  finally { busy.value = false }
+}
+async function reveal() {
+  if (!snapshot.value || locked.value) return
+  const id = ++secretRequest
+  const gameId = snapshot.value.gameId
+  await perform(async () => {
+    const result = await port.value!.getMyWord(gameId)
+    if (result.playerId !== snapshot.value!.playerId) throw new Error('词卡身份不匹配，请重新连接')
+    if (active && !disposed && id === secretRequest && gameId === snapshot.value?.gameId) secret.value = result
+  })
+}
+async function execute(command: NonNullable<typeof retry.value>) {
+  await perform(async () => {
+    hideSecret()
+    try {
+      const next = command.drawing ? await port.value!.submitDrawing!(command.gameId, command.drawing, command.meta!) : command.action ? await port.value!.act(command.gameId, command.action, command.meta!) : await port.value!.replay(command.replayId!)
+      receive(next); retry.value = null
+    } catch (e) {
+      if (!isUcError(e)) { retry.value = command; throw new Error('提交结果尚未确认。请重试，不会重复计票或推进回合。') }
+      retry.value = null
+      await load()
+      if (e.code === 'STALE_STATE') throw new Error('其他玩家已更新进度。请查看当前页面，再次确认你的选择。')
+      throw e
+    }
+  })
+}
+async function send(action: UcClientAction, version = snapshot.value?.view.version) {
+  if (!snapshot.value || locked.value || version === undefined) return
+  await execute({ gameId: snapshot.value.gameId, action, meta: { requestId: `${requestPrefix}-${++sequence}`, expectedVersion: version, expectedPhase: snapshot.value.view.phase, expectedRound: snapshot.value.view.round, expectedTurnKey: snapshot.value.view.turnKey } })
+}
+async function submitDrawing(drawing: DrawingSubmission) {
+  if (!snapshot.value || locked.value || !rights.value?.canFinish || !port.value?.submitDrawing) return
+  const v = snapshot.value.view
+  await execute({ gameId: snapshot.value.gameId, drawing, meta: { requestId: requestPrefix + '-drawing-' + (++sequence), expectedVersion: v.version, expectedPhase: v.phase, expectedRound: v.round, expectedTurnKey: v.turnKey } })
+}
+async function retryCommand() { if (retry.value && !busy.value) await execute(retry.value) }
+async function acknowledge() { if (secret.value && rights.value?.canAcknowledge) await send({ type: 'acknowledgeWord' }) }
+function confirmVote() {
+  if (!snapshot.value || !rights.value?.canVote || selected.value === undefined || locked.value || confirming.value) return
+  const targetId = selected.value
+  const captured = { gameId: snapshot.value.gameId, round: snapshot.value.view.round, turnKey: snapshot.value.view.turnKey, version: snapshot.value.view.version }
+  confirming.value = true
+  uni.showModal({ title: targetId === null ? '确认弃权？' : `投给 ${nameOf(targetId)}？`, content: '提交后不能更改。你只能提交自己的这一票。', success: r => {
+    if (!r.confirm) return
+    if (snapshot.value?.gameId === captured.gameId && snapshot.value.view.round === captured.round && snapshot.value.view.turnKey === captured.turnKey && rights.value?.canVote) void send({ type: 'vote', targetId }, captured.version)
+    else notice.value = '阶段已经变化，这次选择没有提交。'
+  }, complete: () => { confirming.value = false } })
+}
+function confirmEnd() {
+  if (!rights.value?.canEnd || locked.value || confirming.value) return
+  confirming.value = true
+  uni.showModal({ title: '提前结束本局？', content: '所有玩家会同步看到结果和词语。', success: r => { if (r.confirm) void send({ type: 'endGame' }) }, complete: () => { confirming.value = false } })
+}
+async function replay() {
+  if (!rights.value?.isHost || locked.value || !snapshot.value) return
+  await execute({ gameId: snapshot.value.gameId, replayId: `${requestPrefix}-replay-${++sequence}` })
+}
+async function toggleInvites() {
+  showInvites.value = !showInvites.value
+  if (showInvites.value && port.value?.getInvites) await perform(async () => { invites.value = await port.value!.getInvites!() })
+}
+function copyInvite(url: string) { uni.setClipboardData({ data: url }) }
+function settings() { uni.redirectTo({ url: '/pages-uc/setup' }) }
+onMounted(async () => {
+  const query = props.query
+  try {
+    if (query?.session && query?.ticket) installPlayerPort(createPlayerPreviewPort(previewOrigin(), String(query.session), String(query.ticket), props.variant), props.variant)
+    port.value = getPlayerPort(props.variant)
+    if (!port.value) { error.value = '请打开分配给自己的加入链接，或返回测试入口创建联调游戏。'; return }
+    await load()
+    let ticks = 0
+    timer = setInterval(() => { clock.value = Date.now(); if (active && ++ticks % 3 === 0) void load() }, 250)
+  } catch (e) { error.value = isUcError(e) || e instanceof Error ? e.message : '连接游戏失败' }
+})
+onHide(() => { active = false; hideSecret() })
+onShow(() => { active = true; if (port.value) void load() })
+onUnmounted(() => { disposed = true; hideSecret(); if (timer) clearInterval(timer) })
+</script>
+
+<style>
+@import '../classic.css';
+.gallery-picture { display:block; text-align:center; font-size:64rpx; padding:24rpx; }
+.identity { font-weight: 700; }
+.person { display: block; margin: 28rpx 0; font-size: 38rpx; font-weight: 800; line-height: 1.5; }
+.personal-word { text-align: center; }
+.secret-word { display: block; padding: 36rpx 0; font-size: 64rpx; color: #a14b2c; font-weight: 800; }
+.secret-word.small { font-size: 44rpx; }
+.sealed { padding: 56rpx 12rpx; margin: 24rpx 0; border: 2rpx dashed #bacaba; border-radius: 18rpx; color: #65776f; }
+.personal-wait { margin: 24rpx 0 0; }
+.player-line { display: flex; align-items: center; justify-content: space-between; gap: 16rpx; padding: 20rpx 0; border-bottom: 2rpx solid #edf0e7; }
+.vote-options { margin: 24rpx 0; }
+.player-clock { font-size: 40rpx; font-weight: 700; white-space: nowrap; }
+.final-player { padding: 20rpx 0; border-bottom: 2rpx solid #edf0e7; }
+</style>

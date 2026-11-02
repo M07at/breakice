@@ -36,6 +36,54 @@
       }
     }
   ],
+  "subPackages": [
+    {
+      "root": "pages-uc",
+      "pages": [
+        {
+          "path": "hybrid",
+          "style": {
+            "navigationBarTitleText": "你画我猜谁是卧底"
+          }
+        },
+        {
+          "path": "hybrid-player",
+          "style": {
+            "navigationBarTitleText": "你画我猜谁是卧底 · 我的游戏"
+          }
+        },
+        {
+          "path": "player",
+          "style": {
+            "navigationBarTitleText": "谁是卧底 · 我的游戏"
+          }
+        },
+        {
+          "path": "setup",
+          "style": {
+            "navigationBarTitleText": "谁是卧底"
+          }
+        }
+      ]
+    },
+    {
+      "root": "pages-bank",
+      "pages": [
+        {
+          "path": "index",
+          "style": {
+            "navigationBarTitleText": "题库管理"
+          }
+        },
+        {
+          "path": "detail",
+          "style": {
+            "navigationBarTitleText": "题库"
+          }
+        }
+      ]
+    }
+  ],
   "globalStyle": {
     "navigationBarTextStyle": "black",
     "navigationBarTitleText": "破冰局",

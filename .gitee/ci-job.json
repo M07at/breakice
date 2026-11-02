@@ -1,0 +1,23 @@
+{
+  "description": "Platform-neutral Gitee job setup recipe; not an auto-loaded Gitee Go YAML file",
+  "name": "C checks",
+  "runtime": "Node.js 22",
+  "source": "this repository",
+  "events": [
+    "pull request created/updated targeting master",
+    "push to master",
+    "manual"
+  ],
+  "command": "sh scripts/ci.sh",
+  "workingDirectory": "repository root",
+  "successExitCode": 0,
+  "artifacts": [
+    "app/reports/verify.json",
+    "app/reports/tests.xml",
+    "app/reports/release-manifest.json",
+    "app/dist/build/mp-weixin",
+    "app/dist/build/h5"
+  ],
+  "requiredBeforeMerge": true,
+  "automaticUploadOrPublish": false
+}
