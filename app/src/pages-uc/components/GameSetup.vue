@@ -6,6 +6,9 @@
       <text class="uc-subtitle">{{ variant === 'classic' ? '同一组人，不同的秘密词。听一听，谁的描述有点不一样？' : '用画作表达秘密词。看一看，谁画得有点不一样？' }}</text>
     </view>
     <view class="uc-note">每位玩家使用自己的手机，在自己的界面领词、作画和投票。</view>
+    <!-- #ifndef H5 -->
+    <view class="uc-note integration">当前是小程序端：多设备实时服务尚未接入（由 A 模块负责）。完整联调请在电脑上运行 npm run dev:players，用 H5 预览打开并分发邀请链接。</view>
+    <!-- #endif -->
     <view v-if="error" class="uc-error" role="alert">{{ error }}</view>
     <view v-if="fixedResume" class="uc-card"><text class="uc-label">返回我的游戏</text><text class="uc-muted">继续使用你之前绑定的玩家身份。</text><button class="uc-button uc-secondary" :disabled="starting" @tap="resumeFixed">打开我的游戏 →</button></view>
     <view class="uc-card">
@@ -67,7 +70,29 @@ const countsText = computed(() => {
 })
 async function loadBanks() { fixedResume.value = !!getPlayerPort(variant.value); try { banks.value = await bankRepo().listBanks(LOCAL_USER_ID, 'undercover'); selectedBanks.value = selectedBanks.value.filter(id => banks.value.some(b=>b.id===id)); if (!selectedBanks.value.length) selectedBanks.value = ['sys_undercover'] } catch(e) { error.value = (e as Error).message } }
 onShow(loadBanks)
-onMounted(loadBanks)
+onMounted(() => {
+  applyRoster()
+  loadBanks()
+})
+
+/**
+ * 从 D 模块的房间等待区进入时，用房间名单预填座位，玩家不必再手输昵称。
+ * 这里是组件内部，直接读当前页面栈的参数，避免依赖页面级 onLoad 生命周期。
+ */
+function applyRoster() {
+  const pages = getCurrentPages()
+  const current = pages[pages.length - 1] as unknown as { options?: Record<string, string> } | undefined
+  const raw = current?.options?.names
+  if (!raw) return
+  const roster = raw
+    .split(',')
+    .map((name) => decodeURIComponent(name.trim()))
+    .filter(Boolean)
+    .slice(0, limits.value.max)
+  if (roster.length < limits.value.min) return
+  count.value = roster.length
+  names.value = [...roster, ...Array(Math.max(0, 20 - roster.length)).fill('')]
+}
 
 function resumeFixed() { uni.navigateTo({ url: getPlayerPort(variant.value)?.resumeUrl ?? (variant.value === 'draw' ? '/pages-uc/hybrid-player' : '/pages-uc/player') }) }
 function onBlankChange(e: Event) { blank.value = switchValue(e) }
@@ -100,4 +125,5 @@ async function start() {
 .option-row { margin: 28rpx 0 16rpx; }
 .bank { width: 100%; margin-top: 12rpx; font-size: 26rpx; }
 .footer-note { text-align: center; margin-top: 24rpx; }
+.integration { background: #fff4dc; color: #8a5a17; }
 </style>

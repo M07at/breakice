@@ -55,7 +55,7 @@ function showHelp() {
         <view class="game-preview truth">
           <text class="game-emoji">🎡</text>
           <text class="game-name">真心话大冒险</text>
-          <text class="game-status">已上线</text>
+          <text class="game-status">房间内开启</text>
         </view>
         <view class="game-preview drawing">
           <text class="game-emoji">✏️</text>
@@ -65,8 +65,13 @@ function showHelp() {
         <view class="game-preview undercover">
           <text class="game-emoji">🕵️</text>
           <text class="game-name">谁是卧底</text>
-          <text class="game-status">即将上线</text>
+          <text class="game-status">房间内开启</text>
         </view>
+      </view>
+      <view class="bank-link" @click="go('/pages-bank/index')">
+        <text class="bank-link-title">题库管理</text>
+        <text class="bank-link-desc">谁是卧底与融合玩法共用 488 条题库</text>
+        <text class="bank-link-arrow">›</text>
       </view>
     </view>
 
@@ -310,6 +315,34 @@ function showHelp() {
   margin-top: 8rpx;
   opacity: 0.7;
   font-size: 18rpx;
+}
+
+.bank-link {
+  display: flex;
+  align-items: center;
+  margin-top: 16rpx;
+  padding: 22rpx 20rpx;
+  border: 1rpx dashed var(--line);
+  border-radius: 18rpx;
+  background: #fff;
+}
+
+.bank-link-title {
+  color: var(--ink);
+  font-size: 25rpx;
+  font-weight: 800;
+}
+
+.bank-link-desc {
+  flex: 1;
+  margin-left: 14rpx;
+  color: var(--muted);
+  font-size: 20rpx;
+}
+
+.bank-link-arrow {
+  color: var(--brand);
+  font-size: 38rpx;
 }
 
 .trust-row {

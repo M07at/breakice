@@ -4,12 +4,26 @@ import { onShareAppMessage } from '@dcloudio/uni-app'
 import { useRoomStore } from '../../stores/room'
 import PlayerList from '../../components/PlayerList.vue'
 import RoomCodeCard from '../../components/RoomCodeCard.vue'
+import { bankUrl, undercoverSetupUrl } from '../../services/gameEntry'
 
 const roomStore = useRoomStore()
 const room = computed(() => roomStore.room)
 
 function startTruthOrDare() {
   roomStore.begin('truth-or-dare').then(() => uni.redirectTo({ url: '/pages/game/index' }))
+}
+
+/** 进入 C 模块的开设页；房间名单会作为座位昵称预填。 */
+function startUndercover() {
+  uni.navigateTo({ url: undercoverSetupUrl('classic', room.value?.players) })
+}
+
+function startHybrid() {
+  uni.navigateTo({ url: undercoverSetupUrl('draw', room.value?.players) })
+}
+
+function openBank() {
+  uni.navigateTo({ url: bankUrl() })
 }
 
 function leaveRoom() {
@@ -54,16 +68,27 @@ onShareAppMessage(() => ({
         <view class="choice-copy"><text class="choice-title">真心话大冒险</text><text class="choice-desc">转盘选人，随机抽题，轻松破冰</text></view>
         <text class="choice-arrow">›</text>
       </view>
-      <view class="game-choice disabled">
-        <text class="choice-icon">✏️</text>
-        <view class="choice-copy"><text class="choice-title">你画我猜</text><text class="choice-desc">由其他成员模块接入</text></view>
-        <text class="coming">待接入</text>
-      </view>
-      <view class="game-choice disabled">
+      <view class="game-choice available" @click="startUndercover">
         <text class="choice-icon">🕵️</text>
-        <view class="choice-copy"><text class="choice-title">谁是卧底</text><text class="choice-desc">由其他成员模块接入</text></view>
+        <view class="choice-copy"><text class="choice-title">谁是卧底</text><text class="choice-desc">每人看自己的词，轮流描述后投票</text></view>
+        <text class="choice-arrow">›</text>
+      </view>
+      <view class="game-choice available" @click="startHybrid">
+        <text class="choice-icon">✏️</text>
+        <view class="choice-copy"><text class="choice-title">你画我猜谁是卧底</text><text class="choice-desc">画作代替描述，再看谁画得不一样</text></view>
+        <text class="choice-arrow">›</text>
+      </view>
+      <view class="game-choice disabled">
+        <text class="choice-icon">🎨</text>
+        <view class="choice-copy"><text class="choice-title">你画我猜</text><text class="choice-desc">由 B 模块的画笔与评分接入</text></view>
         <text class="coming">待接入</text>
       </view>
+      <view class="tool-row" @click="openBank">
+        <text class="tool-title">题库管理</text>
+        <text class="tool-desc">谁是卧底与融合玩法共用同一套题库</text>
+        <text class="choice-arrow">›</text>
+      </view>
+      <text class="integration-note">谁是卧底系列按「每人一台手机」设计；小程序端实时服务由 A 模块接入，H5 预览可用本地联调服务。</text>
     </view>
 
     <view v-else class="ready-panel">
@@ -137,6 +162,10 @@ onShareAppMessage(() => ({
   background: var(--brand-soft);
 }
 
+.game-choice.available {
+  background: #fff;
+}
+
 .game-choice.disabled {
   opacity: 0.55;
 }
@@ -150,6 +179,10 @@ onShareAppMessage(() => ({
   border-radius: 15rpx;
   background: #fff;
   font-size: 32rpx;
+}
+
+.game-choice.disabled .choice-icon {
+  background: #f2f4f8;
 }
 
 .choice-copy {
@@ -182,6 +215,36 @@ onShareAppMessage(() => ({
 .coming {
   color: var(--muted);
   font-size: 19rpx;
+}
+
+.tool-row {
+  display: flex;
+  align-items: center;
+  margin-top: 18rpx;
+  padding: 20rpx 16rpx;
+  border: 1rpx dashed var(--line);
+  border-radius: 16rpx;
+}
+
+.tool-title {
+  color: var(--ink);
+  font-size: 25rpx;
+  font-weight: 800;
+}
+
+.tool-desc {
+  flex: 1;
+  margin-left: 14rpx;
+  color: var(--muted);
+  font-size: 20rpx;
+}
+
+.integration-note {
+  display: block;
+  margin-top: 18rpx;
+  color: var(--muted);
+  font-size: 19rpx;
+  line-height: 1.6;
 }
 
 .ready-panel {
