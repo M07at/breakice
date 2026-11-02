@@ -1,8 +1,8 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { onShareAppMessage } from '@dcloudio/uni-app'
 import { useRoomStore } from '../../stores/room'
-import { pickPrompt, pickRandomPlayer } from '../../services/truthOrDareService'
+import { getPromptPoolSize, pickPrompt, pickRandomPlayer, refreshPromptPools } from '../../services/truthOrDareService'
 import type { TruthOrDarePrompt } from '../../types/room'
 import Avatar from '../../components/Avatar.vue'
 
@@ -18,6 +18,17 @@ const customPrompt = ref('')
 const activeTab = ref<'truth' | 'dare'>('truth')
 
 const remainingText = computed(() => `${completedIds.value.length} 轮已完成`)
+const poolVersion = ref(0)
+const poolText = computed(() => {
+  poolVersion.value
+  return `${getPromptPoolSize('truth')} 条真心话 · ${getPromptPoolSize('dare')} 条大冒险`
+})
+
+// 题库来自 C 模块的共享题库：先渲染系统题库，再把自建题库并进来。
+onMounted(async () => {
+  await refreshPromptPools()
+  poolVersion.value += 1
+})
 
 function spin() {
   if (spinning.value || !room.value?.players.length) return
@@ -119,7 +130,7 @@ onShareAppMessage(() => ({
       <button class="next-btn" @click="nextRound">下一轮 ›</button>
     </view>
 
-    <view class="game-note">题目仅供破冰参考，任何人都可以选择跳过不适合自己的问题。</view>
+    <view class="game-note">题库：{{ poolText }}。题目仅供破冰参考，任何人都可以选择跳过不适合自己的问题。</view>
 
     <view v-if="showCustomPrompt" class="modal-mask" @click.self="showCustomPrompt = false">
       <view class="modal-sheet">
