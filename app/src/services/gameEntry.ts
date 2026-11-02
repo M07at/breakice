@@ -31,7 +31,8 @@ export function toSeatNames(players: Player[] | undefined | null): string[] {
 export function undercoverSetupUrl(variant: UndercoverVariant, players?: Player[] | null): string {
   const names = toSeatNames(players)
   const base = ROUTE[variant]
-  return names.length ? `${base}?names=${encodeURIComponent(names.join(','))}` : base
+  // 逐个编码再用逗号拼接，避免逗号本身被编码后无法拆分。
+  return names.length ? `${base}?names=${names.map((name) => encodeURIComponent(name)).join(',')}` : base
 }
 
 export function bankUrl(): string {

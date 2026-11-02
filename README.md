@@ -123,6 +123,7 @@ Replace C's development adapters at their boundaries; preserve the game rules, p
 
 ## Current documentation
 
+- [整合说明（D + C 合并现状）](docs/整合说明.md)
 - [C integration handoff](README-C-HANDOFF.md)
 - [D 模块开发任务清单](docs/D模块开发任务清单.md)
 - [Classic rules](docs/c/undercover-rules.md)

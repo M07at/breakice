@@ -1,4 +1,5 @@
-:root {
+/* 微信小程序的 WXSS 没有 :root，设计变量挂在 page 上，H5 会被 uni-app 映射到 uni-page-body。 */
+page {
   --brand: #4f46e5;
   --brand-deep: #3730a3;
   --brand-soft: #eef0ff;

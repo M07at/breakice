@@ -86,12 +86,20 @@ function applyRoster() {
   if (!raw) return
   const roster = raw
     .split(',')
-    .map((name) => decodeURIComponent(name.trim()))
+    .map((name) => safeDecode(name.trim()))
     .filter(Boolean)
     .slice(0, limits.value.max)
   if (roster.length < limits.value.min) return
   count.value = roster.length
   names.value = [...roster, ...Array(Math.max(0, 20 - roster.length)).fill('')]
+}
+
+function safeDecode(value: string) {
+  try {
+    return decodeURIComponent(value)
+  } catch {
+    return value
+  }
 }
 
 function resumeFixed() { uni.navigateTo({ url: getPlayerPort(variant.value)?.resumeUrl ?? (variant.value === 'draw' ? '/pages-uc/hybrid-player' : '/pages-uc/player') }) }
