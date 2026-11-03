@@ -154,7 +154,7 @@ onUnmounted(() => {
 
 @keyframes slide-in-next {
   from {
-    transform: translateX(56rpx);
+    transform: translateX(14%);
     opacity: 0.3;
   }
   to {
@@ -165,7 +165,7 @@ onUnmounted(() => {
 
 @keyframes slide-in-prev {
   from {
-    transform: translateX(-56rpx);
+    transform: translateX(-14%);
     opacity: 0.3;
   }
   to {

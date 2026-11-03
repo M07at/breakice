@@ -95,6 +95,7 @@ onUnmounted(flushSave)
   flex-direction: column;
   box-sizing: border-box;
   min-height: 100vh;
+  padding-bottom: 48rpx;
   padding-bottom: calc(48rpx + env(safe-area-inset-bottom));
   background: #f7f8fb;
 }
