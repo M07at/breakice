@@ -82,6 +82,23 @@
           }
         }
       ]
+    },
+    {
+      "root": "pages-draw",
+      "pages": [
+        {
+          "path": "setup",
+          "style": {
+            "navigationBarTitleText": "你画我猜"
+          }
+        },
+        {
+          "path": "play",
+          "style": {
+            "navigationBarTitleText": "你画我猜 · 本局"
+          }
+        }
+      ]
     }
   ],
   "globalStyle": {
