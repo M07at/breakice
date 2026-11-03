@@ -1,13 +1,15 @@
 import type { Player } from '../types/room'
 
 /**
- * D 模块（大厅 / 房间）到 C 模块（谁是卧底 / 题库）的入口适配层。
+ * D 模块（大厅 / 房间）到其它模块的入口适配层。
  *
  * 边界说明：
  * - C 的游戏引擎只使用「座位昵称」，玩家身份由各自的 UcPlayerPort 绑定；
  *   这里只负责把大厅的房间名单传过去，不创建游戏状态、不切换操作者。
- * - 头像仍然由 D 的头像系统渲染在房间等待区；C 的页面目前只展示昵称。
- * - 真正的实时同步（多设备）需要 A 模块接入 UcPlayerPort，本文件不提供假实现。
+ * - B 的你画我猜目前是本机房间（LocalDrawRoomBackend），开设页自己管版本和人数，
+ *   这里只提供路由，不接管它的房间状态。
+ * - 头像仍然由 D 的形象系统渲染在房间等待区；C、B 的页面目前只展示昵称。
+ * - 真正的实时同步（多设备）需要 A 模块接入，本文件不提供假实现。
  */
 
 export type UndercoverVariant = 'classic' | 'draw'
@@ -20,6 +22,11 @@ const ROUTE: Record<UndercoverVariant, string> = {
 export const PLAYER_ROUTE: Record<UndercoverVariant, string> = {
   classic: '/pages-uc/player',
   draw: '/pages-uc/hybrid-player',
+}
+
+/** B：你画我猜（常规 / Emoji / 自定义），开设页自带人数与题面选择 */
+export function drawSetupUrl(): string {
+  return '/pages-draw/setup'
 }
 
 /** 房间里的玩家顺序即座位顺序：1 号位是主持人，与 C 的规则一致。 */

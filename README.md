@@ -17,20 +17,34 @@
 
 ```
 app/src/
-├── components/        D：大厅及通用组件（头像、玩家列表、房间码卡片）
+├── components/        D：大厅及通用组件（形象、玩家列表、房间码卡片）
+│   ├── draw-canvas/   B：作画 / 观看 / 只读三种模式的画布
+│   ├── score-card/    B：综合分 + 三维度 + 评语
+│   └── leaderboard/   B：排行榜
 ├── pages/             D：大厅、创建/加入房间、房间等待区、真心话大冒险
 ├── modules/
 │   ├── undercover/    C：谁是卧底引擎、规则、玩家端与后端契约
 │   ├── bank/          C：题库系统、导入导出、校验、488 条原创题库
 │   ├── local/         C：本地会话与玩家预览适配
-│   └── shared/        C：公共工具
+│   ├── shared/        C：公共工具
+│   ├── draw/          B：画布引擎、笔画分片同步、AI 评分、本机房间
+│   └── score/         B：统一计分与排行榜
 ├── pages-uc/          C：谁是卧底 / 你画我猜谁是卧底页面（分包）
 ├── pages-bank/        C：题库管理页面（分包）
+├── pages-draw/        B：你画我猜 setup + play（分包）
 ├── services/          D：房间与游戏服务
 ├── stores/            D：房间状态（Pinia）
 ├── styles/            D：设计系统 token
 └── types/             D：数据类型
 ```
+
+## Current member B delivery
+
+- 你画我猜：常规 / Emoji / 自定义三种版本，90 秒倒计时、到点自动交画、画作揭晓、聊天抢答（答对答案的字会被冰块遮住）、AI 评分与排行榜。
+- 画布：笔画 / 撤销重做 / 清空 / Emoji 贴纸，坐标 0–1000 归一化，每 5 秒一个分片经 `StrokeTransport` 同步（现为回环通道）。
+- 计分：AI 权重可配、封顶、幂等；排行榜。
+- **限制**：房间后端是本机内存版（`LocalDrawRoomBackend`），同一台设备上只有「我」实际作画，其余座位到点自动轮过；真上传、真频道、排行榜落库仍待 A 接入。
+- **H5 限制**：`<canvas type="2d">` 的节点查询是小程序能力，H5 预览里画布不能作画，要在微信开发者工具里看。
 
 ## Current member C delivery
 
@@ -80,7 +94,7 @@ No real credentials are required for this preview. If configuring public platfor
    形象和昵称都会自动保存，没有保存按钮。
 2. 首页下半屏是「创建房间」「加入房间」两个按钮，形象和昵称会随按钮一起带入房间。
 3. 创建房间后复制房间号，或使用右上角分享入口邀请玩家。
-4. 在房间等待区（`pages/room/index`）选择游戏：真心话大冒险、谁是卧底、你画我猜谁是卧底，或进入题库管理。
+4. 在房间等待区（`pages/room/index`）选择游戏：真心话大冒险、谁是卧底、你画我猜谁是卧底、你画我猜，或进入题库管理。
 5. 玩家在大厅点击“准备”。
 6. 当前阶段房间与在线状态为本地 Mock 演示，真实多人同步需要等待 Supabase RPC、Realtime 和二维码接口联调。
 
@@ -100,8 +114,9 @@ No real credentials are required for this preview. If configuring public platfor
 - Classic setup: `/pages-uc/setup`; personal game: `/pages-uc/player`.
 - Hybrid setup: `/pages-uc/hybrid`; personal game: `/pages-uc/hybrid-player`.
 - Shared bank management: `/pages-bank/index` and `/pages-bank/detail`.
+- Draw setup: `/pages-draw/setup`; current round: `/pages-draw/play`.
 
-`pages-uc` 与 `pages-bank` 是微信小程序分包，由大厅与房间等待区进入。The separate routes reuse internal components and one bank repository. There is no phone-handoff mode or player switcher.
+`pages-uc`、`pages-bank`、`pages-draw` 是微信小程序分包，由房间等待区进入。The separate routes reuse internal components and one bank repository. There is no phone-handoff mode or player switcher.
 
 ## Verification
 

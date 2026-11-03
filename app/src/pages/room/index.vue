@@ -4,7 +4,7 @@ import { onShareAppMessage } from '@dcloudio/uni-app'
 import { useRoomStore } from '../../stores/room'
 import PlayerList from '../../components/PlayerList.vue'
 import RoomCodeCard from '../../components/RoomCodeCard.vue'
-import { bankUrl, undercoverSetupUrl } from '../../services/gameEntry'
+import { bankUrl, drawSetupUrl, undercoverSetupUrl } from '../../services/gameEntry'
 
 const roomStore = useRoomStore()
 const room = computed(() => roomStore.room)
@@ -24,6 +24,11 @@ function startHybrid() {
 
 function openBank() {
   uni.navigateTo({ url: bankUrl() })
+}
+
+/** 进入 B 的你画我猜开设页 */
+function startDraw() {
+  uni.navigateTo({ url: drawSetupUrl() })
 }
 
 function leaveRoom() {
@@ -78,17 +83,17 @@ onShareAppMessage(() => ({
         <view class="choice-copy"><text class="choice-title">你画我猜谁是卧底</text><text class="choice-desc">画作代替描述，再看谁画得不一样</text></view>
         <text class="choice-arrow">›</text>
       </view>
-      <view class="game-choice disabled">
+      <view class="game-choice available" @click="startDraw">
         <text class="choice-icon">🎨</text>
-        <view class="choice-copy"><text class="choice-title">你画我猜</text><text class="choice-desc">由 B 模块的画笔与评分接入</text></view>
-        <text class="coming">待接入</text>
+        <view class="choice-copy"><text class="choice-title">你画我猜</text><text class="choice-desc">轮流作画，聊天抢答，AI 评分与排行榜</text></view>
+        <text class="choice-arrow">›</text>
       </view>
       <view class="tool-row" @click="openBank">
         <text class="tool-title">题库管理</text>
         <text class="tool-desc">谁是卧底与融合玩法共用同一套题库</text>
         <text class="choice-arrow">›</text>
       </view>
-      <text class="integration-note">谁是卧底系列按「每人一台手机」设计；小程序端实时服务由 A 模块接入，H5 预览可用本地联调服务。</text>
+      <text class="integration-note">谁是卧底系列按「每人一台手机」设计，小程序端实时服务由 A 模块接入，H5 预览可用本地联调服务；你画我猜目前是本机房间，同一台设备上只有「我」实际作画，其余座位到点自动轮过。</text>
     </view>
 
     <view v-else class="ready-panel">
