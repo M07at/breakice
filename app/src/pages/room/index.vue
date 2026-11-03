@@ -9,26 +9,44 @@ import { bankUrl, drawSetupUrl, undercoverSetupUrl } from '../../services/gameEn
 const roomStore = useRoomStore()
 const room = computed(() => roomStore.room)
 
+/**
+ * 统一的打开方式：跳转失败时给出可见提示。
+ * 小程序里 navigateTo 失败（页面没打进分包、缓存里的旧产物等）默认是静默的，
+ * 之前「点你画我猜没反应」就是这么被掩盖掉的。
+ */
+function openPage(url: string) {
+  uni.navigateTo({
+    url,
+    fail: (error) => {
+      console.warn('打开页面失败', url, error)
+      uni.showToast({ title: `打不开 ${url}`, icon: 'none' })
+    },
+  })
+}
+
 function startTruthOrDare() {
-  roomStore.begin('truth-or-dare').then(() => uni.redirectTo({ url: '/pages/game/index' }))
+  roomStore
+    .begin('truth-or-dare')
+    .then(() => uni.redirectTo({ url: '/pages/game/index' }))
+    .catch((error: unknown) => uni.showToast({ title: `打不开真心话大冒险：${String(error)}`, icon: 'none' }))
 }
 
 /** 进入 C 模块的开设页；房间名单会作为座位昵称预填。 */
 function startUndercover() {
-  uni.navigateTo({ url: undercoverSetupUrl('classic', room.value?.players) })
+  openPage(undercoverSetupUrl('classic', room.value?.players))
 }
 
 function startHybrid() {
-  uni.navigateTo({ url: undercoverSetupUrl('draw', room.value?.players) })
+  openPage(undercoverSetupUrl('draw', room.value?.players))
 }
 
 function openBank() {
-  uni.navigateTo({ url: bankUrl() })
+  openPage(bankUrl())
 }
 
 /** 进入 B 的你画我猜开设页 */
 function startDraw() {
-  uni.navigateTo({ url: drawSetupUrl() })
+  openPage(drawSetupUrl())
 }
 
 function leaveRoom() {
