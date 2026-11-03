@@ -7,7 +7,7 @@ function player(nickname: string, id = nickname): Player {
   return {
     id,
     nickname,
-    avatar: { skin: 'light', eyes: 'round', nose: 'dot', mouth: 'smile', hair: 'short', accessory: 'none' },
+    avatar: { color: 1, body: 1, mouth: 1, eyes: 1, hat: 1 },
     isHost: false,
     isReady: false,
     online: true,

@@ -2,14 +2,14 @@
 import { ref } from 'vue'
 import { onLoad } from '@dcloudio/uni-app'
 import { useRoomStore } from '../../stores/room'
-import AvatarEditor from '../../components/AvatarEditor.vue'
-import { getSavedAvatar, saveAvatar } from '../../services/avatarService'
-import type { AvatarConfig } from '../../types/room'
+import Avatar from '../../components/Avatar.vue'
+import { getSavedProfile } from '../../services/avatarService'
 
 const roomStore = useRoomStore()
 const roomCode = ref('')
-const nickname = ref('')
-const avatar = ref<AvatarConfig>(getSavedAvatar())
+
+/** 形象和昵称统一在首页设置，这里只读取，不再重复编辑 */
+const profile = getSavedProfile()
 
 function applyRoomCode(value: string) {
   const queryCode = value.match(/[?&]code=([^&#]+)/)?.[1]
@@ -35,12 +35,11 @@ onLoad((options) => {
 })
 
 async function submit() {
-  if (roomCode.value.trim().length < 4 || !nickname.value.trim()) {
-    uni.showToast({ title: '请输入房间号和昵称', icon: 'none' })
+  if (roomCode.value.trim().length < 4) {
+    uni.showToast({ title: '请输入房间号', icon: 'none' })
     return
   }
-  await roomStore.join({ code: roomCode.value.trim(), nickname: nickname.value.trim(), avatar: avatar.value })
-  saveAvatar(avatar.value)
+  await roomStore.join({ code: roomCode.value.trim(), nickname: profile.nickname, avatar: profile.avatar })
   uni.redirectTo({ url: '/pages/room/index' })
 }
 </script>
@@ -60,10 +59,13 @@ async function submit() {
     </view>
 
     <view class="surface identity-card">
-      <view class="section-title"><text>告诉大家你是谁</text><text class="muted">匿名即可</text></view>
-      <input v-model="nickname" class="input" maxlength="12" placeholder="输入你的昵称" />
-      <view class="avatar-section-title"><text>自定义头像</text><text class="muted">轻量本地保存</text></view>
-      <AvatarEditor v-model="avatar" />
+      <view class="identity-row">
+        <Avatar :avatar="profile.avatar" size="medium" />
+        <view class="identity-copy">
+          <text class="identity-name">{{ profile.nickname }}</text>
+          <text class="identity-hint">形象和昵称在首页设置</text>
+        </view>
+      </view>
     </view>
 
     <button class="btn btn-primary submit-btn" :loading="roomStore.busy" @click="submit">加入房间</button>
@@ -103,24 +105,27 @@ async function submit() {
   line-height: 78rpx;
 }
 
-.section-title .muted {
-  font-size: 21rpx;
-  font-weight: 400;
-}
-
-.avatar-section-title {
+.identity-row {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  margin-top: 24rpx;
-  color: var(--ink);
-  font-size: 23rpx;
-  font-weight: 700;
 }
 
-.avatar-section-title .muted {
-  font-size: 20rpx;
-  font-weight: 400;
+.identity-copy {
+  margin-left: 18rpx;
+}
+
+.identity-name {
+  display: block;
+  color: var(--ink);
+  font-size: 30rpx;
+  font-weight: 800;
+}
+
+.identity-hint {
+  display: block;
+  margin-top: 6rpx;
+  color: var(--muted);
+  font-size: 21rpx;
 }
 
 .submit-btn {

@@ -43,7 +43,8 @@ app/src/
 
 - 大厅首页、创建房间、加入房间、房间等待区（主持人 / 玩家端布局）。
 - 玩家列表、房间码卡片、分享入口。
-- 自定义头像系统（肤色 / 眼睛 / 鼻子 / 嘴巴 / 发型 / 配饰，CSS 分层绘制，本地缓存保存）。
+- 自定义形象系统：6 张图片图层（color / main / body / mouth / eyes / hat）叠加，首页 5 组左右箭头切换，
+  昵称与形象自动保存在本地，无保存按钮。
 - 真心话大冒险页面与题库服务、房间状态管理。
 - Vant / TDesign 风格设计系统 token。
 
@@ -74,11 +75,23 @@ No real credentials are required for this preview. If configuring public platfor
 
 ## 使用流程
 
-1. 首页选择“创建一个房间”或“加入朋友的房间”。
-2. 创建房间后复制房间号，或使用右上角分享入口邀请玩家。
-3. 在房间等待区（`pages/room/index`）选择游戏：真心话大冒险、谁是卧底、你画我猜谁是卧底，或进入题库管理。
-4. 玩家在大厅点击“准备”。
-5. 当前阶段房间与在线状态为本地 Mock 演示，真实多人同步需要等待 Supabase RPC、Realtime 和二维码接口联调。
+1. 首页（`pages/home/index`）上半屏是形象自定义：中间 1:1 预览，左右各 5 个箭头，从上到下依次换
+   hat（帽子）、eyes（眼睛）、mouth（嘴巴）、body（身体）、color（颜色），编号循环；预览下方填昵称。
+   形象和昵称都会自动保存，没有保存按钮。
+2. 首页下半屏是「创建房间」「加入房间」两个按钮，形象和昵称会随按钮一起带入房间。
+3. 创建房间后复制房间号，或使用右上角分享入口邀请玩家。
+4. 在房间等待区（`pages/room/index`）选择游戏：真心话大冒险、谁是卧底、你画我猜谁是卧底，或进入题库管理。
+5. 玩家在大厅点击“准备”。
+6. 当前阶段房间与在线状态为本地 Mock 演示，真实多人同步需要等待 Supabase RPC、Realtime 和二维码接口联调。
+
+### 形象素材
+
+- 原始素材在 `art/start/avatar`（6 个图层）和 `art/start/bottom`（4 个按钮），共 4.38 MB。
+- 小程序用的压缩版本已提交在 `app/src/static/avatar` 与 `app/src/static/start`，共约 315 KB
+  （缩放 + 调色板量化，主包 2 MB 上限下仍有充足余量）。
+- 替换素材后执行 `python scripts/optimize-art.py` 重新生成；图层数量变化时同步改
+  `app/src/services/avatarService.ts` 里的 `avatarLayers`。
+
 
 ## Independent game routes
 

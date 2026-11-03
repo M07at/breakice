@@ -1,28 +1,27 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import { useRoomStore } from '../../stores/room'
-import AvatarEditor from '../../components/AvatarEditor.vue'
-import { getSavedAvatar, saveAvatar } from '../../services/avatarService'
-import type { AvatarConfig } from '../../types/room'
+import Avatar from '../../components/Avatar.vue'
+import { getSavedProfile } from '../../services/avatarService'
 
 const roomStore = useRoomStore()
 const roomName = ref('周五破冰局')
-const nickname = ref('主持人')
 const maxPlayers = ref('20')
-const avatar = ref<AvatarConfig>(getSavedAvatar())
+
+/** 形象和昵称统一在首页设置，这里只读取，不再重复编辑 */
+const profile = getSavedProfile()
 
 async function submit() {
-  if (!roomName.value.trim() || !nickname.value.trim()) {
-    uni.showToast({ title: '请填写房间名和昵称', icon: 'none' })
+  if (!roomName.value.trim()) {
+    uni.showToast({ title: '请填写房间名', icon: 'none' })
     return
   }
   await roomStore.create({
     name: roomName.value.trim(),
-    nickname: nickname.value.trim(),
+    nickname: profile.nickname,
     maxPlayers: Number(maxPlayers.value) || 20,
-    avatar: avatar.value,
+    avatar: profile.avatar,
   })
-  saveAvatar(avatar.value)
   uni.redirectTo({ url: '/pages/room/index' })
 }
 </script>
@@ -36,22 +35,22 @@ async function submit() {
     </view>
 
     <view class="surface stack-24">
+      <view class="identity-row">
+        <Avatar :avatar="profile.avatar" size="medium" />
+        <view class="identity-copy">
+          <text class="identity-name">{{ profile.nickname }}</text>
+          <text class="identity-hint">形象和昵称在首页设置</text>
+        </view>
+      </view>
+
       <view class="form-field">
         <text class="input-label">房间名称</text>
         <input v-model="roomName" class="input" maxlength="20" placeholder="例如：周五破冰局" />
       </view>
       <view class="form-field">
-        <text class="input-label">你的昵称</text>
-        <input v-model="nickname" class="input" maxlength="12" placeholder="大家怎么称呼你" />
-      </view>
-      <view class="form-field">
         <text class="input-label">人数上限</text>
         <input v-model="maxPlayers" class="input" type="number" maxlength="2" placeholder="4 - 20 人" />
         <text class="field-hint">建议 4-20 人，人数太多时可以分组玩。</text>
-      </view>
-      <view class="form-field avatar-field">
-        <view class="section-title"><text>你的头像</text><text class="muted">可随时更换</text></view>
-        <AvatarEditor v-model="avatar" />
       </view>
     </view>
 
@@ -67,6 +66,31 @@ async function submit() {
 </template>
 
 <style scoped>
+.identity-row {
+  display: flex;
+  align-items: center;
+  padding-bottom: 24rpx;
+  border-bottom: 1rpx solid var(--line);
+}
+
+.identity-copy {
+  margin-left: 18rpx;
+}
+
+.identity-name {
+  display: block;
+  color: var(--ink);
+  font-size: 30rpx;
+  font-weight: 800;
+}
+
+.identity-hint {
+  display: block;
+  margin-top: 6rpx;
+  color: var(--muted);
+  font-size: 21rpx;
+}
+
 .field-hint {
   display: block;
   margin-top: 10rpx;

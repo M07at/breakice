@@ -1,36 +1,19 @@
 export type RoomPhase = 'lobby' | 'playing' | 'ended'
 export type GameType = 'truth-or-dare' | 'drawing' | 'undercover'
 
-export type AvatarOption =
-  | 'light'
-  | 'warm'
-  | 'tan'
-  | 'deep'
-  | 'round'
-  | 'happy'
-  | 'wink'
-  | 'dot'
-  | 'small'
-  | 'triangle'
-  | 'smile'
-  | 'open'
-  | 'line'
-  | 'short'
-  | 'bob'
-  | 'curly'
-  | 'cap'
-  | 'none'
-  | 'glasses'
-  | 'star'
-  | 'headphones'
+/** 形象图层的键：叠加顺序与切换顺序在 avatarService 里定义 */
+export type AvatarLayerKey = 'color' | 'body' | 'mouth' | 'eyes' | 'hat'
 
+/**
+ * 自定义形象 = 每个图层选中的图片编号（从 1 开始）。
+ * 图层从底到顶依次是 color、main、body、mouth、eyes、hat；main 是固定框架，没有编号。
+ */
 export interface AvatarConfig {
-  skin: Extract<AvatarOption, 'light' | 'warm' | 'tan' | 'deep'>
-  eyes: Extract<AvatarOption, 'round' | 'happy' | 'wink'>
-  nose: Extract<AvatarOption, 'dot' | 'small' | 'triangle'>
-  mouth: Extract<AvatarOption, 'smile' | 'open' | 'line'>
-  hair: Extract<AvatarOption, 'short' | 'bob' | 'curly' | 'cap'>
-  accessory: Extract<AvatarOption, 'none' | 'glasses' | 'star' | 'headphones'>
+  color: number
+  body: number
+  mouth: number
+  eyes: number
+  hat: number
 }
 
 export interface Player {
