@@ -1,4 +1,4 @@
-﻿import { env } from '../config/env'
+import { env } from '../config/env'
 import { getSavedProfile, normalizeAvatar } from '../services/avatarService'
 import type { AvatarConfig, GameType, Player, Room, TruthTurn } from '../types/room'
 import { PlatformError } from './types'
@@ -92,7 +92,16 @@ function uniRequest<T>(options: {
         }
         reject(new PlatformError(mapErrorCode(response.data, status), describeError(response.data, status)))
       },
-      fail: () => reject(new PlatformError('NETWORK', '连不上服务器，请检查网络')),
+      fail: (error) => {
+        // 真机上最常见的是「合法域名」没配，微信会把请求直接拦掉；
+        // 原始 errMsg 里有 "url not in domain list" 这类关键信息，必须透出来。
+        const raw = String((error as { errMsg?: string } | undefined)?.errMsg ?? '')
+        const blocked = /domain|url not in|invalid url/i.test(raw)
+        const message = blocked
+          ? '请求被微信拦下了：这个域名不在小程序的「request 合法域名」里（真机才校验，开发者工具勾了"不校验"所以没事）'
+          : `连不上服务器，请检查网络${raw ? `（${raw.slice(0, 80)}）` : ''}`
+        reject(new PlatformError(blocked ? 'NOT_CONFIGURED' : 'NETWORK', message))
+      },
     })
   })
 }
