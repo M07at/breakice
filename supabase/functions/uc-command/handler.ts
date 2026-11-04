@@ -1,4 +1,4 @@
-// 破冰局 · uc-command：服务端谁是卧底引擎
+﻿// 破冰局 · uc-command：服务端谁是卧底引擎
 //
 // 这个文件会被 scripts/build-uc-command.mjs 拼在上面的引擎代码之后，
 // 所以这里**不要写 import**，直接用内联进来的 createGame / applyAction / tick / toPublicView / UcError。
@@ -357,8 +357,8 @@ async function handleCurrent(admin: Admin, uid: string, body: Record<string, any
   const loaded = await loadGame(admin, game.id)
   const members = await roomMembers(admin, roomId)
   const { data: room } = await admin.from('rooms').select('host_id').eq('id', roomId).maybeSingle()
-  return json(
-    snapshotOf({
+  return json({
+    snapshot: snapshotOf({
       gameId: loaded.id,
       gameNumber: loaded.game_number,
       state: loaded.state,
@@ -366,7 +366,7 @@ async function handleCurrent(admin: Admin, uid: string, body: Record<string, any
       hostId: room?.host_id ?? '',
       members,
     }),
-  )
+  })
 }
 
 async function handleWord(admin: Admin, uid: string, body: Record<string, any>): Promise<Response> {
@@ -418,5 +418,6 @@ Deno.serve(async (req: Request) => {
     return fail(error)
   }
 })
+
 
 

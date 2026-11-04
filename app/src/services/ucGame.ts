@@ -1,4 +1,4 @@
-import { roomApi } from '../platform'
+﻿import { roomApi } from '../platform'
 import { PlatformError } from '../platform/types'
 import { SupabaseRoomApi } from '../platform/supabase'
 import { installPlayerPort } from '../modules/undercover/player'
@@ -75,11 +75,16 @@ export async function startUndercoverRound(roomId: string, variant: Variant): Pr
 /** 其他人：房间进入 playing 后，找到本房进行中的一局并接管 */
 export async function adoptUndercoverRound(roomId: string, variant: Variant): Promise<UcPlayerSnapshot | null> {
   activeRoomId = roomId
-  const result = await invoke<{ snapshot: UcPlayerSnapshot | null }>({ op: 'current', room_id: roomId })
-  if (!result?.snapshot) return null
-  install(result.snapshot, variant)
-  activeGameId = result.snapshot.gameId
-  return result.snapshot
+  // 服务端可能返回 { snapshot } 也可能直接返回快照（旧部署），两种都认
+  const result = await invoke<{ snapshot?: UcPlayerSnapshot | null } & Partial<UcPlayerSnapshot>>({
+    op: 'current',
+    room_id: roomId,
+  })
+  const snapshot = result?.snapshot ?? (result?.gameId ? (result as UcPlayerSnapshot) : null)
+  if (!snapshot?.gameId) return null
+  install(snapshot, variant)
+  activeGameId = snapshot.gameId
+  return snapshot
 }
 
 /** 主持人提前结束本局：让服务端把 games.status 收尾，否则下一局会被 GAME_ACTIVE 挡住 */
@@ -93,3 +98,4 @@ export async function endUndercoverRound(): Promise<void> {
   })
   activeGameId = ''
 }
+

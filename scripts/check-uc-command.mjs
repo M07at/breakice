@@ -104,7 +104,8 @@ async function main() {
 
   console.log('\n[2] 开局')
   let gameId
-  const tinyConfig = { describeSeconds: 2, voteSeconds: 2, revealSeconds: 1, maxRounds: 3 }
+  // 投票阶段要留够时间：脚本是串行发请求的，2 秒会在投完之前超时
+  const tinyConfig = { describeSeconds: 2, voteSeconds: 25, revealSeconds: 2, maxRounds: 3 }
   try {
     const res = await uc({ op: 'start', room_id: roomId, variant: 'classic', request_id: 'check-start', config: tinyConfig }, host)
     if (!res.ok) throw new Error(`${res.status} ${res.text.slice(0, 200)}`)
@@ -169,22 +170,76 @@ async function main() {
   console.log('\n[7] 当前局查询')
   try {
     const res = await uc({ op: 'current', room_id: roomId }, tokens[2])
-    if (res.ok && res.data.snapshot?.gameId === gameId) ok('房内成员能找到进行中的一局')
+    // 服务端可能返回 { snapshot } 也可能直接返回快照
+    const snap = res.data?.snapshot ?? res.data
+    if (res.ok && snap?.gameId === gameId) ok('房内成员能找到进行中的一局')
     else bad('current', `${res.status} ${res.text.slice(0, 160)}`)
   } catch (e) {
     bad('current', String(e.message).slice(0, 160))
   }
 
-  console.log('\n[8] 结束本局')
+  console.log('\n[8] 推进到投票并投出一轮')
   try {
-    const res = await uc({ op: 'act', game_id: gameId, action: { type: 'endGame' }, meta: { requestId: 'check-end' } }, host)
-    if (res.ok) ok('主持人结束本局', `phase=${res.data.view.phase}`)
-    else bad('结束本局', `${res.status} ${res.text.slice(0, 160)}`)
+    let phase = ''
+    let snapshot = null
+    for (let i = 0; i < 14; i++) {
+      await new Promise((r) => setTimeout(r, 1200))
+      const res = await uc({ op: 'tick', game_id: gameId }, host)
+      if (!res.ok) break
+      snapshot = res.data
+      phase = snapshot.view.phase
+      if (phase === 'vote' || phase === 'ended') break
+    }
+    if (phase === 'vote') ok('倒计时把局面推进到投票阶段')
+    else bad('推进到投票', `停在 ${phase || '未知'}`)
+
+    if (phase === 'vote') {
+      const alive = snapshot.view.players.filter((p) => p.alive)
+      const target = alive[0]?.id
+      let voted = 0
+      for (let i = 0; i < tokens.length; i++) {
+        const me = alive[i]
+        if (!me) continue
+        const to = alive.find((p) => p.id !== me.id)?.id
+        const res = await uc(
+          { op: 'act', game_id: gameId, action: { type: 'vote', targetId: to ?? target }, meta: { requestId: `vote-${i}` } },
+          tokens[i],
+        )
+        if (res.ok) voted++
+        else console.log(`    投票失败(${i}): ${res.status} ${res.text.slice(0, 140)}`)
+      }
+      if (voted >= alive.length) ok(`所有在局玩家都投出（${voted} 票）`)
+      else bad('投票', `只成功 ${voted}/${alive.length}`)
+
+      await new Promise((r) => setTimeout(r, 1500))
+      const after = await uc({ op: 'tick', game_id: gameId }, host)
+      if (after.ok && ['reveal', 'ended', 'vote'].includes(after.data.view.phase)) {
+        ok('投票后局面继续推进', `phase=${after.data.view.phase}`)
+      } else {
+        bad('投票后推进', `${after.status} ${after.text.slice(0, 120)}`)
+      }
+    }
+  } catch (e) {
+    bad('投票流程', String(e.message).slice(0, 200))
+  }
+
+  console.log('\n[9] 收尾')
+  try {
+    // 投票可能直接把胜负打出来（phase=ended），这时不需要再结束一次
+    const probe = await uc({ op: 'tick', game_id: gameId }, host)
+    const alreadyEnded = probe.ok && probe.data.view.phase === 'ended'
+    if (alreadyEnded) {
+      ok('投票后已自动结算，无需主持人结束')
+    } else {
+      const res = await uc({ op: 'act', game_id: gameId, action: { type: 'endGame' }, meta: { requestId: 'check-end' } }, host)
+      if (res.ok) ok('主持人结束本局', `phase=${res.data.view.phase}`)
+      else bad('结束本局', `${res.status} ${res.text.slice(0, 160)}`)
+    }
     const rooms = await mustCall(`/rest/v1/rooms?id=eq.${roomId}&select=status`, { token: host })
     if (rooms[0]?.status === 'lobby') ok('房间回到大厅')
     else bad('房间回到大厅', JSON.stringify(rooms))
   } catch (e) {
-    bad('结束本局', String(e.message).slice(0, 200))
+    bad('收尾', String(e.message).slice(0, 200))
   }
 
   summary()
@@ -199,3 +254,4 @@ main().catch((e) => {
   console.error(e)
   process.exit(1)
 })
+
