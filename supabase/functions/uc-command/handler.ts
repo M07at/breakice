@@ -14,6 +14,9 @@
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL') ?? ''
 const SERVICE_ROLE = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
 
+/** 部署后可以用 { op: 'version' } 确认线上跑的是哪一版 */
+const HANDLER_VERSION = 'uc-2026-11-04-score'
+
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
@@ -440,6 +443,8 @@ Deno.serve(async (req: Request) => {
         return await handleCurrent(admin, uid, body)
       case 'word':
         return await handleWord(admin, uid, body)
+      case 'version':
+        return json({ version: HANDLER_VERSION })
       default:
         throw new UcError('BAD_REQUEST', `未知操作：${String(body.op)}`)
     }

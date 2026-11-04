@@ -170,6 +170,7 @@ async function main() {
   console.log('\n[7] 当前局查询')
   try {
     const res = await uc({ op: 'current', room_id: roomId }, tokens[2])
+    console.log(`    current 顶层字段: ${Object.keys(res.data ?? {}).join(', ')}`)
     // 服务端可能返回 { snapshot } 也可能直接返回快照
     const snap = res.data?.snapshot ?? res.data
     if (res.ok && snap?.gameId === gameId) ok('房内成员能找到进行中的一局')
@@ -225,6 +226,12 @@ async function main() {
 
   console.log('\n[9] 积分落库')
   try {
+    // 先看 scores 表里到底有没有行，区分「没写进去」和「聚合查不出来」
+    const raw = await mustCall(`/rest/v1/scores?game_id=eq.${gameId}&select=user_id,reason,points,ref`, { token: host })
+    console.log(`    scores 表里这局有 ${Array.isArray(raw) ? raw.length : '?'} 条记录`)
+    if (Array.isArray(raw) && raw.length > 0) {
+      console.log(`    样例: ${JSON.stringify(raw.slice(0, 3))}`)
+    }
     const board = await rpc('room_leaderboard', { p_room_id: roomId }, host)
     if (Array.isArray(board) && board.length > 0 && board.some((row) => Number(row.points) > 0)) {
       ok('积分榜有数据', board.map((row) => `${row.nickname}:${row.points}`).join('  '))
