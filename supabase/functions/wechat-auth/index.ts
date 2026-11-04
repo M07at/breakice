@@ -71,12 +71,12 @@ Deno.serve(async (req) => {
   // 线上项目里的密钥名是 WECHAT_SECRET，仓库这份最初写的是 WECHAT_APPSECRET；
   // 两个都认，避免重新部署时因为命名不一致直接 WECHAT_NOT_CONFIGURED。
   const appsecret = Deno.env.get("WECHAT_APPSECRET") ?? Deno.env.get("WECHAT_SECRET")
-  // 派生密码用的密钥：优先 WECHAT_LOGIN_SECRET，没配就退回 AppSecret 本身。
-  // 一旦线上有用户，这个值不能再改，否则老用户密码对不上（下面会自动重设，但仍建议固定）。
-  const loginSecret = Deno.env.get("WECHAT_LOGIN_SECRET") ?? appsecret
   if (!appid || !appsecret) {
     return json({ error: "WECHAT_NOT_CONFIGURED", detail: "缺少 WECHAT_APPID / WECHAT_SECRET" }, 500)
   }
+  // 派生密码用的密钥：优先 WECHAT_LOGIN_SECRET，没配就退回 AppSecret 本身。
+  // 一旦线上有用户，这个值不能再改，否则老用户密码对不上（下面会自动重设，但仍建议固定）。
+  const loginSecret = Deno.env.get("WECHAT_LOGIN_SECRET") ?? appsecret
 
   const url = `${SESSION_URL}?appid=${encodeURIComponent(appid)}&secret=${encodeURIComponent(appsecret)}&js_code=${encodeURIComponent(code)}&grant_type=authorization_code`
 
