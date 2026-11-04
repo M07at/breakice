@@ -1,4 +1,4 @@
-<script setup lang="ts">
+﻿<script setup lang="ts">
 /**
  * 你画我猜 · 房间联机页。
  *
@@ -24,7 +24,7 @@ import { createDrawPublisher } from '@/services/drawRemote'
 import type { DrawRemoteApi, Publisher } from '@/services/drawRemote'
 import { createRemoteDrawRoom, } from '@/services/drawRemote'
 import { createSupabaseDrawApi, clearRemoteDrawRoom, publishDrawWord, readMyDrawWord } from '@/services/drawRemoteApi'
-import { onLivePoke, pokeRoom } from '@/services/liveRoom'
+import { liveConnected, onLivePoke, pokeRoom } from '@/services/liveRoom'
 
 interface CanvasApi {
   exportPng(): Promise<string>
@@ -311,6 +311,14 @@ async function endSession() {
       <button v-if="isHost" class="ghost" @click="endSession">结束</button>
     </view>
 
+    <view class="alert debug">
+      角色={{ isHost ? '主持人' : '观战' }}｜我={{ meId.slice(0, 6) }}｜阶段={{ view ? view.phase : '无视图' }}｜画者={{
+        view ? view.painterId.slice(0, 6) : '-'
+      }}｜轮次={{ view ? view.roundKey : '-' }}｜题面={{ myWord ? myWord.word : '空' }}｜通道={{
+        liveConnected() ? '连' : '断'
+      }}
+    </view>
+
     <view v-if="error" class="alert">{{ error }}</view>
 
     <view v-if="!view" class="surface empty">等待主持人开局…</view>
@@ -488,7 +496,10 @@ async function endSession() {
   background: #f6f8fb;
   font-size: 26rpx;
 }
+.alert.debug { color: #1e3a8a; background: #e8effc; font-size: 20rpx; }
 </style>
+
+
 
 
 
