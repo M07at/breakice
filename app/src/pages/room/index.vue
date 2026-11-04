@@ -57,6 +57,32 @@ function gameUrl(gameType: GameType): string {
 const isUndercover = (gameType: GameType | null) => gameType === 'undercover' || gameType === 'hybrid'
 const variantOf = (gameType: GameType): 'classic' | 'draw' => (gameType === 'hybrid' ? 'draw' : 'classic')
 
+/**
+ * 你画我猜目前只有单机版：B 的房间后端跑在客户端，多台设备各自开一局、互相看不到。
+ * 在它接入服务端之前，这里明确告诉主持人是单机，避免误以为是联机。
+ */
+function confirmLocalDraw() {
+  uni.showModal({
+    title: '你画我猜（单机演示）',
+    content: '联机版还没接入服务端：接下来只有你这台设备进入游戏，其他玩家的手机不会同步，他们也可以各自点开单机玩。',
+    confirmText: '单机试玩',
+    cancelText: '再等等',
+    success: (result) => {
+      if (result.confirm) void startLocalDraw()
+    },
+  })
+}
+
+async function startLocalDraw() {
+  try {
+    await roomStore.begin('drawing')
+    await nextTick()
+    openPage(drawSetupUrl(roomStore.memberCount))
+  } catch (issue) {
+    uni.showToast({ title: toErrorMessage(issue), icon: 'none' })
+  }
+}
+
 async function hostStart(gameType: GameType) {
   const minPlayers = MIN_PLAYERS[gameType]
   if (roomStore.memberCount < minPlayers) {
@@ -65,6 +91,10 @@ async function hostStart(gameType: GameType) {
   }
   if (!roomStore.allReady) {
     uni.showToast({ title: `还有 ${missingReady.value} 人没准备`, icon: 'none' })
+    return
+  }
+  if (gameType === 'drawing') {
+    confirmLocalDraw()
     return
   }
   try {
@@ -101,6 +131,11 @@ async function enterCurrentGame() {
     } catch (issue) {
       uni.showToast({ title: toErrorMessage(issue), icon: 'none' })
     }
+    return
+  }
+  if (gameType === 'drawing' && !roomStore.isHost) {
+    // 单机版没有服务端房间，其他人跟进去只会各开一局，不如说清楚
+    uni.showToast({ title: '你画我猜是单机演示，本局只在主持人设备上进行', icon: 'none' })
     return
   }
   openPage(gameUrl(gameType))
@@ -214,7 +249,7 @@ onShareAppMessage(() => ({
       </view>
       <view :class="['game-choice', 'available', { dimmed: !roomStore.allReady }]" @click="hostStart('drawing')">
         <text class="choice-icon">🎨</text>
-        <view class="choice-copy"><text class="choice-title">你画我猜</text><text class="choice-desc">轮流作画，聊天抢答，AI 评分与排行榜</text></view>
+        <view class="choice-copy"><text class="choice-title">你画我猜</text><text class="choice-desc">轮流作画，聊天抢答，AI 评分与排行榜（单机演示）</text></view>
         <text class="choice-arrow">›</text>
       </view>
       <view class="tool-row" @click="openBank">
