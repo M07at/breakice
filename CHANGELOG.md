@@ -1,6 +1,28 @@
-# Changes
+﻿# Changes
 
 ## Unreleased
+- Integration: **服务端谁是卧底引擎**（`functions/uc-command`）。C 的纯规则引擎被内联成单文件函数，
+  提供 start / act / tick / current / word 五个操作；开局校验房主与全员准备，动作身份只认 token，
+  结算事件写进 `scores`（唯一约束去重）。客户端 `services/ucGame.ts` 实现 `UcPlayerPort`。
+- Integration: **中途退出同步**。`op=tick` / `op=act` 前按房间成员表对账，把已离场玩家按
+  `playerLeft` 摘掉，避免轮到他发言时整局卡到倒计时。
+- Integration: **融合玩法真实画布**。B 的 `draw-canvas` 替换 C 的模拟适配器：导出 PNG →
+  上传 `artworks` 私有桶 → `submit_artwork` 建档 → AI 评分（未配 key 自动降级）→ 画廊签名地址渲染。
+- Integration: **真心话回合共享**（`0014`）。`rooms.settings.truth` 存「轮到谁 + 什么题」，
+  转盘/换题/下一轮/自定义题都会写共享状态，所有人看到同一份。
+- Integration: **Realtime 广播**。小程序没有浏览器 WebSocket，手写 Phoenix 协议最小客户端
+  （`platform/realtime.ts`），房间与对局变化即时推送，断线回退到 2 秒轮询。
+- Integration: **微信小程序码**（`functions/wechat-qrcode` + `0016`）。校验本房成员后调
+  `wxacode.getUnlimited`，access_token 落库缓存，失效自动刷新；二维码页优先展示小程序码，
+  失败回退到普通二维码。
+- Integration: **数据备份与回退**（`0015` + `docs/备份与回退.md`）。快照 profiles 与自建题库，
+  回灌是合并式（只补缺失），函数只对 SQL Editor / service_role 开放。
+- Integration: **你画我猜联机底座**（`0017` + `services/drawRemote.ts`）。主持人发布权威视图、
+  其他人在指令队列投操作；客户端远程层含 7 个单测。页面接线仍待完成，见
+  `docs/你画我猜联机方案.md`。
+- Fix: 房间页二维码原用旧版 canvas（原生组件）浮在上层吃掉点击，导致「谁是卧底」卡片点不动；
+  已改为独立页面 + `canvas type="2d"`。
+- Fix: `showModal` 的 `confirmText` 超过 4 个字符会直接失败，造成点击无反应；已改为自动补位提示。
 - Integration: **A 的平台后端接入**。`supabase/migrations/0001…0005`、`functions/wechat-auth`、
   `functions/ai-score` 与 `docs/a/` 进入仓库；新增 `0006_rpc_lobby_integration.sql` 补上小程序端
   无法 PATCH 的开局/结束/改昵称 RPC。
@@ -22,3 +44,4 @@
 - C2: synchronized hybrid mock drawings, review stage and scoring fallback; actual canvas/AI not integrated.
 - C3: independent game routes, Chinese/English defaults and shared persistent development question bank.
 - C4: environment doctor, reproducible checks/reports, release hashes and Gitee activation recipe. Hosted CI activation remains pending.
+
