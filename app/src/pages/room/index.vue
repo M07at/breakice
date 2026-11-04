@@ -73,7 +73,7 @@ function openPage(url: string) {
 
 /** 真心话大冒险 / 你画我猜：页面自己开局，路由带上房间人数 */
 function gameUrl(gameType: GameType): string {
-  if (gameType === 'drawing') return drawSetupUrl(roomStore.memberCount)
+  if (gameType === 'drawing') return drawSetupUrl(roomStore.memberCount, room.value?.id)
   return '/pages/game/index'
 }
 
@@ -100,7 +100,7 @@ async function startLocalDraw() {
   try {
     await roomStore.begin('drawing')
     await nextTick()
-    openPage(drawSetupUrl(roomStore.memberCount))
+    openPage(drawSetupUrl(roomStore.memberCount, room.value?.id))
   } catch (issue) {
     uni.showToast({ title: toErrorMessage(issue), icon: 'none' })
   }
@@ -547,6 +547,8 @@ onShareAppMessage(() => ({
 }
 .build-tag { display: block; margin-top: 4rpx; color: var(--muted); font-size: 19rpx; }
 </style>
+
+
 
 
 

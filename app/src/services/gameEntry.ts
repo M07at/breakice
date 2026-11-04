@@ -25,10 +25,11 @@ export const PLAYER_ROUTE: Record<UndercoverVariant, string> = {
 }
 
 /** B：你画我猜（常规 / Emoji / 自定义）；人数由房间决定，开设页只选版本 */
-export function drawSetupUrl(memberCount?: number): string {
+export function drawSetupUrl(memberCount?: number, roomId?: string): string {
   const count = Math.round(Number(memberCount) || 0)
-  // lock=1：进入游戏后不允许再改人数
-  return count >= 2 && count <= 12 ? `/pages-draw/setup?count=${count}&lock=1` : '/pages-draw/setup'
+  // lock=1：进入游戏后不允许再改人数；room 让联机版能发布/订阅对局
+  const room = roomId ? `&room=${encodeURIComponent(roomId)}` : ''
+  return count >= 2 && count <= 12 ? `/pages-draw/setup?count=${count}&lock=1${room}` : `/pages-draw/setup?room=${encodeURIComponent(roomId ?? '')}`
 }
 
 /** 房间里的玩家顺序即座位顺序：1 号位是主持人，与 C 的规则一致。 */

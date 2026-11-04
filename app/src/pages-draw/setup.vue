@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <view class="page">
     <view class="section">
       <view class="section-title">版本</view>
@@ -53,6 +53,8 @@ const customText = ref('')
 const starting = ref(false)
 /** 从房间进来时锁定人数：这一局就是房间里这些人 */
 const locked = ref(false)
+/** 从房间进来时带上房间 id；联机版要靠它发布/订阅对局 */
+const roomId = ref('')
 
 // 从房间进入时用房间人数预填，房间是这一局的单位
 onMounted(() => {
@@ -61,6 +63,8 @@ onMounted(() => {
   const raw = Number(current?.options?.count)
   if (Number.isFinite(raw)) count.value = Math.min(12, Math.max(2, Math.round(raw)))
   locked.value = current?.options?.lock === '1'
+  // 从房间进来时会带 room=<id>，联机版靠它发布/订阅对局
+  roomId.value = String(current?.options?.room ?? '')
 })
 
 async function start() {
@@ -72,7 +76,7 @@ async function start() {
       playerCount: count.value,
       customText: customText.value,
     })
-    uni.navigateTo({ url: '/pages-draw/play' })
+    uni.navigateTo({ url: roomId.value ? '/pages-draw/play?room=' + encodeURIComponent(roomId.value) : '/pages-draw/play' })
   } catch (error) {
     const message = error instanceof Error ? error.message : '开局失败'
     uni.showToast({ title: message, icon: 'none' })
@@ -116,3 +120,4 @@ async function start() {
   font-size: 30rpx;
 }
 </style>
+
