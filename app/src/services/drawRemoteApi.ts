@@ -1,4 +1,4 @@
-import { roomApi } from '../platform'
+﻿import { roomApi } from '../platform'
 import { SupabaseRoomApi } from '../platform/supabase'
 import type { DrawAction, DrawActionKind, DrawRemoteApi } from './drawRemote'
 import type { DrawRoomView } from '../modules/draw/room'
@@ -79,5 +79,39 @@ export async function clearRemoteDrawRoom(roomId: string): Promise<void> {
     await (roomApi as SupabaseRoomApi).rpcCall<void>('clear_draw_session', { p_room_id: roomId })
   } catch (error) {
     console.warn('清理你画我猜会话失败', error)
+  }
+}
+/** 主持人把这一轮的题面发给作画者（只有本人能读回） */
+export async function publishDrawWord(
+  roomId: string,
+  roundKey: string,
+  userId: string,
+  word: string,
+): Promise<void> {
+  if (roomApi.mode !== 'supabase' || !word) return
+  try {
+    await (roomApi as SupabaseRoomApi).rpcCall<void>('publish_draw_word', {
+      p_room_id: roomId,
+      p_round_key: roundKey,
+      p_user_id: userId,
+      p_word: word,
+    })
+  } catch (error) {
+    console.warn('发布题面失败', error)
+  }
+}
+
+/** 作画者读自己的题面 */
+export async function readMyDrawWord(roomId: string, roundKey: string): Promise<string> {
+  if (roomApi.mode !== 'supabase') return ''
+  try {
+    const word = await (roomApi as SupabaseRoomApi).rpcCall<string | null>('read_my_draw_word', {
+      p_room_id: roomId,
+      p_round_key: roundKey,
+    })
+    return typeof word === 'string' ? word : ''
+  } catch (error) {
+    console.warn('读取题面失败', error)
+    return ''
   }
 }

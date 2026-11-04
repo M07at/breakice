@@ -1,4 +1,4 @@
-/**
+﻿/**
  * 你画我猜的「房间」：谁在画、还剩多少时间、谁交了什么、最后怎么排名。
  *
  * 页面只依赖 `DrawRoomBackend` 这个接口。现在的实现是本机内存版
@@ -211,6 +211,16 @@ export class LocalDrawRoomBackend implements DrawRoomBackend {
   /** 揭晓阶段的结束时刻（这一张看完就换下一位） */
   private revealEndsAt = 0
   private word: DrawWord | null = null
+
+  /** 联机用：主持人把当前这轮的题面发给远程作画者（视图里对别人不可见） */
+  currentWord(): string | null {
+    return this.word?.word ?? null
+  }
+
+  /** 联机用：这一轮是谁在画 */
+  currentPainterId(): string {
+    return this.painterId()
+  }
   private palette: string[] = []
   private drawings: Record<string, DrawRoomDrawing> = {}
   private messages: DrawMessage[] = []
@@ -535,6 +545,7 @@ export function disposeDrawRoom(room: LocalDrawRoomBackend | null = current): vo
   room.dispose()
   if (current === room) current = null
 }
+
 
 
 

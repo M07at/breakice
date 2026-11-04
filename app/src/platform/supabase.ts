@@ -1,4 +1,4 @@
-import { env } from '../config/env'
+﻿import { env } from '../config/env'
 import { getSavedProfile, normalizeAvatar } from '../services/avatarService'
 import type { AvatarConfig, GameType, Player, Room, TruthTurn } from '../types/room'
 import { PlatformError } from './types'
@@ -353,7 +353,11 @@ export class SupabaseRoomApi implements RoomApi {
         success: (response) => {
           const status = Number(response.statusCode)
           if (status >= 200 && status < 300) resolve()
-          else reject(new PlatformError('UNKNOWN', `画作上传失败（HTTP ${status}）`))
+          else {
+            // 把服务端原话带出来：400 常见是路径不合法 / RLS 拒绝 / 同名对象
+            const detail = String(response.data ?? '').slice(0, 160)
+            reject(new PlatformError('UNKNOWN', `画作上传失败（HTTP ${status}）${detail ? `：${detail}` : ''}`))
+          }
         },
         fail: () => reject(new PlatformError('NETWORK', '画作上传失败，请检查网络')),
       })
@@ -543,6 +547,7 @@ export class SupabaseRoomApi implements RoomApi {
     }
   }
 }
+
 
 
 

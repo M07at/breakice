@@ -1,4 +1,4 @@
-﻿<script setup lang="ts">
+<script setup lang="ts">
 /**
  * 你画我猜 · 房间联机页。
  *
@@ -12,6 +12,8 @@ import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { onLoad } from '@dcloudio/uni-app'
 import DrawCanvas from '@/components/draw-canvas/draw-canvas.vue'
 import { DrawEngine } from '@/modules/draw/engine'
+import { ChunkPump } from '@/modules/draw/sync'
+import type { DrawChunk } from '@/modules/draw/types'
 import { disposeDrawRoom, startLocalDrawRoom } from '@/modules/draw/room'
 import type { DrawRoomView } from '@/modules/draw/room'
 import type { LocalDrawRoomBackend } from '@/modules/draw/room'
@@ -21,7 +23,8 @@ import { fetchRoom } from '@/services/roomService'
 import { createDrawPublisher } from '@/services/drawRemote'
 import type { DrawRemoteApi, Publisher } from '@/services/drawRemote'
 import { createRemoteDrawRoom, } from '@/services/drawRemote'
-import { createSupabaseDrawApi, clearRemoteDrawRoom } from '@/services/drawRemoteApi'
+import { createSupabaseDrawApi, clearRemoteDrawRoom, publishDrawWord, readMyDrawWord } from '@/services/drawRemoteApi'
+import { onLivePoke, pokeRoom } from '@/services/liveRoom'
 
 interface CanvasApi {
   exportPng(): Promise<string>
@@ -58,7 +61,9 @@ const painterName = computed(() => {
   const painter = view.value?.players.find((player) => player.id === view.value?.painterId)
   return painter?.name ?? '有人'
 })
-const myWord = computed(() => view.value?.word ?? null)
+const remoteWord = ref('')
+let lastRoundKey = ''
+const myWord = computed(() => view.value?.word ?? (remoteWord.value ? { word: remoteWord.value } : null))
 const hintText = computed(() => {
   const hint = view.value?.hint
   if (!hint) return ''
@@ -73,17 +78,59 @@ const remain = computed(() => {
 
 /** 联机用的单人画布引擎：只画自己的这一张 */
 const painterEngine = new DrawEngine({ by: 'live-painter' })
+/** 观战画布：把作画者广播来的分片重放出来 */
+const viewerEngine = new DrawEngine({ by: 'live-viewer' })
+const viewCanvasRef = ref<{ paint(): void } | null>(null)
+let painterPump: ChunkPump | null = null
+let offStroke: (() => void) | null = null
 
 onLoad((options) => {
   roomId.value = String(options?.room ?? '')
 })
 
-/** 收到新视图时统一处理：校正时钟、刷新画廊图片 */
+/** 收到新视图时统一处理：校正时钟、刷新画廊图片、同步私有题面 */
 function adoptView(next: DrawRoomView) {
   serverOffset.value = next.serverTime - Date.now()
   clockTick.value = Date.now()
+  // 换了一轮就清掉上一轮读到的题面
+  if (lastRoundKey !== next.roundKey) {
+    lastRoundKey = next.roundKey
+    remoteWord.value = ''
+  }
   view.value = next
   void syncPanelUrls()
+
+  // 主持人：远程玩家作画时，把他的题面发到私有通道（视图里对别人不可见）
+  if (isHost.value && localBackend && next.painterId !== meId.value) {
+    const word = localBackend.currentWord()
+    if (word) void publishDrawWord(roomId.value, next.roundKey, next.painterId, word)
+  }
+
+  // 作画者本人：从私有通道取自己的题
+  if (!isHost.value && next.painterId === meId.value && !next.word && !remoteWord.value) {
+    void readMyDrawWord(roomId.value, next.roundKey).then((word) => {
+      if (word) remoteWord.value = word
+    })
+  }
+
+  // 作画者的笔画实时广播给其他人：轮到我就开泵，轮不到就停
+  const drawing = next.phase === 'drawing'
+  if (drawing && next.painterId === meId.value) {
+    if (!painterPump) {
+      painterPump = new ChunkPump(
+        painterEngine,
+        {
+          send: (chunk: DrawChunk) => pokeRoom('stroke', { chunk }),
+          subscribe: () => () => undefined,
+        },
+        { intervalMs: 600 },
+      )
+      painterPump.start()
+    }
+  } else if (painterPump) {
+    painterPump.stop()
+    painterPump = null
+  }
 }
 
 onMounted(async () => {
@@ -149,6 +196,14 @@ onMounted(async () => {
       offView = remote.subscribe((next) => adoptView(next))
       adoptView(await remote.view())
     }
+
+    // 所有人都监听笔画广播（作画者自己收到自己的会 applyChunk 返回 0，不影响）
+    offStroke = onLivePoke((event, payload) => {
+      if (event !== 'stroke') return
+      const chunk = (payload as { chunk?: DrawChunk }).chunk
+      if (!chunk) return
+      if (viewerEngine.applyChunk(chunk) > 0) viewCanvasRef.value?.paint()
+    })
   } catch (issue) {
     error.value = issue instanceof Error ? issue.message : String(issue)
   }
@@ -190,7 +245,9 @@ async function submitDrawing() {
     const filePath = await canvasRef.value.exportPng()
     if (!filePath) throw new Error('还没画东西')
     const supabase = roomApi as SupabaseRoomApi
-    const storagePath = `${roomId.value}/draw/${view.value.roundKey}/${meId.value}.png`
+    const basePath = `${roomId.value}/draw/${view.value.roundKey}/${meId.value}`
+    // 每轮一张，带上时间戳避免同名对象覆盖导致上传被判冲突
+    const storagePath = `${basePath}-${Date.now()}.png`
     await supabase.uploadArtwork(storagePath, filePath)
     // 主持人直接喂本机后端；其他人走指令队列
     if (localBackend) {
@@ -212,9 +269,15 @@ async function sendGuess() {
   if (!text || !view.value) return
   guess.value = ''
   try {
+    // 本地先判断一次：服务端要等主持人处理队列再回传，自己先给个即时反馈
+    const mine = myWord.value?.word ?? ''
+    const hit = Boolean(mine) && text.toLowerCase() === mine.toLowerCase()
+
     if (localBackend) await localBackend.sendMessage(text)
     else await api?.postAction(roomId.value, 'message', { text })
-    if (localBackend) view.value = await localBackend.view()
+    if (localBackend) adoptView(await localBackend.view())
+
+    if (hit) uni.showToast({ title: '答对了！', icon: 'success' })
   } catch (issue) {
     error.value = issue instanceof Error ? issue.message : String(issue)
   }
@@ -262,6 +325,11 @@ async function endSession() {
       <view v-if="myTurn && view.phase === 'drawing'" class="surface">
         <DrawCanvas ref="canvasRef" :engine="painterEngine" mode="draw" variant="classic" @error="error = $event" />
         <button class="primary" :disabled="busy" @click="submitDrawing">{{ busy ? '上传中…' : '交画' }}</button>
+      </view>
+
+      <view v-else-if="view.phase === 'drawing'" class="surface">
+        <text class="label">{{ painterName }} 正在画</text>
+        <DrawCanvas ref="viewCanvasRef" :engine="viewerEngine" mode="watch" variant="classic" @error="error = $event" />
       </view>
 
       <view v-if="view.panel.length" class="surface">
@@ -421,6 +489,12 @@ async function endSession() {
   font-size: 26rpx;
 }
 </style>
+
+
+
+
+
+
 
 
 
