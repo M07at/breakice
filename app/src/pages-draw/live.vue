@@ -1,4 +1,4 @@
-﻿<script setup lang="ts">
+<script setup lang="ts">
 /**
  * 你画我猜 · 房间联机页。
  *
@@ -57,9 +57,30 @@ let clockTimer: ReturnType<typeof setInterval> | null = null
 let ticking = false
 
 const myTurn = computed(() => Boolean(view.value && view.value.painterId === meId.value && view.value.phase === 'drawing'))
+
+/** 座位号：同名玩家靠它区分（B 的视图里 players 顺序就是座位顺序） */
+function seatOf(id: string): number {
+  const index = view.value?.players.findIndex((player) => player.id === id) ?? -1
+  return index >= 0 ? index + 1 : 0
+}
+
+/** 「名字 #座位」——同名时也能一眼分清，颜色也按座位走 */
+function labelOf(id: string, fallback = ''): string {
+  const player = view.value?.players.find((item) => item.id === id)
+  const name = player?.name ?? fallback
+  const seat = seatOf(id)
+  return seat > 0 ? `${name} #${seat}` : name
+}
+
+function toneOf(id: string): string {
+  const seat = seatOf(id)
+  return seat > 0 ? `tone-${seat % 6}` : ''
+}
+
 const painterName = computed(() => {
-  const painter = view.value?.players.find((player) => player.id === view.value?.painterId)
-  return painter?.name ?? '有人'
+  const painterId = view.value?.painterId
+  if (!painterId) return '有人'
+  return labelOf(painterId).split(' #')[0] || '有人'
 })
 const remoteWord = ref('')
 /** 题面通道出错时的提示（例如 0018 没跑） */
@@ -277,7 +298,8 @@ async function sendGuess() {
   try {
     // 本地先判断一次：服务端要等主持人处理队列再回传，自己先给个即时反馈
     const mine = myWord.value?.word ?? ''
-    const hit = Boolean(mine) && text.toLowerCase() === mine.toLowerCase()
+    // 画的人不能猜自己的题：B 的引擎本来就这么判，本地提示也要跟上
+    const hit = !myTurn.value && Boolean(mine) && text.toLowerCase() === mine.toLowerCase()
 
     if (localBackend) await localBackend.sendMessage(text)
     else await api?.postAction(roomId.value, 'message', { text })
@@ -350,7 +372,7 @@ async function endSession() {
       <view v-if="view.panel.length" class="surface">
         <text class="label">本轮作品</text>
         <view v-for="entry in view.panel" :key="entry.playerId" class="panel-row">
-          <text class="name">{{ entry.name }}</text>
+          <text class="name">{{ entry.name }} {{ entry.shortId }}</text>
           <image v-if="panelUrls[entry.imageRef]" class="shot" :src="panelUrls[entry.imageRef]" mode="widthFix" />
           <text class="muted">答案：{{ entry.answer }}<template v-if="entry.ai"> · AI {{ entry.ai.score }} 分</template></text>
           <view class="reactions">
@@ -363,13 +385,14 @@ async function endSession() {
       <view class="surface">
         <text class="label">猜一猜</text>
         <view v-for="message in view.messages.slice(-8)" :key="message.id" class="message" :class="{ correct: message.kind === 'correct' }">
-          <text class="who">{{ message.playerName }}</text>
+          <text class="who" :class="toneOf(message.playerId)">{{ labelOf(message.playerId, message.playerName) }}</text>
           <text class="text">{{ message.text }}</text>
         </view>
-        <view class="input-row">
+        <view v-if="!myTurn" class="input-row">
           <input v-model="guess" class="input" placeholder="输入你的答案" confirm-type="send" @confirm="sendGuess" />
           <button class="primary small" @click="sendGuess">发送</button>
         </view>
+        <text v-else class="muted">这一轮你在画，不能猜自己的题</text>
       </view>
     </template>
   </view>
@@ -504,7 +527,13 @@ async function endSession() {
   font-size: 26rpx;
 }
 .alert.debug { color: #1e3a8a; background: #e8effc; font-size: 20rpx; }
-</style>
+.tone-0 { color: #4f46e5; }
+.tone-1 { color: #0891b2; }
+.tone-2 { color: #c2410c; }
+.tone-3 { color: #15803d; }
+.tone-4 { color: #7c3aed; }
+.tone-5 { color: #b45309; }</style>
+
 
 
 
