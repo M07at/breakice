@@ -1,4 +1,4 @@
-﻿import type { DrawReaction, DrawRoomBackend, DrawRoomView } from '../modules/draw/room'
+import type { DrawReaction, DrawRoomBackend, DrawRoomView } from '../modules/draw/room'
 
 /**
  * 你画我猜联机的客户端远程层。
@@ -100,10 +100,11 @@ export function createDrawPublisher(options: PublisherOptions): Publisher {
     const payload = action.payload ?? {}
     switch (action.kind) {
       case 'submitDrawing':
-        await options.backend.submitDrawing(String(payload.imageRef ?? ''))
+        // 传上发言人，主持人才能代收别人的画
+        await options.backend.submitDrawing(String(payload.imageRef ?? ''), action.userId)
         break
       case 'message':
-        await options.backend.sendMessage(String(payload.text ?? ''))
+        await options.backend.sendMessage(String(payload.text ?? ''), action.userId)
         break
       case 'reaction':
         await options.backend.sendReaction(String(payload.targetPlayerId ?? ''), payload.kind as DrawReaction)
