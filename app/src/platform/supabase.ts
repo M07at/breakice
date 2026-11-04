@@ -123,7 +123,12 @@ function describeError(data: unknown, status: number): string {
   if (text.includes('ROOM_FULL')) return '房间人数已满'
   if (text.includes('HOST_ONLY')) return '只有主持人可以这么做'
   if (text.includes('NOT_A_MEMBER')) return '你不在这个房间里'
-  if (text.includes('AUTH_REQUIRED') || status === 401) return '登录已过期，请重新进入'
+  if (text.includes('NOT_ALL_READY')) return '还有玩家没有准备'
+  if (text.includes('AUTH_REQUIRED') || status === 401) {
+    // 把服务端原话带上，方便区分「token 过期」「没带 key」「token 无效」
+    const detail = errorText(data).slice(0, 80)
+    return detail ? `登录失效：${detail}` : `登录失效（HTTP ${status}）`
+  }
   return `服务器返回 ${status}`
 }
 
@@ -189,17 +194,29 @@ export class SupabaseRoomApi implements RoomApi {
         fail: () => reject(new PlatformError('AUTH_REQUIRED', '微信登录失败，请重试')),
       })
     })
-    const data = await uniRequest<{
-      user_id: string
-      access_token: string
-      refresh_token: string
-      expires_in: number
-    }>({
+    const raw = await uniRequest<Record<string, unknown>>({
       path: '/functions/v1/wechat-auth',
       method: 'POST',
       body: { code, nickname: getSavedProfile().nickname },
     })
-    return this.store(data.user_id, data.access_token, data.refresh_token, data.expires_in)
+    // 线上部署的函数版本可能和仓库里的返回结构不一致，这里几种常见形状都认
+    const data = (raw ?? {}) as Record<string, any>
+    const nested = (data.session ?? data.data ?? {}) as Record<string, any>
+    const accessToken =
+      data.access_token ?? nested.access_token ?? data.accessToken ?? data.token ?? data.jwt ?? nested.token
+    const refreshToken = data.refresh_token ?? nested.refresh_token ?? data.refreshToken ?? nested.refreshToken ?? ''
+    const expiresIn = Number(data.expires_in ?? nested.expires_in ?? data.expiresIn ?? 3600)
+    const userId =
+      data.user_id ?? nested.user_id ?? data.user?.id ?? nested.user?.id ?? data.profile?.id ?? nested.profile?.id
+
+    if (!accessToken || !userId) {
+      console.warn('[wechat-auth] 返回结构无法识别', raw)
+      throw new PlatformError(
+        'AUTH_REQUIRED',
+        `微信登录返回缺少字段（拿到的是：${Object.keys(data).join(', ') || '空'}）`,
+      )
+    }
+    return this.store(String(userId), String(accessToken), String(refreshToken), expiresIn)
   }
 
   private async signInAnonymously(): Promise<Session> {
