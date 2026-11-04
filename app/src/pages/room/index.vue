@@ -14,6 +14,9 @@ import type { GameType } from '../../types/room'
 
 const roomStore = useRoomStore()
 const room = computed(() => roomStore.room)
+/** 版本标签：改这里就能确认开发者工具里跑的是不是最新包 */
+const BUILD_LABEL = 'v15-1105'
+
 const notice = ref('')
 /** 临时诊断：点开局后这一行会显示走到哪一步，方便定位"点了没反应" */
 const debugLine = ref('')
@@ -255,6 +258,7 @@ onShareAppMessage(() => ({
         <text class="eyebrow">ROOM LOBBY</text>
         <text class="room-title">{{ room.name }}</text>
         <text class="room-platform">{{ roomStore.platformLabel }} · {{ roomStore.memberCount }}/{{ room.maxPlayers }} 人</text>
+        <text class="build-tag">构建 {{ BUILD_LABEL }}</text>
       </view>
       <button class="leave-btn" @click="leaveRoom">退出</button>
     </view>
@@ -559,7 +563,12 @@ onShareAppMessage(() => ({
   margin-top: 30rpx;
 }
 .debug-line { display: block; margin: 6rpx 0 14rpx; padding: 8rpx 12rpx; border-radius: 8rpx; color: #7c2d12; background: #fef3c7; font-size: 20rpx; word-break: break-all; }
+.build-tag { display: block; margin-top: 4rpx; color: var(--muted); font-size: 19rpx; }
 </style>
+
+
+
+
 
 
 
