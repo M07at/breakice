@@ -101,7 +101,10 @@ export async function publishDrawWord(
   }
 }
 
-/** 作画者读自己的题面 */
+/**
+ * 作画者读自己的题面。
+ * 出错时不再静默返回空串——否则页面只是"没有词"，完全看不出是迁移没跑。
+ */
 export async function readMyDrawWord(roomId: string, roundKey: string): Promise<string> {
   if (roomApi.mode !== 'supabase') return ''
   try {
@@ -111,7 +114,12 @@ export async function readMyDrawWord(roomId: string, roundKey: string): Promise<
     })
     return typeof word === 'string' ? word : ''
   } catch (error) {
-    console.warn('读取题面失败', error)
-    return ''
+    const message = error instanceof Error ? error.message : String(error)
+    throw new Error(
+      /does not exist|PGRST202|404/i.test(message)
+        ? '题面通道不存在：请先在 SQL Editor 执行 0018_draw_words.sql'
+        : `读取题面失败：${message.slice(0, 80)}`,
+    )
   }
 }
+

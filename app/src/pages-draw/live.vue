@@ -62,6 +62,8 @@ const painterName = computed(() => {
   return painter?.name ?? '有人'
 })
 const remoteWord = ref('')
+/** 题面通道出错时的提示（例如 0018 没跑） */
+const wordError = ref('')
 let lastRoundKey = ''
 const myWord = computed(() => view.value?.word ?? (remoteWord.value ? { word: remoteWord.value } : null))
 const hintText = computed(() => {
@@ -108,9 +110,13 @@ function adoptView(next: DrawRoomView) {
 
   // 作画者本人：从私有通道取自己的题
   if (!isHost.value && next.painterId === meId.value && !next.word && !remoteWord.value) {
-    void readMyDrawWord(roomId.value, next.roundKey).then((word) => {
-      if (word) remoteWord.value = word
-    })
+    void readMyDrawWord(roomId.value, next.roundKey)
+      .then((word) => {
+        if (word) remoteWord.value = word
+      })
+      .catch((issue) => {
+        wordError.value = issue instanceof Error ? issue.message : String(issue)
+      })
   }
 
   // 作画者的笔画实时广播给其他人：轮到我就开泵，轮不到就停
@@ -319,6 +325,7 @@ async function endSession() {
       }}
     </view>
 
+    <view v-if="wordError" class="alert">{{ wordError }}</view>
     <view v-if="error" class="alert">{{ error }}</view>
 
     <view v-if="!view" class="surface empty">等待主持人开局…</view>
@@ -498,6 +505,9 @@ async function endSession() {
 }
 .alert.debug { color: #1e3a8a; background: #e8effc; font-size: 20rpx; }
 </style>
+
+
+
 
 
 
