@@ -456,7 +456,7 @@ async function endSession() {
 }
 .eyebrow {
   display: block;
-  color: #8a8f9c;
+  color: var(--muted);
   font-size: 20rpx;
   letter-spacing: 2rpx;
 }
@@ -469,13 +469,13 @@ async function endSession() {
 .muted {
   display: block;
   margin-top: 6rpx;
-  color: #8a8f9c;
+  color: var(--muted);
   font-size: 22rpx;
 }
 .surface {
   margin-bottom: 20rpx;
   padding: 24rpx;
-  border-radius: 20rpx;
+  border-radius: var(--radius-md);
   background: #fff;
 }
 .label {
@@ -487,7 +487,7 @@ async function endSession() {
 .word {
   display: block;
   margin-top: 12rpx;
-  color: #4f46e5;
+  color: var(--brand);
   font-size: 30rpx;
   font-weight: 800;
 }
@@ -495,7 +495,7 @@ async function endSession() {
   margin-top: 16rpx;
   border-radius: 14rpx;
   color: #fff;
-  background: #4f46e5;
+  background: var(--brand);
   font-size: 28rpx;
 }
 .primary.small {
@@ -504,22 +504,22 @@ async function endSession() {
   font-size: 24rpx;
 }
 .ghost {
-  border-radius: 12rpx;
-  color: #4f46e5;
-  background: #eef0ff;
+  border-radius: var(--radius-md);
+  color: var(--brand);
+  background: var(--brand-soft);
   font-size: 24rpx;
 }
 .alert {
   margin-bottom: 16rpx;
   padding: 16rpx;
-  border-radius: 12rpx;
-  color: #c2410c;
-  background: #fff1e6;
+  border-radius: var(--radius-md);
+  color: var(--danger);
+  background: var(--brand-soft);
   font-size: 22rpx;
   word-break: break-all;
 }
 .empty {
-  color: #8a8f9c;
+  color: var(--muted);
   text-align: center;
 }
 .panel-row {
@@ -529,8 +529,8 @@ async function endSession() {
   display: block;
   width: 100%;
   margin: 8rpx 0;
-  border-radius: 12rpx;
-  background: #f6f8fb;
+  border-radius: var(--radius-md);
+  background: var(--canvas);
 }
 .name {
   display: block;
@@ -545,8 +545,8 @@ async function endSession() {
 .tiny {
   padding: 0 16rpx;
   border-radius: 10rpx;
-  color: #4f46e5;
-  background: #eef0ff;
+  color: var(--brand);
+  background: var(--brand-soft);
   font-size: 22rpx;
 }
 .message {
@@ -560,7 +560,7 @@ async function endSession() {
   font-weight: 700;
 }
 .who {
-  color: #8a8f9c;
+  color: var(--muted);
 }
 .input-row {
   display: flex;
@@ -571,14 +571,14 @@ async function endSession() {
   flex: 1;
   height: 72rpx;
   padding: 0 20rpx;
-  border-radius: 12rpx;
-  background: #f6f8fb;
+  border-radius: var(--radius-md);
+  background: var(--canvas);
   font-size: 26rpx;
 }
 .alert.debug { color: #1e3a8a; background: #e8effc; font-size: 20rpx; }
-.tone-0 { color: #4f46e5; }
+.tone-0 { color: var(--brand); }
 .tone-1 { color: #0891b2; }
-.tone-2 { color: #c2410c; }
+.tone-2 { color: var(--danger); }
 .tone-3 { color: #15803d; }
 .tone-4 { color: #7c3aed; }
 .tone-5 { color: #b45309; }/* 颁奖台：1/2/3 名高度递减，图片用 Avatar 组件 */
@@ -621,7 +621,7 @@ async function endSession() {
 }
 .pscore {
   margin-top: 4rpx;
-  color: #172033;
+  color: var(--ink);
   font-size: 32rpx;
   font-weight: 800;
 }
@@ -633,12 +633,12 @@ async function endSession() {
   align-items: center;
   gap: 12rpx;
   padding: 12rpx 8rpx;
-  border-bottom: 1rpx solid #f0f1f5;
+  border-bottom: 1rpx solid var(--line);
   font-size: 24rpx;
 }
 .tr text:first-child {
   width: 60rpx;
-  color: #8a8f9c;
+  color: var(--muted);
 }
 .tr text:nth-child(2) {
   flex: 1;
@@ -649,9 +649,11 @@ async function endSession() {
   font-weight: 700;
 }
 .tr.th {
-  color: #8a8f9c;
+  color: var(--muted);
   font-size: 22rpx;
 }</style>
+
+
 
 
 
