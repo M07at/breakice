@@ -1,8 +1,8 @@
-/* 微信小程序的 WXSS 没有 :root，设计变量挂在 page 上，H5 会被 uni-app 映射到 uni-page-body。 */
+﻿/* 微信小程序的 WXSS 没有 :root，设计变量挂在 page 上，H5 会被 uni-app 映射到 uni-page-body。 */
 page {
-  --brand: #4f46e5;
-  --brand-deep: #3730a3;
-  --brand-soft: #eef0ff;
+  --brand: #4f8ef7;
+  --brand-deep: #2f6bd6;
+  --brand-soft: #e9f1ff;
   --mint: #0f9f87;
   --mint-soft: #e7f8f4;
   --warning: #d97706;
@@ -130,3 +130,4 @@ page {
   align-items: center;
   justify-content: space-between;
 }
+

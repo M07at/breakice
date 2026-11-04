@@ -152,13 +152,13 @@ async function generateWxCode() {
   margin-top: 16rpx;
   border-radius: 16rpx;
   color: #fff;
-  background: #4f46e5;
+  background: var(--brand);
   font-size: 28rpx;
 }
 
 .btn.ghost {
-  color: #4f46e5;
-  background: #eef0ff;
+  color: var(--brand);
+  background: var(--brand-soft);
 }
 
 .error {
@@ -170,4 +170,5 @@ async function generateWxCode() {
 }
 .warn { margin-top: 8rpx; padding: 12rpx 16rpx; border-radius: 10rpx; color: #7c2d12; background: #fef3c7; font-size: 20rpx; line-height: 1.5; }
 </style>
+
 

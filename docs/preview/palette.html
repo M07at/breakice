@@ -1,0 +1,261 @@
+﻿<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>破冰局 · 配色预览</title>
+    <style>
+      /* 与 app/src/styles/tokens.scss 保持一致；改色时两边一起改 */
+      :root {
+        --brand: #4f8ef7;
+        --brand-deep: #2f6bd6;
+        --brand-soft: #e9f1ff;
+        --mint: #0f9f87;
+        --mint-soft: #e7f8f4;
+        --warning: #d97706;
+        --danger: #dc4c64;
+        --ink: #172033;
+        --muted: #6c7588;
+        --line: #e7eaf0;
+        --surface: #ffffff;
+        --canvas: #f6f8fb;
+        --shadow: 0 6px 16px rgba(30, 41, 59, 0.08);
+        --radius-lg: 14px;
+        --radius-md: 10px;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        padding: 18px;
+        background: var(--canvas);
+        color: var(--ink);
+        font-family: -apple-system, 'PingFang SC', 'Microsoft YaHei', sans-serif;
+        font-size: 14px;
+      }
+      .eyebrow {
+        color: var(--muted);
+        font-size: 10px;
+        letter-spacing: 1px;
+      }
+      .title {
+        margin: 2px 0 0;
+        font-size: 18px;
+        font-weight: 800;
+      }
+      .muted {
+        color: var(--muted);
+        font-size: 11px;
+      }
+      .surface {
+        margin-top: 12px;
+        padding: 14px;
+        border-radius: var(--radius-lg);
+        background: var(--surface);
+        box-shadow: var(--shadow);
+      }
+      .label {
+        display: block;
+        margin-bottom: 6px;
+        font-size: 14px;
+        font-weight: 700;
+      }
+      .code-card {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 14px;
+        border-radius: var(--radius-lg);
+        color: #fff;
+        background: linear-gradient(135deg, #4f8ef7, #7fb4fb);
+        box-shadow: 0 8px 18px rgba(79, 142, 247, 0.22);
+      }
+      .code {
+        display: block;
+        margin-top: 3px;
+        font-size: 26px;
+        font-weight: 800;
+        letter-spacing: 3px;
+      }
+      .code-hint {
+        display: block;
+        margin-top: 3px;
+        opacity: 0.85;
+        font-size: 11px;
+      }
+      .mini {
+        display: inline-block;
+        margin-top: 9px;
+        margin-right: 6px;
+        padding: 5px 10px;
+        border-radius: 6px;
+        background: rgba(255, 255, 255, 0.2);
+        font-size: 11px;
+      }
+      .players {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
+      .row {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+      .dot {
+        width: 22px;
+        height: 22px;
+        border-radius: 50%;
+        background: var(--brand-soft);
+        color: var(--brand);
+        font-size: 11px;
+        line-height: 22px;
+        text-align: center;
+      }
+      .tag {
+        margin-left: auto;
+        padding: 2px 8px;
+        border-radius: 999px;
+        background: var(--mint-soft);
+        color: var(--mint);
+        font-size: 10px;
+      }
+      .tag.off {
+        background: var(--canvas);
+        color: var(--muted);
+      }
+      .btn {
+        display: block;
+        width: 100%;
+        margin-top: 10px;
+        padding: 11px;
+        border: 0;
+        border-radius: var(--radius-md);
+        color: #fff;
+        background: var(--brand);
+        font-size: 14px;
+        font-weight: 600;
+        text-align: center;
+      }
+      .btn.secondary {
+        color: var(--brand);
+        background: var(--brand-soft);
+      }
+      .choice {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        margin-top: 8px;
+        padding: 11px;
+        border-radius: var(--radius-md);
+        background: var(--canvas);
+      }
+      .choice .arrow {
+        margin-left: auto;
+        color: var(--muted);
+      }
+      .podium {
+        display: flex;
+        align-items: flex-end;
+        gap: 8px;
+        margin-top: 6px;
+      }
+      .podium .item {
+        flex: 1;
+        padding: 10px 6px;
+        border-radius: var(--radius-md);
+        text-align: center;
+        background: linear-gradient(180deg, #eef4ff, #dbe8ff);
+      }
+      .podium .item.first {
+        order: 2;
+        padding-top: 16px;
+        background: linear-gradient(180deg, #fff7e0, #ffe9b8);
+      }
+      .podium .item.second {
+        order: 1;
+      }
+      .podium .item.third {
+        order: 3;
+        background: linear-gradient(180deg, #fdf1e7, #f6ddc8);
+      }
+      .seat {
+        color: var(--brand);
+        font-weight: 700;
+      }
+      .score {
+        display: block;
+        font-size: 18px;
+        font-weight: 800;
+      }
+      .table .tr {
+        display: flex;
+        gap: 8px;
+        padding: 8px 2px;
+        border-bottom: 1px solid var(--line);
+        font-size: 12px;
+      }
+      .table .tr span:first-child {
+        width: 28px;
+        color: var(--muted);
+      }
+      .table .tr span:nth-child(2) {
+        flex: 1;
+      }
+      .table .tr span:last-child {
+        width: 46px;
+        text-align: right;
+        font-weight: 700;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="eyebrow">ROOM LOBBY</div>
+    <div class="title">周五晚 · 破冰局</div>
+    <div class="muted">Supabase · 4/8 人 · 构建 v17</div>
+
+    <div class="surface">
+      <div class="code-card">
+        <div>
+          <span style="opacity: 0.85; font-size: 11px">房间号</span>
+          <span class="code">KDZ4YW</span>
+          <span class="code-hint">分享房间号或二维码，邀请朋友加入</span>
+          <span class="mini">复制房间号</span><span class="mini">二维码</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="surface">
+      <span class="label">房间成员 4/8</span>
+      <div class="players">
+        <div class="row"><span class="dot">1</span><span>阿瑞 <span class="muted">#1</span></span><span class="tag">已准备</span></div>
+        <div class="row"><span class="dot">2</span><span>小明 <span class="muted">#2</span></span><span class="tag">已准备</span></div>
+        <div class="row"><span class="dot">3</span><span>小明 <span class="muted">#3</span></span><span class="tag off">未准备</span></div>
+        <div class="row"><span class="dot">4</span><span>悦悦 <span class="muted">#4</span></span><span class="tag">已准备</span></div>
+      </div>
+      <button class="btn">我准备好了</button>
+    </div>
+
+    <div class="surface">
+      <span class="label">主持人控制台</span>
+      <div class="choice"><span>🕵️</span><span>谁是卧底</span><span class="arrow">›</span></div>
+      <div class="choice"><span>✏️</span><span>你画我猜谁是卧底</span><span class="arrow">›</span></div>
+      <div class="choice"><span>🎡</span><span>真心话大冒险</span><span class="arrow">›</span></div>
+    </div>
+
+    <div class="surface">
+      <span class="label">最终排名</span>
+      <div class="podium">
+        <div class="item second"><div>🥈</div><div class="seat">小明 #2</div><span class="score">520</span></div>
+        <div class="item first"><div>🥇</div><div class="seat">阿瑞 #1</div><span class="score">760</span></div>
+        <div class="item third"><div>🥉</div><div class="seat">悦悦 #4</div><span class="score">410</span></div>
+      </div>
+      <div class="table">
+        <div class="tr"><span>4</span><span class="seat">小明 #3</span><span>200</span></div>
+      </div>
+      <button class="btn secondary">返回房间</button>
+    </div>
+  </body>
+</html>
+

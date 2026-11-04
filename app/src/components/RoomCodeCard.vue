@@ -1,4 +1,4 @@
-<script setup lang="ts">
+﻿<script setup lang="ts">
 const props = defineProps<{ code: string; roomName: string }>()
 
 function copyCode() {
@@ -50,8 +50,8 @@ function openQr() {
   padding: 28rpx;
   border-radius: var(--radius-lg);
   color: #fff;
-  background: linear-gradient(135deg, #4f46e5, #6259e9);
-  box-shadow: 0 16rpx 30rpx rgba(79, 70, 229, 0.22);
+  background: linear-gradient(135deg, #4f8ef7, #7fb4fb);
+  box-shadow: 0 16rpx 30rpx rgba(79, 142, 247, 0.22);
 }
 
 .code-copy {
@@ -117,3 +117,4 @@ function openQr() {
   font-size: 19rpx;
 }
 </style>
+
