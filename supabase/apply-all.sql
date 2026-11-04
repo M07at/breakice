@@ -1,15 +1,7 @@
-﻿-- 破冰局 · 一次性建库脚本（0001 → 0006 按顺序拼接）
--- 用法：Supabase 后台 → SQL Editor → 新建查询 → 粘贴全文 → Run
--- 说明：
---   1. 每支迁移都是幂等的（if not exists / create or replace / drop policy if exists），
---      重复执行不会报错，也不会重复插数据。
---   2. 开头有一段兼容处理：如果项目里已经存在一张「结构不同」的 public.rooms
---      （例如早期原型留下的、没有 code 列的表），会先把旧表改名成 rooms_legacy_backup
---      再建新表。**只改名，不删任何数据**；确认旧数据没用之后可以自己 drop。
+﻿-- 破冰局 · 建库前处理：把早期原型留下的同名表改名备份
+-- 用法：先单独执行本文件，再按 0001 → 0006 顺序执行 migrations。
+-- 只改名，不删数据；确认旧数据没用之后可以自己 drop table public.rooms_legacy_backup;
 
--- ===========================================================================
--- 0. 兼容：旧原型的 rooms 表与新 schema 冲突时，改名备份
--- ===========================================================================
 do $$
 begin
   if exists (
@@ -19,15 +11,17 @@ begin
     select 1 from information_schema.columns
     where table_schema = 'public' and table_name = 'rooms' and column_name = 'code'
   ) then
-    if not exists (
+    if exists (
       select 1 from information_schema.tables
       where table_schema = 'public' and table_name = 'rooms_legacy_backup'
     ) then
-      alter table public.rooms rename to rooms_legacy_backup;
-      raise notice 'old public.rooms renamed to rooms_legacy_backup';
+      raise notice 'rooms_legacy_backup 已存在，跳过改名';
     else
-      raise notice 'rooms_legacy_backup already exists; skipped rename';
+      alter table public.rooms rename to rooms_legacy_backup;
+      raise notice '旧 rooms 已改名为 rooms_legacy_backup';
     end if;
+  else
+    raise notice 'public.rooms 不存在或已经是新结构，无需处理';
   end if;
 end $$;
 
@@ -1156,6 +1150,10 @@ grant execute on function public.submit_artwork(uuid, text, text) to authenticat
 -- 破冰局 · A：画作存储桶与访问策略
 -- 路径约定：{game_id}/{turn_key}/{user_id}.png
 -- 只有同房间成员可上传/读取；桶为私有，前端用 storage.createSignedUrl 展示。
+--
+-- 集成修正：storage.objects 的 owner / bucket_id 在不同 Supabase Storage 版本里
+-- 可能是 text 也可能是 uuid，直接和 text 比较会报 42883 operator does not exist: uuid = text。
+-- 这里两边都显式转 text，与版本无关。
 
 insert into storage.buckets (id, name, public)
 values ('artworks', 'artworks', false)
@@ -1165,7 +1163,7 @@ drop policy if exists artworks_upload_member on storage.objects;
 create policy artworks_upload_member on storage.objects
 for insert to authenticated
 with check (
-  bucket_id = 'artworks'
+  bucket_id::text = 'artworks'
   and public.is_room_member(((storage.foldername(name))[1])::uuid)
 );
 
@@ -1173,7 +1171,7 @@ drop policy if exists artworks_read_member on storage.objects;
 create policy artworks_read_member on storage.objects
 for select to authenticated
 using (
-  bucket_id = 'artworks'
+  bucket_id::text = 'artworks'
   and public.is_room_member(((storage.foldername(name))[1])::uuid)
 );
 
@@ -1181,8 +1179,8 @@ drop policy if exists artworks_delete_owner on storage.objects;
 create policy artworks_delete_owner on storage.objects
 for delete to authenticated
 using (
-  bucket_id = 'artworks'
-  and owner = auth.uid()::text
+  bucket_id::text = 'artworks'
+  and owner::text = auth.uid()::text
 );
 
 -- =======================================================================
