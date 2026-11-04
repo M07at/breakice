@@ -1,7 +1,4 @@
 <script setup lang="ts">
-import { computed } from 'vue'
-import QrCode from './QrCode.vue'
-
 const props = defineProps<{ code: string; roomName: string }>()
 
 function copyCode() {
@@ -16,11 +13,18 @@ function shareRoom() {
 }
 
 /**
- * 二维码里放的是带房间号的深链文本。
- * 小程序里用「加入房间 → 扫描二维码」扫它，applyRoomCode 会解析出 code 参数。
- * 注意：这不是微信「小程序码」，小程序码需要服务端用 access_token 调接口生成。
+ * 二维码放到独立页面：旧版 canvas 是原生组件，会浮在页面上层并吃掉点击，
+ * 放在大厅里会挡住主持人控制台的卡片。
  */
-const qrText = computed(() => `break-ice-hall://join?code=${props.code}`)
+function openQr() {
+  uni.navigateTo({
+    url: `/pages/room/qr?code=${encodeURIComponent(props.code)}`,
+    fail: (error) => {
+      console.warn('打开二维码页失败', error)
+      uni.showToast({ title: '打不开二维码页', icon: 'none' })
+    },
+  })
+}
 </script>
 
 <template>
@@ -32,11 +36,8 @@ const qrText = computed(() => `break-ice-hall://join?code=${props.code}`)
       <view class="code-actions">
         <button class="mini-btn" @click="copyCode">复制房间号</button>
         <button class="mini-btn secondary" @click="shareRoom">分享房间</button>
+        <button class="mini-btn" @click="openQr">二维码</button>
       </view>
-    </view>
-    <view class="qr-wrap">
-      <QrCode :text="qrText" :size="118" canvas-id="room-code-qr" />
-      <text class="qr-tip">扫码加入</text>
     </view>
   </view>
 </template>
