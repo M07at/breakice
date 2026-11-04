@@ -143,6 +143,25 @@ export function avatarForSeat(seat: number): AvatarConfig {
   }
 }
 
+/** 只解出 JWT 的声明部分用于排查，不做验签，也不打印签名 */
+function decodeClaims(token: string): Record<string, unknown> | null {
+  const parts = token.split('.')
+  if (parts.length !== 3) return null
+  try {
+    const payload = parts[1].replace(/-/g, '+').replace(/_/g, '/')
+    const json = decodeURIComponent(
+      payload
+        .split('')
+        .map((char) => `%${`00${char.charCodeAt(0).toString(16)}`.slice(-2)}`)
+        .join(''),
+    )
+    const claims = JSON.parse(json) as Record<string, unknown>
+    return { role: claims.role, aud: claims.aud, iss: claims.iss, exp: claims.exp, sub: claims.sub }
+  } catch {
+    return null
+  }
+}
+
 export class SupabaseRoomApi implements RoomApi {
   readonly mode = 'supabase' as const
   readonly label = 'Supabase 房间'
@@ -216,6 +235,8 @@ export class SupabaseRoomApi implements RoomApi {
         `微信登录返回缺少字段（拿到的是：${Object.keys(data).join(', ') || '空'}）`,
       )
     }
+    // 只打印 JWT 的声明部分（role / exp / iss），不含签名，用来判断 PostgREST 为什么拒绝
+    console.log('[wechat-auth] 会话', { userId, tokenLen: String(accessToken).length, claims: decodeClaims(String(accessToken)) })
     return this.store(String(userId), String(accessToken), String(refreshToken), expiresIn)
   }
 
