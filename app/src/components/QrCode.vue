@@ -18,27 +18,94 @@ const props = withDefaults(
 const instance = getCurrentInstance()?.proxy
 const styleSize = computed(() => `${props.size}px`)
 
-function draw() {
-  if (!props.text) return
+interface QrMatrix {
+  count: number
+  isDark(row: number, col: number): boolean
+}
+
+function buildMatrix(): QrMatrix | null {
+  if (!props.text) return null
   const qr = qrcode(0, 'M')
   qr.addData(props.text)
   qr.make()
+  return { count: qr.getModuleCount(), isDark: (row, col) => qr.isDark(row, col) }
+}
 
-  const count = qr.getModuleCount()
-  const cell = props.size / count
+/** 按矩阵逐格填色 */
+function paint(ctx: CanvasRenderingContext2D | UniApp.CanvasContext, matrix: QrMatrix) {
+  const cell = props.size / matrix.count
+  ctx.fillStyle = props.light
+  ctx.fillRect(0, 0, props.size, props.size)
+  ctx.fillStyle = props.dark
+  for (let row = 0; row < matrix.count; row++) {
+    for (let col = 0; col < matrix.count; col++) {
+      if (!matrix.isDark(row, col)) continue
+      // 多画 0.4px 消除模块之间的缝隙
+      ctx.fillRect(col * cell, row * cell, cell + 0.4, cell + 0.4)
+    }
+  }
+}
+
+/**
+ * 小程序：用 <canvas type="2d"> 同层渲染。
+ * 旧版 canvas-id 是原生组件，会浮在页面上层并把点击吃掉，必须避开。
+ */
+function drawSameLayer() {
+  const matrix = buildMatrix()
+  if (!matrix) return
+  // uni 的类型定义里 NodeField 是给小程序用的，H5 没有，这里按运行时能力取
+  const query = uni.createSelectorQuery().in(instance as never) as unknown as {
+    select(selector: string): {
+      fields(fields: Record<string, boolean>): {
+        exec(callback: (result: { node?: unknown }[]) => void): void
+      }
+    }
+  }
+  query
+    .select(`#${props.canvasId}`)
+    .fields({ node: true, size: true })
+    .exec((result) => {
+      const node = result?.[0]?.node as
+        | { width: number; height: number; getContext(type: '2d'): CanvasRenderingContext2D }
+        | undefined
+      if (!node) {
+        drawLegacy()
+        return
+      }
+      const dpr = uni.getSystemInfoSync().pixelRatio || 2
+      node.width = props.size * dpr
+      node.height = props.size * dpr
+      const ctx = node.getContext('2d')
+      ctx.scale(dpr, dpr)
+      paint(ctx, matrix)
+    })
+}
+
+/** H5 兜底：没有 node 节点时走旧的 CanvasContext */
+function drawLegacy() {
+  const matrix = buildMatrix()
+  if (!matrix) return
   const ctx = uni.createCanvasContext(props.canvasId, instance as never)
-
   ctx.setFillStyle(props.light)
   ctx.fillRect(0, 0, props.size, props.size)
   ctx.setFillStyle(props.dark)
-  for (let row = 0; row < count; row++) {
-    for (let col = 0; col < count; col++) {
-      if (!qr.isDark(row, col)) continue
-      // 多画 0.3px 消除模块之间的缝隙
-      ctx.fillRect(col * cell, row * cell, cell + 0.3, cell + 0.3)
+  const cell = props.size / matrix.count
+  for (let row = 0; row < matrix.count; row++) {
+    for (let col = 0; col < matrix.count; col++) {
+      if (!matrix.isDark(row, col)) continue
+      ctx.fillRect(col * cell, row * cell, cell + 0.4, cell + 0.4)
     }
   }
   ctx.draw()
+}
+
+function draw() {
+  // #ifdef H5
+  drawLegacy()
+  // #endif
+  // #ifndef H5
+  drawSameLayer()
+  // #endif
 }
 
 onMounted(() => {
@@ -54,7 +121,13 @@ watch(
 
 <template>
   <view class="qr" :style="{ width: styleSize, height: styleSize }">
-    <canvas :canvas-id="canvasId" :id="canvasId" class="qr-canvas" :style="{ width: styleSize, height: styleSize }" />
+    <canvas
+      type="2d"
+      :id="canvasId"
+      :canvas-id="canvasId"
+      class="qr-canvas"
+      :style="{ width: styleSize, height: styleSize }"
+    />
   </view>
 </template>
 
@@ -67,5 +140,7 @@ watch(
 
 .qr-canvas {
   display: block;
+  width: 100%;
+  height: 100%;
 }
 </style>
