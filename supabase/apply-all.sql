@@ -1,7 +1,35 @@
 ﻿-- 破冰局 · 一次性建库脚本（0001 → 0006 按顺序拼接）
 -- 用法：Supabase 后台 → SQL Editor → 新建查询 → 粘贴全文 → Run
--- 说明：每支迁移都是幂等的（if not exists / create or replace / drop policy if exists），
---       重复执行不会报错，也不会重复插入数据。
+-- 说明：
+--   1. 每支迁移都是幂等的（if not exists / create or replace / drop policy if exists），
+--      重复执行不会报错，也不会重复插数据。
+--   2. 开头有一段兼容处理：如果项目里已经存在一张「结构不同」的 public.rooms
+--      （例如早期原型留下的、没有 code 列的表），会先把旧表改名成 rooms_legacy_backup
+--      再建新表。**只改名，不删任何数据**；确认旧数据没用之后可以自己 drop。
+
+-- ===========================================================================
+-- 0. 兼容：旧原型的 rooms 表与新 schema 冲突时，改名备份
+-- ===========================================================================
+do $$
+begin
+  if exists (
+    select 1 from information_schema.tables
+    where table_schema = 'public' and table_name = 'rooms'
+  ) and not exists (
+    select 1 from information_schema.columns
+    where table_schema = 'public' and table_name = 'rooms' and column_name = 'code'
+  ) then
+    if not exists (
+      select 1 from information_schema.tables
+      where table_schema = 'public' and table_name = 'rooms_legacy_backup'
+    ) then
+      alter table public.rooms rename to rooms_legacy_backup;
+      raise notice 'old public.rooms renamed to rooms_legacy_backup';
+    else
+      raise notice 'rooms_legacy_backup already exists; skipped rename';
+    end if;
+  end if;
+end $$;
 
 -- =======================================================================
 -- 0001_schema.sql
@@ -348,7 +376,6 @@ where public.is_room_member(g.room_id);
 revoke all on public.game_public from anon;
 grant select on public.game_public to authenticated;
 
-
 -- =======================================================================
 -- 0002_rls.sql
 -- =======================================================================
@@ -530,7 +557,6 @@ revoke insert, update, delete on public.ai_scores      from anon, authenticated;
 revoke insert, update, delete on public.scores         from anon, authenticated;
 revoke insert, update, delete on public.room_members   from anon, authenticated;
 revoke insert, delete on public.rooms                  from anon, authenticated;
-
 
 -- =======================================================================
 -- 0003_rpc_room.sql
@@ -843,7 +869,6 @@ grant execute on function public.transfer_host(uuid, uuid) to authenticated;
 grant execute on function public.set_room_settings(uuid, text, jsonb) to authenticated;
 grant execute on function public.close_room(uuid) to authenticated;
 
-
 -- =======================================================================
 -- 0004_rpc_game.sql
 -- =======================================================================
@@ -1125,7 +1150,6 @@ grant execute on function public.get_my_word(uuid) to authenticated;
 grant execute on function public.acknowledge_my_word(uuid) to authenticated;
 grant execute on function public.submit_artwork(uuid, text, text) to authenticated;
 
-
 -- =======================================================================
 -- 0005_storage.sql
 -- =======================================================================
@@ -1160,7 +1184,6 @@ using (
   bucket_id = 'artworks'
   and owner = auth.uid()::text
 );
-
 
 -- =======================================================================
 -- 0006_rpc_lobby_integration.sql
@@ -1291,5 +1314,3 @@ revoke all on function public.set_my_nickname(text) from public;
 grant execute on function public.start_room_game(uuid, text) to authenticated;
 grant execute on function public.end_room_game(uuid) to authenticated;
 grant execute on function public.set_my_nickname(text) to authenticated;
-
-
