@@ -21,6 +21,8 @@ export const useRoomStore = defineStore('room', () => {
   const connecting = ref(false)
 
   let unsubscribe: Unsubscribe | null = null
+/** 这个房间是不是本机亲手建的：只有亲手建的才允许关房 */
+let hostedHere = false
 let liveUnsubscribe: (() => void) | null = null
 
   const platformLabel = computed(() => roomService.platformLabel())
@@ -89,6 +91,7 @@ let liveUnsubscribe: (() => void) | null = null
     try {
       await syncIdentityQuietly()
       const created = await roomService.createRoom(input)
+      hostedHere = true
       attach(created)
       subscribe(created.id)
     } catch (issue) {
@@ -105,6 +108,7 @@ let liveUnsubscribe: (() => void) | null = null
     try {
       await syncIdentityQuietly()
       const joined = await roomService.joinRoom(input)
+      hostedHere = false
       attach(joined)
       subscribe(joined.id)
     } catch (issue) {
@@ -128,6 +132,7 @@ let liveUnsubscribe: (() => void) | null = null
     connecting.value = true
     try {
       const next = await roomService.fetchRoom(roomId)
+      hostedHere = false
       attach(next)
       subscribe(next.id)
       return true
@@ -209,7 +214,10 @@ let liveUnsubscribe: (() => void) | null = null
   async function leave() {
     if (room.value) {
       try {
-        if (isHost.value) await roomService.closeRoom(room.value.id)
+        // 只有「在这台设备上亲手建过这个房间」才允许关房。
+        // 否则同一个微信号在另一台设备上进房后点退出，会以房主身份把房间关掉，
+        // 把还在房间里的人全部挤出去。
+        if (isHost.value && hostedHere) await roomService.closeRoom(room.value.id)
         else await roomService.leaveRoom(room.value.id)
       } catch {
         // 离开失败也要清掉本地状态，避免卡在房间里
@@ -256,6 +264,8 @@ let liveUnsubscribe: (() => void) | null = null
     clear,
   }
 })
+
+
 
 
 
