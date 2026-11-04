@@ -109,15 +109,25 @@ function askFillBots(shortfall: number): Promise<boolean> {
     uni.showModal({
       title: '人数不够',
       content: `还差 ${shortfall} 人。要补 ${shortfall} 个机器人先开一局吗？机器人会自动领词、跳过自己的发言、随机投票。`,
-      confirmText: `补 ${shortfall} 个机器人`,
+      // 微信限制：confirmText / cancelText 都不能超过 4 个字符，超了 showModal 直接失败
+      confirmText: '补位开局',
       cancelText: '再等等',
       success: (result) => resolve(Boolean(result.confirm)),
-      fail: () => resolve(false),
+      // 弹窗本身失败时按"同意补位"处理，别让主持人点了没反应
+      fail: (error) => {
+        console.warn('补位确认弹窗失败，直接补位', error)
+        resolve(true)
+      },
     })
   })
 }
 
 async function hostStart(gameType: GameType) {
+  console.log('[房间] 点击开局', gameType, {
+    members: roomStore.memberCount,
+    allReady: roomStore.allReady,
+    isHost: roomStore.isHost,
+  })
   const minPlayers = MIN_PLAYERS[gameType]
   // 谁是卧底 / 融合玩法可以用机器人补位，人数不够也能开局
   if (roomStore.memberCount < minPlayers && !isUndercover(gameType)) {
@@ -125,7 +135,12 @@ async function hostStart(gameType: GameType) {
     return
   }
   if (!roomStore.allReady) {
-    uni.showToast({ title: `还有 ${missingReady.value} 人没准备`, icon: 'none' })
+    uni.showModal({
+      title: '还不能开局',
+      content: `还有 ${missingReady.value} 人没点「我准备好了」，等他们准备好再开局。`,
+      showCancel: false,
+      confirmText: '知道了',
+    })
     return
   }
   if (gameType === 'drawing') {
@@ -141,7 +156,12 @@ async function hostStart(gameType: GameType) {
         const fill = await askFillBots(shortfall)
         if (!fill) return
       }
-      await startUndercoverRound(room.value.id, variant, shortfall)
+      uni.showLoading({ title: '正在开局…', mask: true })
+      try {
+        await startUndercoverRound(room.value.id, variant, shortfall)
+      } finally {
+        uni.hideLoading()
+      }
       roomStore.markPlaying(gameType)
       await nextTick()
       openPage(PLAYER_PAGE[variant])
@@ -151,6 +171,7 @@ async function hostStart(gameType: GameType) {
     await nextTick()
     openPage(gameUrl(gameType))
   } catch (issue) {
+    uni.hideLoading()
     uni.showToast({ title: toErrorMessage(issue), icon: 'none' })
   }
 }
