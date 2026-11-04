@@ -89,9 +89,16 @@ async function main() {
   console.log(`项目：${BASE}\n`)
 
   console.log('[1] 表结构')
+  // 表只对 authenticated 授权（RLS 负责过滤），所以先用匿名会话拿 token 再探测
+  let probe = null
+  try {
+    probe = await anonymousSession('probe')
+  } catch (error) {
+    console.log(`  （匿名登录不可用，改用未登录身份探测：${String(error.message).slice(0, 80)}）`)
+  }
   for (const table of ['profiles', 'rooms', 'room_members', 'games', 'game_secrets', 'artworks', 'word_banks']) {
     try {
-      await call(`/rest/v1/${table}?select=*&limit=1`)
+      await call(`/rest/v1/${table}?select=*&limit=1`, { token: probe?.token })
       ok(`表 ${table}`)
     } catch (error) {
       fail(`表 ${table}`, String(error.message).slice(0, 160))
@@ -167,8 +174,10 @@ async function main() {
   }
 
   try {
-    await call(`/rest/v1/room_members?room_id=eq.${roomId}`, { token: outsider.token })
-    fail('房间隔离', '陌生人读到了成员列表')
+    const { data } = await call(`/rest/v1/room_members?room_id=eq.${roomId}`, { token: outsider.token })
+    // RLS 下可能是「报错」，也可能是「返回空数组」，两种都算隔离成功
+    if (Array.isArray(data) && data.length === 0) ok('房间隔离：陌生人读不到成员')
+    else fail('房间隔离', `陌生人读到了 ${Array.isArray(data) ? data.length : '?'} 条成员`)
   } catch {
     ok('房间隔离：陌生人读不到成员')
   }
