@@ -1,7 +1,7 @@
 // 破冰局 · A：微信登录 → Supabase 会话
 // 流程：wx.login() 拿 code → 本函数调 jscode2session 换 openid → 建/取用户 → 返回会话
 // 需要的函数级密钥（不要放进前端）：
-//   WECHAT_APPID / WECHAT_APPSECRET / WECHAT_LOGIN_SECRET
+//   WECHAT_APPID / WECHAT_SECRET（或 WECHAT_APPSECRET）/ WECHAT_LOGIN_SECRET
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2"
 
 export const corsHeaders = {
@@ -11,6 +11,7 @@ export const corsHeaders = {
 }
 
 const SESSION_URL = "https://api.weixin.qq.com/sns/jscode2session"
+const DEFAULT_NICKNAME = "玩家"
 
 function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
@@ -34,6 +35,24 @@ async function derivePassword(openid: string, secret: string) {
     .slice(0, 40)
 }
 
+type Admin = ReturnType<typeof createClient>
+
+/**
+ * 按邮箱在 auth.users 里找人。
+ * profiles.openid 可能因为历史迁移缺失，这里兜底，避免"用户已存在但找不到 id"。
+ */
+async function findUserIdByEmail(admin: Admin, email: string): Promise<string | undefined> {
+  const target = email.toLowerCase()
+  for (let page = 1; page <= 5; page++) {
+    const { data, error } = await admin.auth.admin.listUsers({ page, perPage: 200 })
+    if (error || !data?.users?.length) return undefined
+    const hit = (data.users as { id: string; email?: string }[]).find((user) => user.email?.toLowerCase() === target)
+    if (hit) return hit.id
+    if (data.users.length < 200) return undefined
+  }
+  return undefined
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders })
   if (req.method !== "POST") return json({ error: "METHOD_NOT_ALLOWED" }, 405)
@@ -53,10 +72,10 @@ Deno.serve(async (req) => {
   // 两个都认，避免重新部署时因为命名不一致直接 WECHAT_NOT_CONFIGURED。
   const appsecret = Deno.env.get("WECHAT_APPSECRET") ?? Deno.env.get("WECHAT_SECRET")
   // 派生密码用的密钥：优先 WECHAT_LOGIN_SECRET，没配就退回 AppSecret 本身。
-  // 一旦线上有用户，这个值不能再改，否则老用户会变成新账号。
+  // 一旦线上有用户，这个值不能再改，否则老用户密码对不上（下面会自动重设，但仍建议固定）。
   const loginSecret = Deno.env.get("WECHAT_LOGIN_SECRET") ?? appsecret
   if (!appid || !appsecret) {
-    return json({ error: "WECHAT_NOT_CONFIGURED" }, 500)
+    return json({ error: "WECHAT_NOT_CONFIGURED", detail: "缺少 WECHAT_APPID / WECHAT_SECRET" }, 500)
   }
 
   const url = `${SESSION_URL}?appid=${encodeURIComponent(appid)}&secret=${encodeURIComponent(appsecret)}&js_code=${encodeURIComponent(code)}&grant_type=authorization_code`
@@ -75,67 +94,103 @@ Deno.serve(async (req) => {
 
   const supabaseUrl = Deno.env.get("SUPABASE_URL")
   const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")
-  if (!supabaseUrl || !serviceKey) return json({ error: "SUPABASE_NOT_CONFIGURED" }, 500)
+  if (!supabaseUrl || !serviceKey) {
+    return json({ error: "SUPABASE_NOT_CONFIGURED", detail: "缺少 SUPABASE_URL / SERVICE_ROLE_KEY" }, 500)
+  }
 
   const admin = createClient(supabaseUrl, serviceKey, {
     auth: { persistSession: false, autoRefreshToken: false },
   })
 
-  const email = `${session.openid}@wechat.local`
-  const password = await derivePassword(session.openid, loginSecret)
+  const openid = String(session.openid)
+  const email = `${openid}@wechat.local`
+  const password = await derivePassword(openid, loginSecret)
+  const nickname = payload.nickname?.trim() || DEFAULT_NICKNAME
 
-  const { data: existingProfile } = await admin
+  // ---- 1) 找到这个微信对应的账号：openid → 邮箱 → 新建 ----
+  let userId: string | undefined
+  let currentNickname: string | undefined
+
+  const { data: byOpenid } = await admin
     .from("profiles")
-    .select("id, nickname, avatar_url")
-    .eq("openid", session.openid)
+    .select("id, nickname")
+    .eq("openid", openid)
     .maybeSingle()
+  if (byOpenid?.id) {
+    userId = byOpenid.id as string
+    currentNickname = (byOpenid.nickname as string | null) ?? undefined
+  }
 
-  let userId = existingProfile?.id as string | undefined
+  if (!userId) {
+    // profiles 里的 openid 可能是历史遗留的空值，按邮箱兜底
+    userId = await findUserIdByEmail(admin, email)
+  }
 
   if (!userId) {
     const { data: created, error } = await admin.auth.admin.createUser({
       email,
       password,
       email_confirm: true,
-      user_metadata: {
-        openid: session.openid,
-        nickname: payload.nickname ?? "玩家",
-        avatar_url: payload.avatar_url ?? null,
-      },
+      user_metadata: { openid, nickname, avatar_url: payload.avatar_url ?? null },
     })
-
-    // 并发首次登录可能已被另一请求创建，退回查询
     if (error && !String(error.message).toLowerCase().includes("already")) {
       return json({ error: "USER_CREATE_FAILED", detail: error.message }, 500)
     }
-
-    userId = created?.user?.id
-    if (!userId) {
-      const { data: retry } = await admin
-        .from("profiles")
-        .select("id")
-        .eq("openid", session.openid)
-        .maybeSingle()
-      userId = retry?.id as string | undefined
-    }
-
-    if (userId) {
-      await admin
-        .from("profiles")
-        .update({
-          openid: session.openid,
-          nickname: payload.nickname ?? "玩家",
-          avatar_url: payload.avatar_url ?? null,
-        })
-        .eq("id", userId)
-    }
+    userId = created?.user?.id ?? (await findUserIdByEmail(admin, email))
   }
 
-  if (!userId) return json({ error: "USER_NOT_READY" }, 500)
+  if (!userId) {
+    return json({ error: "USER_NOT_READY", detail: "既没有现成账号，也没能新建" }, 500)
+  }
 
-  const { data: signIn, error: signInError } = await admin.auth.signInWithPassword({ email, password })
-  if (signInError || !signIn.session) {
-    return json({ error: "SESSION_FAILED", detail: signInError?.message ?? "no session" }, 500)
+  // ---- 2) 保证 profiles 行存在且 openid 正确（历史数据可能缺这两样） ----
+  const { data: profileRow } = await admin
+    .from("profiles")
+    .select("id, nickname, avatar_url")
+    .eq("id", userId)
+    .maybeSingle()
+
+  const keepNickname = profileRow?.nickname && profileRow.nickname !== DEFAULT_NICKNAME
+  if (!profileRow) {
+    await admin.from("profiles").insert({
+      id: userId,
+      openid,
+      nickname,
+      avatar_url: payload.avatar_url ?? null,
+    })
+  } else {
+    await admin
+      .from("profiles")
+      .update({
+        openid,
+        // 只补默认昵称，不覆盖用户自己设置过的名字
+        nickname: keepNickname ? profileRow.nickname : (currentNickname ?? nickname),
+        avatar_url: profileRow.avatar_url ?? payload.avatar_url ?? null,
+      })
+      .eq("id", userId)
+  }
+
+  // ---- 3) 登录；历史账号的密码可能来自旧密钥，对不上就重设再试 ----
+  let signIn = await admin.auth.signInWithPassword({ email, password })
+  let resetPassword = false
+
+  if (!signIn.data?.session) {
+    resetPassword = true
+    const { error: resetError } = await admin.auth.admin.updateUserById(userId, {
+      password,
+      email_confirm: true,
+    })
+    if (resetError) {
+      return json(
+        { error: "PASSWORD_RESET_FAILED", detail: resetError.message, signIn: signIn.error?.message },
+        500,
+      )
+    }
+    signIn = await admin.auth.signInWithPassword({ email, password })
+  }
+
+  if (signIn.error || !signIn.data?.session) {
+    return json({ error: "SESSION_FAILED", detail: signIn.error?.message ?? "no session" }, 500)
   }
 
   const { data: profile } = await admin
@@ -146,9 +201,12 @@ Deno.serve(async (req) => {
 
   return json({
     user_id: userId,
-    access_token: signIn.session.access_token,
-    refresh_token: signIn.session.refresh_token,
-    expires_in: signIn.session.expires_in,
+    access_token: signIn.data.session.access_token,
+    refresh_token: signIn.data.session.refresh_token,
+    expires_in: signIn.data.session.expires_in,
     profile,
+    // 便于排查：这次是不是靠兜底/重设密码才登进来的
+    recovered: resetPassword || !byOpenid?.id,
   })
 })
+
