@@ -1,4 +1,4 @@
-﻿import { roomApi } from '../platform'
+import { roomApi } from '../platform'
 import { PlatformError } from '../platform/types'
 import { SupabaseRoomApi } from '../platform/supabase'
 import { installPlayerPort } from '../modules/undercover/player'
@@ -141,12 +141,13 @@ function install(snapshot: UcPlayerSnapshot, variant: Variant) {
 }
 
 /** 主持人开局：服务端建局、发牌，然后把端口装好，页面直接进玩家端 */
-export async function startUndercoverRound(roomId: string, variant: Variant): Promise<UcPlayerSnapshot> {
+export async function startUndercoverRound(roomId: string, variant: Variant, bots = 0): Promise<UcPlayerSnapshot> {
   activeRoomId = roomId
   const snapshot = await invoke<UcPlayerSnapshot>({
     op: 'start',
     room_id: roomId,
     variant,
+    bots,
     request_id: `start-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
   })
   install(snapshot, variant)
@@ -180,5 +181,6 @@ export async function endUndercoverRound(): Promise<void> {
   })
   activeGameId = ''
 }
+
 
 

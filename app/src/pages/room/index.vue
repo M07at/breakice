@@ -103,9 +103,24 @@ async function startLocalDraw() {
   }
 }
 
+/** 人不够时问一句要不要补机器人（机器人会自动领词、跳过发言、随机投票） */
+function askFillBots(shortfall: number): Promise<boolean> {
+  return new Promise((resolve) => {
+    uni.showModal({
+      title: '人数不够',
+      content: `还差 ${shortfall} 人。要补 ${shortfall} 个机器人先开一局吗？机器人会自动领词、跳过自己的发言、随机投票。`,
+      confirmText: `补 ${shortfall} 个机器人`,
+      cancelText: '再等等',
+      success: (result) => resolve(Boolean(result.confirm)),
+      fail: () => resolve(false),
+    })
+  })
+}
+
 async function hostStart(gameType: GameType) {
   const minPlayers = MIN_PLAYERS[gameType]
-  if (roomStore.memberCount < minPlayers) {
+  // 谁是卧底 / 融合玩法可以用机器人补位，人数不够也能开局
+  if (roomStore.memberCount < minPlayers && !isUndercover(gameType)) {
     uni.showToast({ title: `${GAME_LABEL[gameType]}至少要 ${minPlayers} 人`, icon: 'none' })
     return
   }
@@ -121,7 +136,12 @@ async function hostStart(gameType: GameType) {
     if (isUndercover(gameType) && room.value) {
       // 谁是卧底：由服务端建局发牌（uc-command → uc_start_game 会把房间置为 playing）
       const variant = variantOf(gameType)
-      await startUndercoverRound(room.value.id, variant)
+      const shortfall = Math.max(0, 4 - roomStore.memberCount)
+      if (shortfall > 0) {
+        const fill = await askFillBots(shortfall)
+        if (!fill) return
+      }
+      await startUndercoverRound(room.value.id, variant, shortfall)
       roomStore.markPlaying(gameType)
       await nextTick()
       openPage(PLAYER_PAGE[variant])

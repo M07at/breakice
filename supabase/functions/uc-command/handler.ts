@@ -150,13 +150,19 @@ async function snapshotOf(input: {
   members: { user_id: string; profiles?: { nickname?: string } }[]
 }) {
   const artworks = input.state.config.variant === 'draw' ? await loadArtworks(input.admin, input.gameId) : []
+  // 名单以引擎里的座位顺序为准，机器人没有 room_members 记录，名字从 bots 表补
+  const names = new Map<string, string>()
+  for (const m of input.members) names.set(m.user_id, m.profiles?.nickname ?? '玩家')
+  for (const bot of await loadBots(input.admin)) {
+    if (!names.has(bot.user_id)) names.set(bot.user_id, BOT_NAME(bot.slot))
+  }
   return {
     sessionId: input.gameId,
     gameId: input.gameId,
     gameNumber: input.gameNumber,
     playerId: input.viewerId,
     hostId: input.hostId,
-    players: input.members.map((m) => ({ id: m.user_id, name: m.profiles?.nickname ?? '玩家' })),
+    players: input.state.players.map((p) => ({ id: p.id, name: names.get(p.id) ?? '玩家' })),
     view: toPublicView(input.state),
     artworks,
     serverNow: Date.now(),
@@ -164,6 +170,70 @@ async function snapshotOf(input: {
 }
 
 type ScoreRow = { game_id: string; user_id: string; points: number; reason: string; ref: string }
+
+/** 机器人下一步该做什么；没有就让位给真人 */
+function nextBotAction(state: UcState, botIds: Set<string>): { actor: string; action: UcAction } | null {
+  if (state.phase === 'word') {
+    const bot = state.players.find((p) => botIds.has(p.id) && !state.wordConfirmedIds.includes(p.id))
+    return bot ? { actor: bot.id, action: { type: 'acknowledgeWord', by: bot.id } as UcAction } : null
+  }
+  if (state.phase === 'describe') {
+    const speaker = currentSpeaker(state)
+    return speaker && botIds.has(speaker)
+      ? { actor: speaker, action: { type: 'turnDone', by: speaker } as UcAction }
+      : null
+  }
+  if (state.phase === 'vote') {
+    const bot = state.players.find(
+      (p) => p.alive && botIds.has(p.id) && !(p.id in state.votes) && eligibleVoterIds(state).includes(p.id),
+    )
+    if (!bot) return null
+    const targets = eligibleVoterIds(state).filter((id) => id !== bot.id)
+    const target = targets.length > 0 ? targets[Math.floor(Math.random() * targets.length)] : null
+    return { actor: bot.id, action: { type: 'vote', by: bot.id, targetId: target } as UcAction }
+  }
+  return null
+}
+
+/**
+ * 把机器人的回合自动走完：领词 → 发言结束 → 投票。
+ * 只在轮到机器人时推进，撞到真人就停，所以不会替真人做决定。
+ */
+async function driveBots(admin: Admin, gameId: string, maxSteps = 24): Promise<void> {
+  const bots = await loadBots(admin)
+  if (bots.length === 0) return
+  const botIds = new Set(bots.map((bot) => bot.user_id))
+
+  for (let step = 0; step < maxSteps; step++) {
+    const game = await loadGame(admin, gameId)
+    if (game.status !== 'active') return
+    const pick = nextBotAction(game.state, botIds)
+    if (!pick) return
+
+    const now = Date.now()
+    const applied = applyAction(game.state, pick.action, { now, isHost: false })
+    const settled = tick(applied.state, now)
+    const next = settled.state
+    const ended = next.phase === 'ended'
+    const { error } = await admin.rpc('uc_commit_action', {
+      p_game_id: gameId,
+      p_actor: pick.actor,
+      p_request_id: `bot-${gameId}-${next.version}-${pick.action.type}`,
+      p_fingerprint: await digest({ bot: pick.actor, version: game.state.version, type: pick.action.type }),
+      p_state: next,
+      p_view: toPublicView(next),
+      p_version: next.version,
+      p_status: ended ? 'ended' : 'active',
+      p_ended_reason: ended ? next.endedReason : null,
+    })
+    if (error) {
+      console.warn('[uc-command] 机器人提交失败', error.message)
+      return
+    }
+    await writeScores(admin, gameId, [...applied.events, ...settled.events], `bot-${next.version}`)
+    if (ended) return
+  }
+}
 
 /**
  * 把引擎事件里的计分落库。
@@ -186,6 +256,45 @@ async function writeScores(admin: Admin, gameId: string, events: UcEvent[], refB
     .from('scores')
     .upsert(rows, { onConflict: 'game_id,user_id,reason,ref', ignoreDuplicates: true })
   if (error) console.warn('[uc-command] 写积分失败', error.message)
+}
+
+type BotRow = { slot: number; user_id: string }
+
+const BOT_NAME = (slot: number) => `机器人${slot}`
+
+/** 读取已创建的机器人账号（按 slot 排序） */
+async function loadBots(admin: Admin): Promise<BotRow[]> {
+  const { data, error } = await admin.from('bots').select('slot, user_id').order('slot')
+  if (error) {
+    console.warn('[uc-command] 读取机器人失败', error.message)
+    return []
+  }
+  return (data ?? []) as BotRow[]
+}
+
+/** 确保有 count 个机器人账号；没有就现建（auth 用户 + profiles，昵称由触发器写入） */
+async function ensureBots(admin: Admin, count: number): Promise<BotRow[]> {
+  if (count <= 0) return []
+  const existing = await loadBots(admin)
+  const bySlot = new Map(existing.map((bot) => [bot.slot, bot.user_id]))
+  const out: BotRow[] = []
+  for (let slot = 1; slot <= count; slot++) {
+    let userId = bySlot.get(slot)
+    if (!userId) {
+      const { data, error } = await admin.auth.admin.createUser({
+        email: `bot${slot}@bots.breakice.local`,
+        password: `bot-${slot}-${crypto.randomUUID()}`,
+        email_confirm: true,
+        user_metadata: { nickname: BOT_NAME(slot) },
+      })
+      if (error || !data?.user) throw new UcError('BAD_REQUEST', `创建机器人失败：${error?.message ?? '未知错误'}`)
+      userId = data.user.id
+      const { error: insertError } = await admin.from('bots').insert({ slot, user_id: userId })
+      if (insertError) console.warn('[uc-command] 记录机器人失败', insertError.message)
+    }
+    out.push({ slot, user_id: String(userId) })
+  }
+  return out
 }
 
 async function loadGame(admin: Admin, gameId: string) {
@@ -224,8 +333,19 @@ async function handleStart(admin: Admin, uid: string, body: Record<string, any>)
   if (room.status !== 'lobby') throw new UcError('GAME_ACTIVE', '房间里已经有一局了')
 
   const members = await roomMembers(admin, roomId)
-  if (members.length < 4) throw new UcError('PLAYER_COUNT', '至少需要 4 名玩家')
   if (members.some((m) => !m.ready)) throw new UcError('BAD_CONFIG', '还有玩家没有准备')
+
+  // 人不够时用机器人补位（最多补 3 个），这样一个人也能开局验证流程
+  const botCount = Math.max(0, Math.min(3, Math.round(Number(body.bots ?? 0))))
+  const rosterIds = members.map((m) => m.user_id)
+  if (rosterIds.length < 4 && botCount === 0) {
+    throw new UcError('PLAYER_COUNT', '至少需要 4 名玩家，或用机器人补齐')
+  }
+  if (botCount > 0) {
+    const bots = await ensureBots(admin, botCount)
+    rosterIds.push(...bots.map((bot) => bot.user_id))
+  }
+  if (rosterIds.length < 4) throw new UcError('PLAYER_COUNT', `还差 ${4 - rosterIds.length} 人，机器人也没补够`)
 
   const { data: active } = await admin
     .from('games')
@@ -238,7 +358,7 @@ async function handleStart(admin: Admin, uid: string, body: Record<string, any>)
   const config = { ...DEFAULT_CONFIG, variant, ...(body.config ?? {}) }
   const startedAt = Date.now()
   const transition = createGame({
-    playerIds: members.map((m) => m.user_id),
+    playerIds: rosterIds,
     pair: pickPair(variant),
     config,
     now: startedAt,
@@ -269,12 +389,16 @@ async function handleStart(admin: Admin, uid: string, body: Record<string, any>)
   }
 
   const { data: created } = await admin.from('games').select('game_number').eq('id', String(gameId)).maybeSingle()
+
+  // 开局后机器人会把"领词"这类动作立刻走完，所以快照要用刷新后的状态
+  await driveBots(admin, String(gameId))
+  const fresh = await loadGame(admin, String(gameId))
   return json(
     await snapshotOf({
       admin,
-      gameId: String(gameId),
+      gameId: fresh.id,
       gameNumber: created?.game_number ?? 1,
-      state,
+      state: fresh.state,
       viewerId: uid,
       hostId: room.host_id,
       members,
@@ -356,13 +480,16 @@ async function handleAct(admin: Admin, uid: string, body: Record<string, any>): 
   await writeScores(admin, game.id, [...applied.events, ...settled.events], requestId)
 
   console.log('[uc-command] act', { game: game.id, action: full.type, version: resultVersion })
+  // 轮到机器人就立刻替它走完，回到真人回合再返回
+  await driveBots(admin, game.id)
+  const fresh = await loadGame(admin, game.id)
   const members = await roomMembers(admin, game.room_id)
   return json(
     await snapshotOf({
       admin,
-      gameId: game.id,
-      gameNumber: game.game_number,
-      state: next,
+      gameId: fresh.id,
+      gameNumber: fresh.game_number,
+      state: fresh.state,
       viewerId: uid,
       hostId,
       members,
@@ -405,14 +532,16 @@ async function handleTick(admin: Admin, uid: string, body: Record<string, any>):
     }
   }
 
+  await driveBots(admin, game.id)
+  const fresh = await loadGame(admin, game.id)
   const members = await roomMembers(admin, game.room_id)
   const { data: room } = await admin.from('rooms').select('host_id').eq('id', game.room_id).maybeSingle()
   return json(
     await snapshotOf({
       admin,
-      gameId: game.id,
-      gameNumber: game.game_number,
-      state: settled.state,
+      gameId: fresh.id,
+      gameNumber: fresh.game_number,
+      state: fresh.state,
       viewerId: uid,
       hostId: room?.host_id ?? '',
       members,

@@ -1,4 +1,4 @@
-<script setup lang="ts">
+﻿<script setup lang="ts">
 /**
  * 融合玩法里的「作画回合」：用 B 的真实画布替换 C 的模拟图形。
  *
@@ -97,3 +97,4 @@ function clearCanvas() {
   flex: 1;
 }
 </style>
+
