@@ -54,12 +54,21 @@ export const useRoomStore = defineStore('room', () => {
     })
   }
 
+  /** 昵称同步只是锦上添花，失败不能挡住进房 */
+  async function syncIdentityQuietly() {
+    try {
+      const profile = roomService.currentIdentity()
+      await roomService.syncIdentity(profile.nickname, profile.avatar)
+    } catch (issue) {
+      console.warn('同步昵称失败，继续进房', issue)
+    }
+  }
+
   async function create(input: roomService.CreateRoomInput) {
     busy.value = true
     error.value = ''
     try {
-      const profile = roomService.currentIdentity()
-      await roomService.syncIdentity(profile.nickname, profile.avatar)
+      await syncIdentityQuietly()
       const created = await roomService.createRoom(input)
       attach(created)
       subscribe(created.id)
@@ -75,8 +84,7 @@ export const useRoomStore = defineStore('room', () => {
     busy.value = true
     error.value = ''
     try {
-      const profile = roomService.currentIdentity()
-      await roomService.syncIdentity(profile.nickname, profile.avatar)
+      await syncIdentityQuietly()
       const joined = await roomService.joinRoom(input)
       attach(joined)
       subscribe(joined.id)
