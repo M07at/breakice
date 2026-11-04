@@ -1,74 +1,68 @@
-import { defaultAvatar } from './avatarService'
-import type { AvatarConfig, GameType, Player, Room } from '../types/room'
+import { roomApi } from '../platform'
+import type { Unsubscribe } from '../platform/types'
+import type { GameType, Room } from '../types/room'
+
+/**
+ * 房间服务的统一出口。页面和 store 只跟这里打交道，
+ * 底下是本机房间还是 Supabase 由平台层决定（见 app/src/platform）。
+ */
+
+export { PlatformError, toErrorMessage } from '../platform/types'
 
 export interface CreateRoomInput {
   name: string
   maxPlayers: number
-  nickname: string
-  avatar: AvatarConfig
 }
 
 export interface JoinRoomInput {
   code: string
-  nickname: string
-  avatar: AvatarConfig
 }
 
-const seedPlayers: Player[] = [
-  { id: 'player-2', nickname: '小雨', avatar: { color: 9, body: 7, mouth: 12, eyes: 5, hat: 9 }, isHost: false, isReady: true, online: true },
-  { id: 'player-3', nickname: '阿哲', avatar: { color: 4, body: 3, mouth: 2, eyes: 10, hat: 14 }, isHost: false, isReady: false, online: true },
-]
-
-function createRoomSeed(input: CreateRoomInput): Room {
-  const hostId = 'player-host'
-  return {
-    id: 'mock-room-001',
-    code: '5A7K2M',
-    name: input.name,
-    hostId,
-    maxPlayers: input.maxPlayers,
-    phase: 'lobby',
-    gameType: null,
-    players: [
-      {
-        id: hostId,
-        nickname: input.nickname,
-        avatar: input.avatar,
-        isHost: true,
-        isReady: true,
-        online: true,
-      },
-      ...seedPlayers,
-    ],
-  }
+export function platformLabel(): string {
+  return roomApi.label
 }
 
-export async function createRoom(input: CreateRoomInput): Promise<Room> {
-  await new Promise((resolve) => setTimeout(resolve, 220))
-  return createRoomSeed(input)
+export function currentIdentity() {
+  return roomApi.identity()
 }
 
-export async function joinRoom(input: JoinRoomInput): Promise<Room> {
-  await new Promise((resolve) => setTimeout(resolve, 220))
-  const room = createRoomSeed({ name: '周五破冰局', maxPlayers: 20, nickname: '主持人', avatar: { ...defaultAvatar } })
-  room.players.push({
-    id: 'current-player',
-    nickname: input.nickname,
-    avatar: input.avatar,
-    isHost: false,
-    isReady: false,
-    online: true,
-  })
-  room.code = input.code.toUpperCase()
-  return room
+/** 把首页设置的昵称/形象同步到后端（Supabase 会写 profiles，本机模式只落本地） */
+export function syncIdentity(nickname: string, avatar: ReturnType<typeof currentIdentity>['avatar']) {
+  return roomApi.setIdentity({ nickname, avatar })
 }
 
-export async function startGame(room: Room, gameType: GameType): Promise<Room> {
-  await new Promise((resolve) => setTimeout(resolve, 160))
-  return { ...room, gameType, phase: 'playing' }
+export function createRoom(input: CreateRoomInput): Promise<Room> {
+  return roomApi.createRoom({ title: input.name.trim() || '破冰局', maxPlayers: input.maxPlayers })
 }
 
-export async function getRoomState(code: string): Promise<Room | null> {
-  await new Promise((resolve) => setTimeout(resolve, 120))
-  return code ? createRoomSeed({ name: '周五破冰局', maxPlayers: 20, nickname: '主持人', avatar: { ...defaultAvatar } }) : null
+export function joinRoom(input: JoinRoomInput): Promise<Room> {
+  return roomApi.joinRoom(input.code)
+}
+
+export function leaveRoom(roomId: string): Promise<void> {
+  return roomApi.leaveRoom(roomId)
+}
+
+export function setReady(roomId: string, ready: boolean): Promise<void> {
+  return roomApi.setReady(roomId, ready)
+}
+
+export function startGame(roomId: string, gameType: GameType): Promise<void> {
+  return roomApi.startGame(roomId, gameType)
+}
+
+export function endGame(roomId: string): Promise<void> {
+  return roomApi.endGame(roomId)
+}
+
+export function closeRoom(roomId: string): Promise<void> {
+  return roomApi.closeRoom(roomId)
+}
+
+export function fetchRoom(roomId: string): Promise<Room> {
+  return roomApi.getRoom(roomId)
+}
+
+export function watchRoom(roomId: string, onChange: (room: Room) => void): Unsubscribe {
+  return roomApi.watch(roomId, onChange)
 }

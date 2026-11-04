@@ -1,5 +1,6 @@
 export type RoomPhase = 'lobby' | 'playing' | 'ended'
-export type GameType = 'truth-or-dare' | 'drawing' | 'undercover'
+/** 房间可选的玩法；hybrid = 你画我猜谁是卧底 */
+export type GameType = 'truth-or-dare' | 'drawing' | 'undercover' | 'hybrid'
 
 /** 形象图层的键：叠加顺序与切换顺序在 avatarService 里定义 */
 export type AvatarLayerKey = 'color' | 'body' | 'mouth' | 'eyes' | 'hat'

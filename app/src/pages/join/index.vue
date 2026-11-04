@@ -4,6 +4,7 @@ import { onLoad } from '@dcloudio/uni-app'
 import { useRoomStore } from '../../stores/room'
 import Avatar from '../../components/Avatar.vue'
 import { getSavedProfile } from '../../services/avatarService'
+import { toErrorMessage } from '../../platform/types'
 
 const roomStore = useRoomStore()
 const roomCode = ref('')
@@ -39,8 +40,12 @@ async function submit() {
     uni.showToast({ title: '请输入房间号', icon: 'none' })
     return
   }
-  await roomStore.join({ code: roomCode.value.trim(), nickname: profile.nickname, avatar: profile.avatar })
-  uni.redirectTo({ url: '/pages/room/index' })
+  try {
+    await roomStore.join({ code: roomCode.value.trim() })
+    uni.redirectTo({ url: '/pages/room/index' })
+  } catch (issue) {
+    uni.showToast({ title: roomStore.error || toErrorMessage(issue), icon: 'none' })
+  }
 }
 </script>
 

@@ -36,7 +36,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
+import { onMounted, ref } from 'vue'
 // 按具体文件引，不走 modules/draw 的统一出口：出口会把房间/题库一起带进主包
 import { DRAW_VARIANT_HINT, DRAW_VARIANT_LABEL } from '@/modules/draw/words'
 import { startLocalDrawRoom } from '@/modules/draw/room'
@@ -47,6 +47,14 @@ const variant = ref<DrawVariant>('classic')
 const count = ref(4)
 const customText = ref('')
 const starting = ref(false)
+
+// 从房间进入时用房间人数预填，房间是这一局的单位
+onMounted(() => {
+  const pages = getCurrentPages()
+  const current = pages[pages.length - 1] as unknown as { options?: Record<string, string> } | undefined
+  const raw = Number(current?.options?.count)
+  if (Number.isFinite(raw)) count.value = Math.min(12, Math.max(2, Math.round(raw)))
+})
 
 async function start() {
   if (starting.value) return

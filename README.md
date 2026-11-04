@@ -11,7 +11,8 @@
 - `docs/`：项目过程文档和模块联调约定。
 - `scripts/`：工程质量脚本（环境检查、类型检查、测试、分包体积、密钥扫描、发布清单）。
 
-前端当前使用本地 Mock / 预览服务完成后端边界之前的所有页面与流程；真实 Supabase RPC、Realtime、微信登录和 AI 评分属于 A / B 模块尚未接入的部分，详见 `docs/D模块开发任务清单.md`。
+前端当前以**房间**为游戏单位：大厅创建/加入房间 → 全员准备 → 主持人选玩法 → 房间进入进行中 → 各端进入对应游戏。
+房间后端有两种实现，由 `VITE_SUPABASE_URL` / `VITE_SUPABASE_ANON_KEY` 决定：配好就走 A 的 Supabase，没配就用本机房间。
 
 #### 目录与模块归属
 
@@ -22,6 +23,7 @@ app/src/
 │   ├── score-card/    B：综合分 + 三维度 + 评语
 │   └── leaderboard/   B：排行榜
 ├── pages/             D：大厅、创建/加入房间、房间等待区、真心话大冒险
+├── platform/          A/D：房间后端抽象（本机房间 + Supabase 实现）
 ├── modules/
 │   ├── undercover/    C：谁是卧底引擎、规则、玩家端与后端契约
 │   ├── bank/          C：题库系统、导入导出、校验、488 条原创题库
@@ -36,7 +38,22 @@ app/src/
 ├── stores/            D：房间状态（Pinia）
 ├── styles/            D：设计系统 token
 └── types/             D：数据类型
+
+supabase/              A：数据库迁移、RLS、房间/局次 RPC、Edge Functions
+docs/a/                A：数据库、RPC/频道契约、AI 评分、接入指南
 ```
+
+## Current member A delivery
+
+- 数据库：`profiles` / `rooms` / `room_members` / `games` / `game_secrets` / `game_receipts` /
+  `artworks` / `ai_scores` / `scores` / `word_banks`，以及只暴露公开投影的 `game_public` 视图。
+- RLS：房间隔离、词牌仅本人可读、完整 `games.state` 客户端不可读。
+- RPC：`create_room` / `join_room` / `leave_room` / `set_ready` / `heartbeat` /
+  `transfer_host` / `set_room_settings` / `close_room`，加上本仓补充的
+  `start_room_game` / `end_room_game` / `set_my_nickname`（`0006`）。
+- Edge Functions：`wechat-auth`（code → 会话）、`ai-score`（多模态评分，5s 超时、失败降级）。
+- **未完成**：`uc-command`（服务端规则引擎）与 Realtime 授权仍是 A 的待办；
+  目前游戏引擎仍在客户端运行，Supabase 负责房间与身份。
 
 ## Current member B delivery
 
@@ -93,10 +110,22 @@ No real credentials are required for this preview. If configuring public platfor
    hat（帽子）、eyes（眼睛）、mouth（嘴巴）、body（身体）、color（颜色），编号循环；预览下方填昵称。
    形象和昵称都会自动保存，没有保存按钮。
 2. 首页下半屏是「创建房间」「加入房间」两个按钮，形象和昵称会随按钮一起带入房间。
-3. 创建房间后复制房间号，或使用右上角分享入口邀请玩家。
-4. 在房间等待区（`pages/room/index`）选择游戏：真心话大冒险、谁是卧底、你画我猜谁是卧底、你画我猜，或进入题库管理。
-5. 玩家在大厅点击“准备”。
-6. 当前阶段房间与在线状态为本地 Mock 演示，真实多人同步需要等待 Supabase RPC、Realtime 和二维码接口联调。
+3. 创建房间后复制房间号，或使用右上角分享入口邀请玩家；好友用房间号加入同一个房间。
+4. **全员在房间里点「我准备好了」**，房主在主持人控制台选玩法。没全部准备时开局会被挡下。
+5. 房主选完玩法后，房间进入「本局进行中」，各端进入对应游戏：真心话大冒险、谁是卧底、
+   你画我猜谁是卧底、你画我猜。
+6. 一局结束后房主点「结束本局」，房间回到大厅，可以换下一个玩法再开一局。
+
+### 房间后端配置
+
+| 情况 | 行为 |
+| --- | --- |
+| 没配 `VITE_SUPABASE_URL` / `VITE_SUPABASE_ANON_KEY` | 用**本机房间**：房间状态留在本机，只有一台设备能进这个房间，适合走查流程 |
+| 配了这两个变量 | 走 **Supabase**：登录、建房、加入、准备、开局都走后端，多台设备可进同一个房间 |
+
+配置方式：把 `app/.env.example` 复制成 `app/.env.local`，填上 A 提供的项目地址与 anon key。
+Supabase 侧需要先执行 `supabase/migrations/0001…0006`，并部署 `wechat-auth` 函数。
+anon key 可以放在前端；`service_role`、微信 AppSecret、AI Key 只能放在 Edge Function 环境里。
 
 ### 形象素材
 

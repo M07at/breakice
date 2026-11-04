@@ -3,6 +3,7 @@ import { ref } from 'vue'
 import { useRoomStore } from '../../stores/room'
 import Avatar from '../../components/Avatar.vue'
 import { getSavedProfile } from '../../services/avatarService'
+import { toErrorMessage } from '../../platform/types'
 
 const roomStore = useRoomStore()
 const roomName = ref('周五破冰局')
@@ -16,13 +17,15 @@ async function submit() {
     uni.showToast({ title: '请填写房间名', icon: 'none' })
     return
   }
-  await roomStore.create({
-    name: roomName.value.trim(),
-    nickname: profile.nickname,
-    maxPlayers: Number(maxPlayers.value) || 20,
-    avatar: profile.avatar,
-  })
-  uni.redirectTo({ url: '/pages/room/index' })
+  try {
+    await roomStore.create({
+      name: roomName.value.trim(),
+      maxPlayers: Number(maxPlayers.value) || 20,
+    })
+    uni.redirectTo({ url: '/pages/room/index' })
+  } catch (issue) {
+    uni.showToast({ title: roomStore.error || toErrorMessage(issue), icon: 'none' })
+  }
 }
 </script>
 
