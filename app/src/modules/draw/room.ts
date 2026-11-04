@@ -119,14 +119,14 @@ export interface DrawRoomBackend {
   view(): Promise<DrawRoomView>
   subscribe(onView: (view: DrawRoomView) => void): () => void
   /** 交画。服务端负责：只接受当前作画者的提交、同一轮只收一次、触发 AI 评分 */
-  submitDrawing(imageRef: string): Promise<DrawRoomView>
+  submitDrawing(imageRef: string, actorId?: string): Promise<DrawRoomView>
   /** 倒计时归零时调用，重复调用安全 */
   tick(): Promise<DrawRoomView>
   /**
    * 发一条聊天 / 抢答。
    * 服务端负责：判断是不是答对了、把答案里的字替换成冰块、答对时记一次抢答。
    */
-  sendMessage(text: string): Promise<DrawRoomView>
+  sendMessage(text: string, actorId?: string): Promise<DrawRoomView>
   /** 发花或差评。一人一次随便送，服务端只负责累加 */
   sendReaction(targetPlayerId: string, kind: DrawReaction): Promise<DrawRoomView>
   /** 页面卸载时释放监听和定时器 */
@@ -336,10 +336,12 @@ export class LocalDrawRoomBackend implements DrawRoomBackend {
     }
   }
 
-  async submitDrawing(imageRef: string): Promise<DrawRoomView> {
+  async submitDrawing(imageRef: string, actorId?: string): Promise<DrawRoomView> {
+    // 联机时主持人代收别人的画：actorId 是被代收的人，默认是自己
+    const actor = actorId ?? this.meId
     if (this.phase === 'ended') return this.view()
-    if (this.painterId() !== this.meId) throw new Error('现在不是你画')
-    if (this.drawings[this.meId]) return this.view()
+    if (this.painterId() !== actor) throw new Error('现在不是你画')
+    if (this.drawings[actor]) return this.view()
     // 同一轮只处理一次
     if (this.pendingSubmit) {
       await this.pendingSubmit
@@ -358,13 +360,13 @@ export class LocalDrawRoomBackend implements DrawRoomBackend {
           degraded: true,
         }
       }
-      this.drawings[this.meId] = { playerId: this.meId, imageRef, ai }
-      this.answers[this.meId] = word
+      this.drawings[actor] = { playerId: actor, imageRef, ai }
+      this.answers[actor] = word
       this.board.settleRound({
         roomId: this.roomId,
         gameId: this.gameId,
         roundKey: this.roundKey(),
-        painterId: this.meId,
+        painterId: actor,
         ai,
         guesses: this.guesses,
       })
@@ -395,15 +397,17 @@ export class LocalDrawRoomBackend implements DrawRoomBackend {
    * - 否则当普通聊天发出去，但**和答案重复的字会被冰块遮住**（防止直接剧透）。
    * 画的人不能抢自己的题，所以轮到自己在画时只当聊天。
    */
-  async sendMessage(text: string): Promise<DrawRoomView> {
+  async sendMessage(text: string, actorId?: string): Promise<DrawRoomView> {
     const raw = text.trim()
     if (!raw) return this.view()
-    const player = this.players.find((p) => p.id === this.meId) ?? this.players[0]
+    // 联机时主持人代发别人的消息：actorId 是真正的发言人
+    const actor = actorId ?? this.meId
+    const player = this.players.find((p) => p.id === actor) ?? this.players[0]
     const answer = this.word?.word ?? ''
-    const canGuess = this.phase === 'drawing' && this.painterId() !== this.meId && Boolean(answer)
+    const canGuess = this.phase === 'drawing' && this.painterId() !== actor && Boolean(answer)
     const isCorrect = canGuess && raw.toLowerCase() === answer.toLowerCase()
 
-    if (isCorrect && !this.guesses.some((g) => g.playerId === this.meId)) {
+    if (isCorrect && !this.guesses.some((g) => g.playerId === actor)) {
       const seconds = Math.max(0, Math.round((this.now() - (this.endsAt - DRAW_SECONDS * 1000)) / 1000))
       this.guesses.push({ playerId: this.meId, seconds })
     }
@@ -531,5 +535,6 @@ export function disposeDrawRoom(room: LocalDrawRoomBackend | null = current): vo
   room.dispose()
   if (current === room) current = null
 }
+
 
 

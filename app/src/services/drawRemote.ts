@@ -1,4 +1,4 @@
-import type { DrawReaction, DrawRoomBackend, DrawRoomView } from '../modules/draw/room'
+﻿import type { DrawReaction, DrawRoomBackend, DrawRoomView } from '../modules/draw/room'
 
 /**
  * 你画我猜联机的客户端远程层。
@@ -226,3 +226,4 @@ export function createRemoteDrawRoom(options: RemoteRoomOptions): DrawRoomBacken
     },
   }
 }
+
