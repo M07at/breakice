@@ -1,4 +1,4 @@
-<script setup lang="ts">
+﻿<script setup lang="ts">
 import { computed, nextTick, ref, watch } from 'vue'
 import { onLoad, onShareAppMessage, onShow } from '@dcloudio/uni-app'
 import { useRoomStore } from '../../stores/room'
@@ -103,58 +103,42 @@ async function startLocalDraw() {
   }
 }
 
-/** 人不够时问一句要不要补机器人（机器人会自动领词、跳过发言、随机投票） */
-function askFillBots(shortfall: number): Promise<boolean> {
-  return new Promise((resolve) => {
-    uni.showModal({
-      title: '人数不够',
-      content: `还差 ${shortfall} 人。要补 ${shortfall} 个机器人先开一局吗？机器人会自动领词、跳过自己的发言、随机投票。`,
-      // 微信限制：confirmText / cancelText 都不能超过 4 个字符，超了 showModal 直接失败
-      confirmText: '补位开局',
-      cancelText: '再等等',
-      success: (result) => resolve(Boolean(result.confirm)),
-      // 弹窗本身失败时按"同意补位"处理，别让主持人点了没反应
-      fail: (error) => {
-        console.warn('补位确认弹窗失败，直接补位', error)
-        resolve(true)
-      },
-    })
-  })
-}
-
 async function hostStart(gameType: GameType) {
+  const minPlayers = MIN_PLAYERS[gameType]
   console.log('[房间] 点击开局', gameType, {
     members: roomStore.memberCount,
     allReady: roomStore.allReady,
     isHost: roomStore.isHost,
+    roomId: room.value?.id ?? '(空)',
   })
-  const minPlayers = MIN_PLAYERS[gameType]
+  notice.value = ''
+
   // 谁是卧底 / 融合玩法可以用机器人补位，人数不够也能开局
   if (roomStore.memberCount < minPlayers && !isUndercover(gameType)) {
     uni.showToast({ title: `${GAME_LABEL[gameType]}至少要 ${minPlayers} 人`, icon: 'none' })
     return
   }
   if (!roomStore.allReady) {
-    uni.showModal({
-      title: '还不能开局',
-      content: `还有 ${missingReady.value} 人没点「我准备好了」，等他们准备好再开局。`,
-      showCancel: false,
-      confirmText: '知道了',
-    })
+    uni.showToast({ title: `还有 ${missingReady.value} 人没准备`, icon: 'none' })
+    notice.value = `开局前需要所有人在「准备状态」里点「我准备好了」`
     return
   }
   if (gameType === 'drawing') {
     confirmLocalDraw()
     return
   }
-  try {
-    if (isUndercover(gameType) && room.value) {
-      // 谁是卧底：由服务端建局发牌（uc-command → uc_start_game 会把房间置为 playing）
-      const variant = variantOf(gameType)
-      const shortfall = Math.max(0, 4 - roomStore.memberCount)
+
+  if (isUndercover(gameType)) {
+    if (!room.value) {
+      uni.showToast({ title: '房间信息还没加载好，请稍后重试', icon: 'none' })
+      return
+    }
+    const variant = variantOf(gameType)
+    const shortfall = Math.max(0, Math.min(3, 4 - roomStore.memberCount))
+    try {
+      // 人数不足直接补机器人，不再弹窗确认：少一个可能失败的环节
       if (shortfall > 0) {
-        const fill = await askFillBots(shortfall)
-        if (!fill) return
+        uni.showToast({ title: `人数不足，已补 ${shortfall} 个机器人`, icon: 'none' })
       }
       uni.showLoading({ title: '正在开局…', mask: true })
       try {
@@ -165,14 +149,25 @@ async function hostStart(gameType: GameType) {
       roomStore.markPlaying(gameType)
       await nextTick()
       openPage(PLAYER_PAGE[variant])
-      return
+    } catch (issue) {
+      uni.hideLoading()
+      const message = toErrorMessage(issue)
+      console.error('[房间] 开局失败', issue)
+      uni.showToast({ title: message, icon: 'none' })
+      notice.value = `开局失败：${message}`
     }
+    return
+  }
+
+  try {
     await roomStore.begin(gameType)
     await nextTick()
     openPage(gameUrl(gameType))
   } catch (issue) {
-    uni.hideLoading()
-    uni.showToast({ title: toErrorMessage(issue), icon: 'none' })
+    const message = toErrorMessage(issue)
+    console.error('[房间] 开局失败', issue)
+    uni.showToast({ title: message, icon: 'none' })
+    notice.value = `开局失败：${message}`
   }
 }
 
@@ -553,5 +548,6 @@ onShareAppMessage(() => ({
   margin-top: 30rpx;
 }
 </style>
+
 
 
