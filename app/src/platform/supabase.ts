@@ -1,6 +1,6 @@
 ﻿import { env } from '../config/env'
 import { getSavedProfile, normalizeAvatar } from '../services/avatarService'
-import type { AvatarConfig, GameType, Player, Room } from '../types/room'
+import type { AvatarConfig, GameType, Player, Room, TruthTurn } from '../types/room'
 import { PlatformError } from './types'
 import type { CreateRoomInput, Identity, RoomApi, Unsubscribe } from './types'
 
@@ -448,13 +448,23 @@ export class SupabaseRoomApi implements RoomApi {
     await this.rpc<void>('close_room', { p_room_id: roomId })
   }
 
+  async setTruth(roomId: string, turn: TruthTurn | null): Promise<void> {
+    await this.rpc<void>('set_room_truth', { p_room_id: roomId, p_truth: turn })
+  }
+
   async getRoom(roomId: string): Promise<Room> {
     const session = await this.ensureSession()
     const [rooms, members] = await Promise.all([
-      this.select<{ id: string; code: string; title: string; host_id: string; max_players: number; status: string; game_type: string }[]>(
-        'rooms',
-        `id=eq.${roomId}&select=id,code,title,host_id,max_players,status,game_type`,
-      ),
+      this.select<{
+        id: string
+        code: string
+        title: string
+        host_id: string
+        max_players: number
+        status: string
+        game_type: string
+        settings?: { truth?: TruthTurn | null } | null
+      }[]>('rooms', `id=eq.${roomId}&select=id,code,title,host_id,max_players,status,game_type,settings`),
       this.select<{
         user_id: string
         seat: number
@@ -488,6 +498,7 @@ export class SupabaseRoomApi implements RoomApi {
       maxPlayers: room.max_players,
       phase: room.status === 'playing' ? 'playing' : room.status === 'ended' ? 'ended' : 'lobby',
       gameType: FROM_DB[room.game_type] ?? null,
+      truth: room.settings?.truth ?? null,
       players: players.length
         ? players
         : [{ id: session.userId, nickname: getSavedProfile().nickname, avatar: getSavedProfile().avatar, isHost: true, isReady: false, online: true }],
@@ -523,4 +534,6 @@ export class SupabaseRoomApi implements RoomApi {
     }
   }
 }
+
+
 

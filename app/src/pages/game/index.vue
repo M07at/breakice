@@ -1,14 +1,15 @@
-<script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+﻿<script setup lang="ts">
+import { computed, onMounted, ref, watch } from 'vue'
 import { onShareAppMessage } from '@dcloudio/uni-app'
 import { useRoomStore } from '../../stores/room'
 import { getPromptPoolSize, pickPrompt, pickRandomPlayer, refreshPromptPools } from '../../services/truthOrDareService'
-import type { TruthOrDarePrompt } from '../../types/room'
+import { setTruth } from '../../services/roomService'
+import type { Player, TruthOrDarePrompt, TruthTurn } from '../../types/room'
 import Avatar from '../../components/Avatar.vue'
 
 const roomStore = useRoomStore()
 const room = computed(() => roomStore.room)
-const targetPlayer = ref(pickRandomPlayer(room.value?.players ?? []))
+const targetPlayer = ref<Player | null>(null)
 const prompt = ref<TruthOrDarePrompt | null>(null)
 const completedIds = ref<string[]>([])
 const round = ref(1)
@@ -16,6 +17,43 @@ const spinning = ref(false)
 const showCustomPrompt = ref(false)
 const customPrompt = ref('')
 const activeTab = ref<'truth' | 'dare'>('truth')
+
+/** 把这一轮写进房间共享状态：所有设备看到同一个人、同一道题 */
+async function publish(turn: Partial<TruthTurn>): Promise<void> {
+  const current = room.value
+  if (!current) return
+  const payload: TruthTurn = {
+    round: turn.round ?? round.value,
+    targetId: turn.targetId !== undefined ? turn.targetId : (targetPlayer.value?.id ?? null),
+    promptId: turn.promptId !== undefined ? turn.promptId : (prompt.value?.id ?? null),
+    type: turn.type ?? prompt.value?.type ?? activeTab.value,
+    text: turn.text !== undefined ? turn.text : (prompt.value?.text ?? ''),
+    at: Date.now(),
+    by: roomStore.currentPlayerId ?? '',
+  }
+  try {
+    await setTruth(current.id, payload)
+  } catch (error) {
+    console.warn('同步真心话状态失败', error)
+  }
+}
+
+/** 别人转了盘/换了题：跟着更新，避免各看各的 */
+watch(
+  () => room.value?.truth ?? null,
+  (shared) => {
+    if (!shared) return
+    if (shared.round !== round.value) round.value = shared.round
+    targetPlayer.value = shared.targetId
+      ? (room.value?.players.find((player) => player.id === shared.targetId) ?? null)
+      : null
+    prompt.value =
+      shared.promptId && shared.text
+        ? { id: shared.promptId, type: shared.type, text: shared.text, difficulty: '轻松' }
+        : null
+  },
+  { immediate: true },
+)
 
 const remainingText = computed(() => `${completedIds.value.length} 轮已完成`)
 const poolVersion = ref(0)
@@ -36,13 +74,21 @@ function spin() {
   prompt.value = null
   setTimeout(() => {
     targetPlayer.value = pickRandomPlayer(room.value?.players ?? [])
+    prompt.value = pickPrompt(activeTab.value)
     spinning.value = false
+    void publish({
+      targetId: targetPlayer.value?.id ?? null,
+      promptId: prompt.value?.id ?? null,
+      type: prompt.value?.type ?? activeTab.value,
+      text: prompt.value?.text ?? '',
+    })
   }, 760)
 }
 
 function drawPrompt(type: 'truth' | 'dare') {
   activeTab.value = type
   prompt.value = pickPrompt(type)
+  void publish({ promptId: prompt.value?.id ?? null, type, text: prompt.value?.text ?? '' })
 }
 
 function completeRound() {
@@ -55,6 +101,7 @@ function nextRound() {
   round.value += 1
   targetPlayer.value = null
   prompt.value = null
+  void publish({ round: round.value, targetId: null, promptId: null, text: '' })
 }
 
 function addCustomPrompt() {
@@ -70,6 +117,7 @@ function addCustomPrompt() {
   }
   customPrompt.value = ''
   showCustomPrompt.value = false
+  void publish({ promptId: prompt.value.id, type: prompt.value.type, text: prompt.value.text })
 }
 
 function leaveGame() {
@@ -418,3 +466,6 @@ onShareAppMessage(() => ({
   to { transform: scale(1.05) rotate(8deg); }
 }
 </style>
+
+
+

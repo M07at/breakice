@@ -1,6 +1,6 @@
 import { roomApi } from '../platform'
 import type { Unsubscribe } from '../platform/types'
-import type { GameType, Room } from '../types/room'
+import type { GameType, Room, TruthTurn } from '../types/room'
 
 /**
  * 房间服务的统一出口。页面和 store 只跟这里打交道，
@@ -55,6 +55,11 @@ export function endGame(roomId: string): Promise<void> {
   return roomApi.endGame(roomId)
 }
 
+/** 真心话大冒险：把这一轮的「轮到谁 + 什么题」写到房间共享状态 */
+export function setTruth(roomId: string, turn: TruthTurn | null): Promise<void> {
+  return roomApi.setTruth(roomId, turn)
+}
+
 export function closeRoom(roomId: string): Promise<void> {
   return roomApi.closeRoom(roomId)
 }
@@ -66,3 +71,4 @@ export function fetchRoom(roomId: string): Promise<Room> {
 export function watchRoom(roomId: string, onChange: (room: Room) => void): Unsubscribe {
   return roomApi.watch(roomId, onChange)
 }
+

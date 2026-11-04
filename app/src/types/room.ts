@@ -26,6 +26,17 @@ export interface Player {
   online: boolean
 }
 
+/** 真心话大冒险的共享回合：所有客户端读同一份，避免各转各的 */
+export interface TruthTurn {
+  round: number
+  targetId: string | null
+  promptId: string | null
+  type: 'truth' | 'dare'
+  text: string
+  at: number
+  by: string
+}
+
 export interface Room {
   id: string
   code: string
@@ -35,6 +46,8 @@ export interface Room {
   phase: RoomPhase
   gameType: GameType | null
   players: Player[]
+  /** 真心话大冒险的共享状态（服务端 rooms.settings.truth） */
+  truth?: TruthTurn | null
 }
 
 export interface TruthOrDarePrompt {
@@ -43,3 +56,4 @@ export interface TruthOrDarePrompt {
   text: string
   difficulty: '轻松' | '进阶'
 }
+

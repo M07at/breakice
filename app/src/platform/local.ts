@@ -1,5 +1,5 @@
-import { getSavedProfile, normalizeAvatar, normalizeNickname, saveProfile } from '../services/avatarService'
-import type { AvatarConfig, GameType, Player, Room } from '../types/room'
+﻿import { getSavedProfile, normalizeAvatar, normalizeNickname, saveProfile } from '../services/avatarService'
+import type { AvatarConfig, GameType, Player, Room, TruthTurn } from '../types/room'
 import { PlatformError } from './types'
 import type { CreateRoomInput, Identity, RoomApi, Unsubscribe } from './types'
 
@@ -22,6 +22,7 @@ interface LocalRoomRecord {
   maxPlayers: number
   phase: Room['phase']
   gameType: GameType | null
+  truth?: TruthTurn | null
   members: { id: string; nickname: string; avatar: AvatarConfig; ready: boolean; online: boolean; seat: number }[]
 }
 
@@ -89,6 +90,7 @@ function toRoom(record: LocalRoomRecord): Room {
     maxPlayers: record.maxPlayers,
     phase: record.phase,
     gameType: record.gameType,
+    truth: record.truth ?? null,
     players,
   }
 }
@@ -235,6 +237,12 @@ export class LocalRoomApi implements RoomApi {
     emit(record)
   }
 
+  async setTruth(roomId: string, turn: TruthTurn | null): Promise<void> {
+    const record = load(roomId)
+    record.truth = turn
+    save(record)
+  }
+
   async getRoom(roomId: string): Promise<Room> {
     return toRoom(load(roomId))
   }
@@ -255,3 +263,6 @@ export class LocalRoomApi implements RoomApi {
     }
   }
 }
+
+
+

@@ -1,4 +1,4 @@
-import type { AvatarConfig, GameType, Room } from '../types/room'
+﻿import type { AvatarConfig, GameType, Room, TruthTurn } from '../types/room'
 
 /** 后端形态：配置了 Supabase 就用 Supabase，否则用本机房间 */
 export type PlatformMode = 'supabase' | 'local'
@@ -40,6 +40,8 @@ export interface RoomApi {
   startGame(roomId: string, gameType: GameType): Promise<void>
   /** 主持人结束本局，房间回到大厅 */
   endGame(roomId: string): Promise<void>
+  /** 真心话大冒险：把「轮到谁 + 什么题」写进房间共享状态 */
+  setTruth(roomId: string, turn: TruthTurn | null): Promise<void>
   /** 主持人关闭房间 */
   closeRoom(roomId: string): Promise<void>
   getRoom(roomId: string): Promise<Room>
@@ -73,3 +75,5 @@ export function toErrorMessage(error: unknown): string {
   if (error instanceof Error) return error.message
   return '操作失败，请重试'
 }
+
+
