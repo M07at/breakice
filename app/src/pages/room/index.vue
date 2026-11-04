@@ -4,7 +4,8 @@ import { onLoad, onShareAppMessage, onShow } from '@dcloudio/uni-app'
 import { useRoomStore } from '../../stores/room'
 import PlayerList from '../../components/PlayerList.vue'
 import RoomCodeCard from '../../components/RoomCodeCard.vue'
-import { bankUrl, drawSetupUrl, undercoverSetupUrl } from '../../services/gameEntry'
+import { bankUrl, drawSetupUrl } from '../../services/gameEntry'
+import { adoptUndercoverRound, endUndercoverRound, PLAYER_PAGE, startUndercoverRound } from '../../services/ucGame'
 import { toErrorMessage } from '../../platform/types'
 import type { GameType } from '../../types/room'
 
@@ -39,13 +40,14 @@ function openPage(url: string) {
   })
 }
 
-/** 各端进入对应游戏；C 的两个玩法会把房间名单带过去当座位 */
+/** 真心话大冒险 / 你画我猜：页面自己开局，路由带上房间人数 */
 function gameUrl(gameType: GameType): string {
-  if (gameType === 'undercover') return undercoverSetupUrl('classic', room.value?.players)
-  if (gameType === 'hybrid') return undercoverSetupUrl('draw', room.value?.players)
   if (gameType === 'drawing') return drawSetupUrl(roomStore.memberCount)
   return '/pages/game/index'
 }
+
+const isUndercover = (gameType: GameType | null) => gameType === 'undercover' || gameType === 'hybrid'
+const variantOf = (gameType: GameType): 'classic' | 'draw' => (gameType === 'hybrid' ? 'draw' : 'classic')
 
 async function hostStart(gameType: GameType) {
   if (!roomStore.allReady) {
@@ -53,6 +55,15 @@ async function hostStart(gameType: GameType) {
     return
   }
   try {
+    if (isUndercover(gameType) && room.value) {
+      // 谁是卧底：由服务端建局发牌（uc-command → uc_start_game 会把房间置为 playing）
+      const variant = variantOf(gameType)
+      await startUndercoverRound(room.value.id, variant)
+      roomStore.markPlaying(gameType)
+      await nextTick()
+      openPage(PLAYER_PAGE[variant])
+      return
+    }
     await roomStore.begin(gameType)
     await nextTick()
     openPage(gameUrl(gameType))
@@ -61,9 +72,24 @@ async function hostStart(gameType: GameType) {
   }
 }
 
-function enterCurrentGame() {
+/** 回到正在进行的一局；谁是卧底要先把房间里的那局接管过来 */
+async function enterCurrentGame() {
   const gameType = room.value?.gameType
   if (!gameType) return
+  if (isUndercover(gameType) && room.value) {
+    const variant = variantOf(gameType)
+    try {
+      const snapshot = await adoptUndercoverRound(room.value.id, variant)
+      if (!snapshot) {
+        uni.showToast({ title: '还没找到进行中的一局，稍后再试', icon: 'none' })
+        return
+      }
+      openPage(PLAYER_PAGE[variant])
+    } catch (issue) {
+      uni.showToast({ title: toErrorMessage(issue), icon: 'none' })
+    }
+    return
+  }
   openPage(gameUrl(gameType))
 }
 
@@ -71,11 +97,19 @@ function enterCurrentGame() {
 watch(
   () => room.value?.phase,
   (phase, previous) => {
-    if (phase === 'playing' && previous === 'lobby' && !roomStore.isHost) enterCurrentGame()
+    if (phase === 'playing' && previous === 'lobby' && !roomStore.isHost) void enterCurrentGame()
   },
 )
 
 async function finishRound() {
+  // 谁是卧底的局在 games 表里，得先让服务端把它收尾，否则下一局会被 GAME_ACTIVE 挡住
+  if (isUndercover(room.value?.gameType ?? null)) {
+    try {
+      await endUndercoverRound()
+    } catch (issue) {
+      console.warn('结束服务端局次失败', issue)
+    }
+  }
   await roomStore.finishGame()
   notice.value = '本局已结束，房间回到大厅'
 }
@@ -404,3 +438,5 @@ onShareAppMessage(() => ({
   margin-top: 30rpx;
 }
 </style>
+
+

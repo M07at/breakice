@@ -1,4 +1,4 @@
-﻿<script setup lang="ts">
+<script setup lang="ts">
 import { ref } from 'vue'
 import { useRoomStore } from '../../stores/room'
 import Avatar from '../../components/Avatar.vue'

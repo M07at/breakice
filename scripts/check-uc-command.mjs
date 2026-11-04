@@ -1,0 +1,201 @@
+#!/usr/bin/env node
+/**
+ * 验收 uc-command（服务端谁是卧底引擎）。
+ *
+ * 会真的在项目里建一个房间、拉 4 个匿名账号、开始一局、领词、确认、推进到投票。
+ * 需要项目开启匿名登录（Authentication → Anonymous）。
+ *
+ * 用法： node scripts/check-uc-command.mjs
+ * 配置： VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY，或 app/.env.local
+ */
+
+import { readFileSync, existsSync } from 'node:fs'
+import { dirname, resolve } from 'node:path'
+import { fileURLToPath } from 'node:url'
+
+const root = resolve(dirname(fileURLToPath(import.meta.url)), '..')
+const envFile = resolve(root, 'app/.env.local')
+
+function readEnvFile() {
+  if (!existsSync(envFile)) return {}
+  const out = {}
+  for (const line of readFileSync(envFile, 'utf8').split(/\r?\n/)) {
+    const m = line.match(/^\s*([A-Z0-9_]+)\s*=\s*(.*)\s*$/)
+    if (m) out[m[1]] = m[2].replace(/^["']|["']$/g, '')
+  }
+  return out
+}
+
+const fileEnv = readEnvFile()
+const BASE = (process.env.VITE_SUPABASE_URL || fileEnv.VITE_SUPABASE_URL || '').replace(/\/+$/, '')
+const KEY = process.env.VITE_SUPABASE_ANON_KEY || fileEnv.VITE_SUPABASE_ANON_KEY || ''
+
+let passed = 0
+let failed = 0
+const ok = (name, detail = '') => {
+  passed++
+  console.log(`  ✓ ${name}${detail ? `  ${detail}` : ''}`)
+}
+const bad = (name, detail = '') => {
+  failed++
+  console.log(`  ✗ ${name}${detail ? `  ${detail}` : ''}`)
+}
+
+async function call(path, { method = 'GET', token, body } = {}) {
+  const res = await fetch(`${BASE}${path}`, {
+    method,
+    headers: { apikey: KEY, Authorization: `Bearer ${token ?? KEY}`, 'Content-Type': 'application/json' },
+    body: body === undefined ? undefined : JSON.stringify(body),
+  })
+  const text = await res.text()
+  let data = null
+  try {
+    data = text ? JSON.parse(text) : null
+  } catch {
+    data = text
+  }
+  return { status: res.status, ok: res.ok, data, text }
+}
+
+async function mustCall(path, options) {
+  const res = await call(path, options)
+  if (!res.ok) throw new Error(`${path} -> ${res.status} ${res.text.slice(0, 200)}`)
+  return res.data
+}
+
+const anonSession = async () => (await mustCall('/auth/v1/signup', { method: 'POST', body: {} })).access_token
+const rpc = (name, args, token) => mustCall(`/rest/v1/rpc/${name}`, { method: 'POST', token, body: args })
+
+async function uc(body, token) {
+  const res = await call('/functions/v1/uc-command', { method: 'POST', token, body })
+  return res
+}
+
+async function main() {
+  if (!BASE || !KEY) {
+    console.error('缺少 Supabase 配置')
+    process.exit(2)
+  }
+  console.log(`项目：${BASE}\n`)
+
+  console.log('[1] 准备 4 个账号与房间')
+  const tokens = []
+  try {
+    for (let i = 0; i < 4; i++) tokens.push(await anonSession())
+    ok('4 个匿名账号')
+  } catch (e) {
+    bad('匿名登录', String(e.message).slice(0, 160))
+    return summary()
+  }
+
+  const host = tokens[0]
+  let roomId
+  try {
+    const rows = await rpc('create_room', { p_title: '引擎验收房', p_game_type: 'lobby', p_max_players: 8, p_settings: {} }, host)
+    roomId = rows[0].room_id
+    const code = rows[0].room_code
+    for (let i = 1; i < 4; i++) await rpc('join_room', { p_code: code }, tokens[i])
+    for (const t of tokens) await rpc('set_ready', { p_room_id: roomId, p_ready: true }, t)
+    ok('建房 + 3 人加入 + 全员准备', `房间号 ${code}`)
+  } catch (e) {
+    bad('准备房间', String(e.message).slice(0, 200))
+    return summary()
+  }
+
+  console.log('\n[2] 开局')
+  let gameId
+  const tinyConfig = { describeSeconds: 2, voteSeconds: 2, revealSeconds: 1, maxRounds: 3 }
+  try {
+    const res = await uc({ op: 'start', room_id: roomId, variant: 'classic', request_id: 'check-start', config: tinyConfig }, host)
+    if (!res.ok) throw new Error(`${res.status} ${res.text.slice(0, 200)}`)
+    const snap = res.data
+    gameId = snap.gameId
+    if (snap.view?.phase === 'word' && snap.players?.length === 4) ok('主持人开局', `gameId ${gameId.slice(0, 8)}… phase=word 玩家=4`)
+    else bad('主持人开局', JSON.stringify(snap).slice(0, 200))
+    if (snap.playerId && snap.hostId === snap.playerId) ok('快照里的身份是房主自己')
+    else bad('快照里的身份')
+  } catch (e) {
+    bad('主持人开局', String(e.message).slice(0, 200))
+    return summary()
+  }
+
+  console.log('\n[3] 权限与幂等')
+  try {
+    const again = await uc({ op: 'start', room_id: roomId, variant: 'classic', request_id: 'check-start-2', config: tinyConfig }, tokens[1])
+    if (again.status === 403) ok('非房主开局被拒（403）')
+    else bad('非房主开局被拒', `HTTP ${again.status} ${again.text.slice(0, 120)}`)
+  } catch (e) {
+    bad('非房主开局', String(e.message).slice(0, 160))
+  }
+
+  console.log('\n[4] 领词')
+  const words = []
+  for (let i = 0; i < tokens.length; i++) {
+    const res = await uc({ op: 'word', game_id: gameId }, tokens[i])
+    if (res.ok && typeof res.data?.word !== 'undefined') {
+      words.push(res.data.word)
+    } else {
+      bad(`玩家 ${i + 1} 领词`, `${res.status} ${res.text.slice(0, 120)}`)
+    }
+  }
+  if (words.length === 4) {
+    const distinct = new Set(words)
+    ok('4 名玩家都拿到词', distinct.size === 2 ? '两组词（平民/卧底）' : `词种=${distinct.size}`)
+  }
+
+  console.log('\n[5] 确认词 + 推进')
+  try {
+    for (let i = 0; i < tokens.length; i++) {
+      const res = await uc({ op: 'act', game_id: gameId, action: { type: 'acknowledgeWord' }, meta: { requestId: `ack-${i}` } }, tokens[i])
+      if (!res.ok) throw new Error(`ack ${i} -> ${res.status} ${res.text.slice(0, 160)}`)
+      if (i === tokens.length - 1) {
+        ok('所有人确认词', `phase=${res.data.view.phase}`)
+      }
+    }
+  } catch (e) {
+    bad('确认词', String(e.message).slice(0, 200))
+  }
+
+  console.log('\n[6] 倒计时推进（tick）')
+  try {
+    await new Promise((r) => setTimeout(r, 2600))
+    const res = await uc({ op: 'tick', game_id: gameId }, host)
+    if (res.ok) ok('tick 返回快照', `phase=${res.data.view.phase} version=${res.data.view.version}`)
+    else bad('tick', `${res.status} ${res.text.slice(0, 160)}`)
+  } catch (e) {
+    bad('tick', String(e.message).slice(0, 160))
+  }
+
+  console.log('\n[7] 当前局查询')
+  try {
+    const res = await uc({ op: 'current', room_id: roomId }, tokens[2])
+    if (res.ok && res.data.snapshot?.gameId === gameId) ok('房内成员能找到进行中的一局')
+    else bad('current', `${res.status} ${res.text.slice(0, 160)}`)
+  } catch (e) {
+    bad('current', String(e.message).slice(0, 160))
+  }
+
+  console.log('\n[8] 结束本局')
+  try {
+    const res = await uc({ op: 'act', game_id: gameId, action: { type: 'endGame' }, meta: { requestId: 'check-end' } }, host)
+    if (res.ok) ok('主持人结束本局', `phase=${res.data.view.phase}`)
+    else bad('结束本局', `${res.status} ${res.text.slice(0, 160)}`)
+    const rooms = await mustCall(`/rest/v1/rooms?id=eq.${roomId}&select=status`, { token: host })
+    if (rooms[0]?.status === 'lobby') ok('房间回到大厅')
+    else bad('房间回到大厅', JSON.stringify(rooms))
+  } catch (e) {
+    bad('结束本局', String(e.message).slice(0, 200))
+  }
+
+  summary()
+}
+
+function summary() {
+  console.log(`\n通过 ${passed} 项，失败 ${failed} 项`)
+  process.exitCode = failed === 0 && passed > 0 ? 0 : 1
+}
+
+main().catch((e) => {
+  console.error(e)
+  process.exit(1)
+})

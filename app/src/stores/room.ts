@@ -160,6 +160,11 @@ export const useRoomStore = defineStore('room', () => {
     }
   }
 
+  /** 服务端已经开局（uc_start_game 会把房间置为 playing），这里只同步本地状态 */
+  function markPlaying(gameType: GameType) {
+    if (!room.value) return
+    room.value = { ...room.value, phase: 'playing', gameType }
+  }
   /** 主持人结束本局，房间回到大厅 */
   async function finishGame() {
     if (!room.value) return
@@ -219,8 +224,10 @@ export const useRoomStore = defineStore('room', () => {
     restore,
     toggleReady,
     begin,
+    markPlaying,
     finishGame,
     leave,
     clear,
   }
 })
+

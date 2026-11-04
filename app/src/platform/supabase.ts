@@ -100,9 +100,15 @@ function uniRequest<T>(options: {
 function errorText(data: unknown): string {
   if (!data || typeof data !== 'object') return ''
   const record = data as Record<string, unknown>
-  return [record.message, record.error_description, record.error, record.msg, record.details]
-    .filter((value) => typeof value === 'string')
-    .join(' ')
+  const parts = [record.message, record.error_description, record.error, record.msg, record.details]
+  // Edge Function 的错误形状是 { error: { code, message } }
+  const nested = record.error
+  if (nested && typeof nested === 'object') {
+    const inner = nested as Record<string, unknown>
+    if (typeof inner.message === 'string') parts.push(inner.message)
+    if (typeof inner.code === 'string') parts.push(inner.code)
+  }
+  return parts.filter((value) => typeof value === 'string').join(' ')
 }
 
 function mapErrorCode(data: unknown, status: number): PlatformError['code'] {
@@ -295,6 +301,15 @@ export class SupabaseRoomApi implements RoomApi {
       body: { refresh_token: refreshToken },
     })
     return this.store(data.user.id, data.access_token, data.refresh_token, data.expires_in)
+  }
+
+  /** 调用 Edge Function（带登录态），给 uc-command 这类游戏指令用 */
+  async invokeFunction<T>(path: string, body: unknown): Promise<T> {
+    const result = await this.call<{ error?: { code?: string; message?: string } }>(path, { method: 'POST', body })
+    if (result && typeof result === 'object' && result.error) {
+      throw new PlatformError('UNKNOWN', result.error.message ?? '游戏服务返回错误')
+    }
+    return result as T
   }
 
   private async call<T>(path: string, options: { method?: 'GET' | 'POST' | 'DELETE'; body?: unknown } = {}): Promise<T> {
