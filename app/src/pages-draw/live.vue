@@ -39,12 +39,19 @@ const busy = ref(false)
 const guess = ref('')
 const panelUrls = ref<Record<string, string>>({})
 const canvasRef = ref<CanvasApi | null>(null)
+/** 服务端时钟与本机时钟的偏差：倒计时按服务端时间算 */
+const serverOffset = ref(0)
+/** 每秒跳一次，用来驱动倒计时显示 */
+const clockTick = ref(Date.now())
 
 let api: DrawRemoteApi | null = null
 let publisher: Publisher | null = null
 let localBackend: LocalDrawRoomBackend | null = null
 let offView: (() => void) | null = null
 let remoteDispose: (() => void) | null = null
+let tickTimer: ReturnType<typeof setInterval> | null = null
+let clockTimer: ReturnType<typeof setInterval> | null = null
+let ticking = false
 
 const myTurn = computed(() => Boolean(view.value && view.value.painterId === meId.value && view.value.phase === 'drawing'))
 const painterName = computed(() => {
@@ -60,7 +67,8 @@ const hintText = computed(() => {
 const remain = computed(() => {
   const snapshot = view.value
   if (!snapshot || snapshot.phase !== 'drawing') return 0
-  return Math.max(0, Math.round((snapshot.endsAt - snapshot.serverTime) / 1000))
+  // endsAt 是服务端时间：先用偏差换成本机时间，再减，倒计时才会真的走
+  return Math.max(0, Math.round((snapshot.endsAt - (clockTick.value + serverOffset.value)) / 1000))
 })
 
 /** 联机用的单人画布引擎：只画自己的这一张 */
@@ -70,6 +78,14 @@ onLoad((options) => {
   roomId.value = String(options?.room ?? '')
 })
 
+/** 收到新视图时统一处理：校正时钟、刷新画廊图片 */
+function adoptView(next: DrawRoomView) {
+  serverOffset.value = next.serverTime - Date.now()
+  clockTick.value = Date.now()
+  view.value = next
+  void syncPanelUrls()
+}
+
 onMounted(async () => {
   if (!roomId.value) {
     error.value = '缺少房间信息，请从房间大厅进入'
@@ -78,9 +94,18 @@ onMounted(async () => {
   try {
     const room = await fetchRoom(roomId.value)
     roomName.value = room.name
-    meId.value = roomApi.identity().id
+    // 用 currentUserId 而不是 identity()：后者在会话尚未建立时会返回 unauthenticated
+    meId.value =
+      roomApi.mode === 'supabase'
+        ? await (roomApi as SupabaseRoomApi).currentUserId()
+        : roomApi.identity().id
     isHost.value = room.hostId === meId.value
     api = createSupabaseDrawApi()
+
+    // 倒计时每秒走一次
+    clockTimer = setInterval(() => {
+      clockTick.value = Date.now()
+    }, 1000)
 
     if (isHost.value) {
       // 主持人：用房间真实名单开局，再把视图发布出去
@@ -98,9 +123,21 @@ onMounted(async () => {
       })
       publisher.start()
       offView = localBackend.subscribe(() => {
-        void localBackend?.view().then((next) => (view.value = next))
+        void localBackend?.view().then((next) => adoptView(next))
       })
-      view.value = await localBackend.view()
+      // 权威时钟跑在主持人设备上：不 tick 的话倒计时归零也不会推进阶段
+      tickTimer = setInterval(() => {
+        if (ticking || !localBackend) return
+        ticking = true
+        localBackend
+          .tick()
+          .then((next) => adoptView(next))
+          .catch((issue) => console.warn('[live] tick 失败', issue))
+          .finally(() => {
+            ticking = false
+          })
+      }, 250)
+      adoptView(await localBackend.view())
     } else {
       const remote = createRemoteDrawRoom({
         roomId: roomId.value,
@@ -109,10 +146,8 @@ onMounted(async () => {
         onError: (issue) => console.warn('[live] 读取失败', issue),
       })
       remoteDispose = () => remote.dispose()
-      offView = remote.subscribe((next) => {
-        view.value = next
-      })
-      view.value = await remote.view()
+      offView = remote.subscribe((next) => adoptView(next))
+      adoptView(await remote.view())
     }
   } catch (issue) {
     error.value = issue instanceof Error ? issue.message : String(issue)
@@ -123,6 +158,10 @@ onUnmounted(() => {
   offView?.()
   remoteDispose?.()
   publisher?.stop()
+  if (tickTimer) clearInterval(tickTimer)
+  if (clockTimer) clearInterval(clockTimer)
+  tickTimer = null
+  clockTimer = null
   disposeDrawRoom(localBackend)
 })
 
@@ -154,10 +193,13 @@ async function submitDrawing() {
     const storagePath = `${roomId.value}/draw/${view.value.roundKey}/${meId.value}.png`
     await supabase.uploadArtwork(storagePath, filePath)
     // 主持人直接喂本机后端；其他人走指令队列
-    if (localBackend) await localBackend.submitDrawing(storagePath)
-    else await api?.postAction(roomId.value, 'submitDrawing', { imageRef: storagePath })
-    view.value = await (localBackend ? localBackend.view() : api!.readView(roomId.value).then((r) => r?.view ?? view.value!))
-    void syncPanelUrls()
+    if (localBackend) {
+      adoptView(await localBackend.submitDrawing(storagePath))
+    } else {
+      await api?.postAction(roomId.value, 'submitDrawing', { imageRef: storagePath })
+      const snapshot = await api?.readView(roomId.value)
+      if (snapshot) adoptView(snapshot.view)
+    }
   } catch (issue) {
     error.value = issue instanceof Error ? issue.message : String(issue)
   } finally {
@@ -379,4 +421,7 @@ async function endSession() {
   font-size: 26rpx;
 }
 </style>
+
+
+
 
