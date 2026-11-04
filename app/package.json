@@ -21,6 +21,7 @@
     "check:artwork": "node ../scripts/check-artwork.mjs",
     "check:truth": "node ../scripts/check-truth.mjs",
     "check:realtime": "node ../scripts/probe-realtime.mjs",
+    "check:drawroom": "node ../scripts/check-draw-room.mjs",
     "verify": "node ../scripts/verify.mjs",
     "doctor": "node ../scripts/doctor.mjs",
     "release:manifest": "node ../scripts/release-manifest.mjs"
