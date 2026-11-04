@@ -1,6 +1,7 @@
-import { computed, ref } from 'vue'
+﻿import { computed, ref } from 'vue'
 import { defineStore } from 'pinia'
 import * as roomService from '../services/roomService'
+import { onLivePoke, pokeRoom, startLive, stopLive } from '../services/liveRoom'
 import { toErrorMessage } from '../platform/types'
 import type { Unsubscribe } from '../platform/types'
 import type { GameType, Room } from '../types/room'
@@ -20,6 +21,7 @@ export const useRoomStore = defineStore('room', () => {
   const connecting = ref(false)
 
   let unsubscribe: Unsubscribe | null = null
+let liveUnsubscribe: (() => void) | null = null
 
   const platformLabel = computed(() => roomService.platformLabel())
   const members = computed(() => room.value?.players ?? [])
@@ -52,6 +54,23 @@ export const useRoomStore = defineStore('room', () => {
       room.value = next
       if (!currentPlayerId.value) currentPlayerId.value = roomService.currentIdentity().id
     })
+    // 实时通道：别人有动作立刻刷新；2 秒轮询仍然保留作为兜底
+    startLive(roomId)
+    liveUnsubscribe?.()
+    liveUnsubscribe = onLivePoke(() => {
+      void refreshNow()
+    })
+  }
+
+  /** 立刻从服务端取一次房间状态（实时 poke 触发，或被页面手动调用） */
+  async function refreshNow() {
+    const id = room.value?.id
+    if (!id) return
+    try {
+      room.value = await roomService.fetchRoom(id)
+    } catch (issue) {
+      console.warn('刷新房间失败', issue)
+    }
   }
 
   /** 昵称同步只是锦上添花，失败不能挡住进房 */
@@ -127,6 +146,7 @@ export const useRoomStore = defineStore('room', () => {
     error.value = ''
     try {
       await roomService.setReady(room.value.id, next)
+      pokeRoom('room')
       room.value = {
         ...room.value,
         players: room.value.players.map((player) =>
@@ -151,6 +171,7 @@ export const useRoomStore = defineStore('room', () => {
     error.value = ''
     try {
       await roomService.startGame(room.value.id, gameType)
+      pokeRoom('room', { game: gameType })
       room.value = { ...room.value, phase: 'playing', gameType }
     } catch (issue) {
       error.value = toErrorMessage(issue)
@@ -171,6 +192,7 @@ export const useRoomStore = defineStore('room', () => {
     busy.value = true
     try {
       await roomService.endGame(room.value.id)
+      pokeRoom('room')
       room.value = {
         ...room.value,
         phase: 'lobby',
@@ -193,12 +215,16 @@ export const useRoomStore = defineStore('room', () => {
         // 离开失败也要清掉本地状态，避免卡在房间里
       }
     }
+    pokeRoom('room')
     clear()
   }
 
   function clear() {
     unsubscribe?.()
     unsubscribe = null
+    liveUnsubscribe?.()
+    liveUnsubscribe = null
+    stopLive()
     room.value = null
     currentPlayerId.value = ''
     error.value = ''
@@ -230,4 +256,8 @@ export const useRoomStore = defineStore('room', () => {
     clear,
   }
 })
+
+
+
+
 

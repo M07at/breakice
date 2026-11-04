@@ -1,7 +1,8 @@
-﻿import { roomApi } from '../platform'
+import { roomApi } from '../platform'
 import { PlatformError } from '../platform/types'
 import { SupabaseRoomApi } from '../platform/supabase'
 import { UcError } from '../modules/undercover/errors'
+import { pokeRoom } from './liveRoom'
 import { installPlayerPort } from '../modules/undercover/player'
 import type { UcPlayerPort, UcPlayerSnapshot } from '../modules/undercover/player'
 import type { Variant } from '../modules/undercover'
@@ -119,7 +120,12 @@ function createPort(gameId: string, variant: Variant): UcPlayerPort {
     resumeUrl: PLAYER_PAGE[variant],
     load: () => invoke<UcPlayerSnapshot>({ op: 'tick', game_id: gameId }),
     getMyWord: (id) => invoke({ op: 'word', game_id: id }),
-    act: (id, action, meta) => invoke<UcPlayerSnapshot>({ op: 'act', game_id: id, action, meta }),
+    act: async (id, action, meta) => {
+      const snapshot = await invoke<UcPlayerSnapshot>({ op: 'act', game_id: id, action, meta })
+      // 告诉同房其他人"局面变了"，他们立刻重拉，不必等 2 秒轮询
+      pokeRoom('game')
+      return snapshot
+    },
     submitDrawing: async (id, drawing, meta) => {
       const submitted = await invoke<UcPlayerSnapshot>({
         op: 'act',
@@ -127,13 +133,14 @@ function createPort(gameId: string, variant: Variant): UcPlayerPort {
         action: { type: 'drawingSubmitted', turnKey: meta.expectedTurnKey, drawingRef: drawing.preview },
         meta,
       })
+      pokeRoom('game')
       // 画作已入库，再要一次 AI 评分；评分失败/超时不影响回合推进
       if (!drawing.artworkId) return submitted
       try {
         const ai = await requireApi().scoreArtwork(drawing.artworkId)
         if (ai?.status === 'success' && typeof ai.total === 'number') {
           const view = submitted.view
-          return await invoke<UcPlayerSnapshot>({
+          const scored = await invoke<UcPlayerSnapshot>({
             op: 'act',
             game_id: id,
             action: {
@@ -150,6 +157,8 @@ function createPort(gameId: string, variant: Variant): UcPlayerPort {
               expectedTurnKey: view.turnKey,
             },
           })
+          pokeRoom('game')
+          return scored
         }
         console.warn('[uc] AI 评分未成功', ai?.status)
       } catch (error) {
@@ -214,6 +223,7 @@ export async function endUndercoverRound(): Promise<void> {
   })
   activeGameId = ''
 }
+
 
 
 

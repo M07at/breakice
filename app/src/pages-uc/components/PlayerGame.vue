@@ -1,4 +1,4 @@
-﻿<template>
+<template>
   <view class="uc-page">
     <view class="uc-header"><text class="uc-eyebrow">破冰局 / {{ snapshot?.view.variant === 'draw' ? '你画我猜谁是卧底' : '谁是卧底' }}</text><view class="uc-row"><text class="uc-title">{{ title }}</text><text v-if="snapshot?.view.phaseDeadline" class="player-clock">{{ remaining }}秒</text></view><text class="uc-subtitle">{{ port?.label ?? '个人游戏界面' }}</text></view>
     <view v-if="snapshot" class="uc-note identity">你是 {{ seatOf(snapshot.playerId) }} 号 · {{ nameOf(snapshot.playerId) }} <text v-if="rights?.isHost">（主持人）</text></view>
@@ -85,6 +85,7 @@ import type { UcClientAction, UcCommandMeta, UcSecretView } from '@/modules/unde
 import { getPlayerPort, installPlayerPort, playerPermissions, shouldAcceptPlayerSnapshot } from '@/modules/undercover/player'
 import type { DrawingSubmission, UcPlayerPort, UcPlayerSnapshot } from '@/modules/undercover/player'
 import { createPlayerPreviewPort, previewOrigin } from '@/modules/local/player-preview'
+import { onLivePoke, pokeRoom } from '@/services/liveRoom'
 import { resolveArtworkUrls } from '@/services/ucGame'
 
 const props = defineProps<{ query: Record<string,string|undefined>; variant: 'classic' | 'draw' }>()
@@ -242,13 +243,16 @@ onMounted(async () => {
     port.value = getPlayerPort(props.variant)
     if (!port.value) { error.value = '请打开分配给自己的加入链接，或返回测试入口创建联调游戏。'; return }
     await load()
+    offLive = onLivePoke(() => { if (!disposed && !polling) void load() })
     let ticks = 0
     timer = setInterval(() => { clock.value = Date.now(); if (active && ++ticks % 3 === 0) void load() }, 250)
   } catch (e) { error.value = isUcError(e) || e instanceof Error ? e.message : '连接游戏失败' }
 })
 onHide(() => { active = false; hideSecret() })
 onShow(() => { active = true; if (port.value) void load() })
-onUnmounted(() => { disposed = true; hideSecret(); if (timer) clearInterval(timer) })
+onUnmounted(() => { disposed = true; hideSecret(); if (timer) clearInterval(timer); offLive?.() })
+/** 同房间有人行动时立刻拉一次，不用等轮询 */
+let offLive: (() => void) | null = null
 </script>
 
 <style>
@@ -267,6 +271,7 @@ onUnmounted(() => { disposed = true; hideSecret(); if (timer) clearInterval(time
 .player-clock { font-size: 40rpx; font-weight: 700; white-space: nowrap; }
 .final-player { padding: 20rpx 0; border-bottom: 2rpx solid #edf0e7; }
 </style>
+
 
 
 
