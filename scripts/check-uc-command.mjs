@@ -120,6 +120,14 @@ async function main() {
     else bad('主持人开局', JSON.stringify(snap).slice(0, 200))
     if (snap.playerId && snap.hostId === snap.playerId) ok('快照里的身份是房主自己')
     else bad('快照里的身份')
+
+    // 0019：开局必须把 rooms.game_type 写成 undercover / hybrid，否则客人不知道该进哪个游戏
+    const started = await mustCall(`/rest/v1/rooms?id=eq.${roomId}&select=game_type,status`, { token: host })
+    if (started[0]?.game_type === 'undercover' && started[0]?.status === 'playing') {
+      ok('开局写入 game_type', `game_type=${started[0].game_type}`)
+    } else {
+      bad('开局写入 game_type', JSON.stringify(started[0]))
+    }
   } catch (e) {
     bad('主持人开局', String(e.message).slice(0, 200))
     return summary()
@@ -259,9 +267,18 @@ async function main() {
       if (res.ok) ok('主持人结束本局', `phase=${res.data.view.phase}`)
       else bad('结束本局', `${res.status} ${res.text.slice(0, 160)}`)
     }
-    const rooms = await mustCall(`/rest/v1/rooms?id=eq.${roomId}&select=status`, { token: host })
+    const rooms = await mustCall(`/rest/v1/rooms?id=eq.${roomId}&select=status,game_type`, { token: host })
     if (rooms[0]?.status === 'lobby') ok('房间回到大厅')
     else bad('房间回到大厅', JSON.stringify(rooms))
+
+    // 0020：一局结束后所有人的准备状态必须清空
+    if (rooms[0]?.game_type === 'lobby') ok('game_type 复位成 lobby')
+    else bad('game_type 复位', JSON.stringify(rooms[0]))
+
+    const members = await mustCall(`/rest/v1/room_members?room_id=eq.${roomId}&select=user_id,ready`, { token: host })
+    const stillReady = (members ?? []).filter((m) => m.ready)
+    if (Array.isArray(members) && stillReady.length === 0) ok('一局结束后全场已重置为未准备', `${members.length} 人`)
+    else bad('准备状态重置', JSON.stringify(stillReady).slice(0, 160))
   } catch (e) {
     bad('收尾', String(e.message).slice(0, 200))
   }
