@@ -15,6 +15,8 @@ import type { GameType } from '../../types/room'
 const roomStore = useRoomStore()
 const room = computed(() => roomStore.room)
 const notice = ref('')
+/** 临时诊断：点开局后这一行会显示走到哪一步，方便定位"点了没反应" */
+const debugLine = ref('')
 /** 本房累计积分（由 uc-command 结算时写入 scores，0010 聚合） */
 const leaderboard = ref<LeaderboardRow[]>([])
 const leaderboardVersion = ref(0)
@@ -112,15 +114,19 @@ async function hostStart(gameType: GameType) {
     roomId: room.value?.id ?? '(空)',
   })
   notice.value = ''
+  // 临时诊断：页面上能看到点击走到哪一步
+  debugLine.value = `点击 ${gameType}｜人数=${roomStore.memberCount}｜已准备=${String(roomStore.allReady)}｜房间=${room.value?.id ? '有' : '无'}`
 
   // 谁是卧底 / 融合玩法可以用机器人补位，人数不够也能开局
   if (roomStore.memberCount < minPlayers && !isUndercover(gameType)) {
     uni.showToast({ title: `${GAME_LABEL[gameType]}至少要 ${minPlayers} 人`, icon: 'none' })
+    debugLine.value += '｜拦截:人数不足'
     return
   }
   if (!roomStore.allReady) {
     uni.showToast({ title: `还有 ${missingReady.value} 人没准备`, icon: 'none' })
     notice.value = `开局前需要所有人在「准备状态」里点「我准备好了」`
+    debugLine.value += '｜拦截:有人没准备'
     return
   }
   if (gameType === 'drawing') {
@@ -131,6 +137,7 @@ async function hostStart(gameType: GameType) {
   if (isUndercover(gameType)) {
     if (!room.value) {
       uni.showToast({ title: '房间信息还没加载好，请稍后重试', icon: 'none' })
+      debugLine.value += '｜拦截:房间为空'
       return
     }
     const variant = variantOf(gameType)
@@ -140,12 +147,14 @@ async function hostStart(gameType: GameType) {
       if (shortfall > 0) {
         uni.showToast({ title: `人数不足，已补 ${shortfall} 个机器人`, icon: 'none' })
       }
+      debugLine.value += `｜补位=${shortfall}｜请求中`
       uni.showLoading({ title: '正在开局…', mask: true })
       try {
         await startUndercoverRound(room.value.id, variant, shortfall)
       } finally {
         uni.hideLoading()
       }
+      debugLine.value += '｜开局成功，正在进入游戏'
       roomStore.markPlaying(gameType)
       await nextTick()
       openPage(PLAYER_PAGE[variant])
@@ -155,6 +164,7 @@ async function hostStart(gameType: GameType) {
       console.error('[房间] 开局失败', issue)
       uni.showToast({ title: message, icon: 'none' })
       notice.value = `开局失败：${message}`
+      debugLine.value += `｜失败:${message}`
     }
     return
   }
@@ -289,6 +299,7 @@ onShareAppMessage(() => ({
     </view>
 
     <view v-else-if="roomStore.isHost" class="surface host-surface">
+      <text v-if="debugLine" class="debug-line">{{ debugLine }}</text>
       <view class="section-title">
         <text>主持人控制台</text>
         <text class="muted">{{ roomStore.allReady ? '可以开局' : `还差 ${missingReady} 人` }}</text>
@@ -547,7 +558,9 @@ onShareAppMessage(() => ({
 .empty-page .btn {
   margin-top: 30rpx;
 }
+.debug-line { display: block; margin: 6rpx 0 14rpx; padding: 8rpx 12rpx; border-radius: 8rpx; color: #7c2d12; background: #fef3c7; font-size: 20rpx; word-break: break-all; }
 </style>
+
 
 
 
