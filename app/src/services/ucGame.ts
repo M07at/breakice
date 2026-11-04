@@ -1,4 +1,4 @@
-import { roomApi } from '../platform'
+﻿import { roomApi } from '../platform'
 import { PlatformError } from '../platform/types'
 import { SupabaseRoomApi } from '../platform/supabase'
 import { UcError } from '../modules/undercover/errors'
@@ -207,7 +207,9 @@ export async function adoptUndercoverRound(roomId: string, variant: Variant): Pr
   })
   const snapshot = result?.snapshot ?? (result?.gameId ? (result as UcPlayerSnapshot) : null)
   if (!snapshot?.gameId) return null
-  install(snapshot, variant)
+  // 以服务端这局的真实玩法为准，房间的 game_type 可能缺失或不准
+  const actual: Variant = snapshot.view?.variant === 'draw' ? 'draw' : variant
+  install(snapshot, actual)
   activeGameId = snapshot.gameId
   return snapshot
 }
@@ -223,6 +225,7 @@ export async function endUndercoverRound(): Promise<void> {
   })
   activeGameId = ''
 }
+
 
 
 

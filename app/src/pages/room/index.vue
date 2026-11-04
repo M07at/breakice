@@ -1,4 +1,4 @@
-﻿<script setup lang="ts">
+<script setup lang="ts">
 import { computed, nextTick, ref, watch } from 'vue'
 import { onLoad, onShareAppMessage, onShow } from '@dcloudio/uni-app'
 import { useRoomStore } from '../../stores/room'
@@ -162,31 +162,54 @@ async function hostStart(gameType: GameType) {
 /** 回到正在进行的一局；谁是卧底要先把房间里的那局接管过来 */
 async function enterCurrentGame() {
   const gameType = room.value?.gameType
-  if (!gameType) return
-  if (isUndercover(gameType) && room.value) {
-    const variant = variantOf(gameType)
+  const roomId = room.value?.id
+
+  // game_type 可能是空的（服务端只置了 playing）。这时不能静默返回：
+  // 先去问服务端有没有进行中的局，有就接管，没有就明说，别让按钮像坏了。
+  if (!gameType || isUndercover(gameType)) {
+    if (!roomId) {
+      uni.showToast({ title: '房间信息还没加载好，稍后重试', icon: 'none' })
+      return
+    }
+    const variant = gameType === 'hybrid' ? 'draw' : 'classic'
     try {
-      const snapshot = await adoptUndercoverRound(room.value.id, variant)
-      if (!snapshot) {
-        uni.showToast({ title: '还没找到进行中的一局，稍后再试', icon: 'none' })
+      const snapshot = await adoptUndercoverRound(roomId, variant)
+      if (snapshot) {
+        const actual = snapshot.view?.variant === 'draw' ? 'draw' : 'classic'
+        openPage(PLAYER_PAGE[actual])
         return
       }
-      openPage(PLAYER_PAGE[variant])
     } catch (issue) {
       uni.showToast({ title: toErrorMessage(issue), icon: 'none' })
+      return
     }
+    uni.showToast({
+      title: gameType ? '还没找到进行中的一局，稍后再试' : '这一局已经结束，等主持人重新开始',
+      icon: 'none',
+    })
     return
   }
 
   openPage(gameUrl(gameType))
 }
 
-/** 别人按了开始：本端跟着进游戏（只在「大厅 → 进行中」这次跳转时触发） */
+/** 自动跳转只做一次，避免轮询触发多次导航 */
+const autoEntered = ref(false)
+
+/** 别人按了开始：本端跟着进游戏（首次进入房间时如果已经在玩，也要跟进去） */
 watch(
   () => room.value?.phase,
   (phase, previous) => {
-    if (phase === 'playing' && previous === 'lobby' && !roomStore.isHost) void enterCurrentGame()
+    if (phase === 'lobby') {
+      autoEntered.value = false
+      return
+    }
+    if (phase !== 'playing' || roomStore.isHost || autoEntered.value) return
+    if (previous !== 'lobby' && previous !== undefined) return
+    autoEntered.value = true
+    void enterCurrentGame()
   },
+  { immediate: true },
 )
 
 async function finishRound() {
