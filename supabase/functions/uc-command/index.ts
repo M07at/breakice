@@ -944,7 +944,52 @@ async function roomMembers(admin: Admin, roomId: string) {
   return (data ?? []) as { user_id: string; seat: number; ready: boolean; profiles?: { nickname?: string } }[]
 }
 
-function snapshotOf(input: {
+const ARTWORK_STATUS: Record<string, 'pending' | 'success' | 'failed' | 'timeout'> = {
+  pending: 'pending',
+  scored: 'success',
+  success: 'success',
+  failed: 'failed',
+  timeout: 'timeout',
+}
+
+/** 本轮/本局的画作 + AI 分数，客户端据此渲染画廊（真实图片走 Storage 签名地址） */
+async function loadArtworks(admin: Admin, gameId: string) {
+  const { data: arts, error } = await admin
+    .from('artworks')
+    .select('id, turn_key, user_id, storage_path, status')
+    .eq('game_id', gameId)
+    .order('created_at', { ascending: true })
+  if (error) {
+    console.warn('[uc-command] 读取画作失败', error.message)
+    return []
+  }
+  if (!arts?.length) return []
+
+  const rows = arts as { id: string; turn_key: string; user_id: string; storage_path: string; status: string }[]
+  const { data: scores } = await admin
+    .from('ai_scores')
+    .select('artwork_id, total, status, comment')
+    .in('artwork_id', rows.map((a) => a.id))
+  const scoreRows = (scores ?? []) as { artwork_id: string; total: number | null; status: string; comment: string | null }[]
+  const byArtwork = new Map(scoreRows.map((s) => [s.artwork_id, s]))
+
+  return rows.map((art) => {
+    const ai = byArtwork.get(art.id)
+    const status = ARTWORK_STATUS[String(ai?.status ?? art.status)] ?? 'pending'
+    return {
+      id: art.id,
+      playerId: art.user_id,
+      turnKey: art.turn_key,
+      preview: art.storage_path,
+      status,
+      score: typeof ai?.total === 'number' ? ai.total : undefined,
+      comment: typeof ai?.comment === 'string' ? ai.comment : undefined,
+    }
+  })
+}
+
+async function snapshotOf(input: {
+  admin: Admin
   gameId: string
   gameNumber: number
   state: UcState
@@ -952,6 +997,7 @@ function snapshotOf(input: {
   hostId: string
   members: { user_id: string; profiles?: { nickname?: string } }[]
 }) {
+  const artworks = input.state.config.variant === 'draw' ? await loadArtworks(input.admin, input.gameId) : []
   return {
     sessionId: input.gameId,
     gameId: input.gameId,
@@ -960,6 +1006,7 @@ function snapshotOf(input: {
     hostId: input.hostId,
     players: input.members.map((m) => ({ id: m.user_id, name: m.profiles?.nickname ?? '玩家' })),
     view: toPublicView(input.state),
+    artworks,
     serverNow: Date.now(),
   }
 }
@@ -1071,7 +1118,8 @@ async function handleStart(admin: Admin, uid: string, body: Record<string, any>)
 
   const { data: created } = await admin.from('games').select('game_number').eq('id', String(gameId)).maybeSingle()
   return json(
-    snapshotOf({
+    await snapshotOf({
+      admin,
       gameId: String(gameId),
       gameNumber: created?.game_number ?? 1,
       state,
@@ -1115,6 +1163,8 @@ async function handleAct(admin: Admin, uid: string, body: Record<string, any>): 
   const now = Date.now()
 
   const full = { ...(action as object), by: uid } as UcAction
+  // AI 评分只能代表自己交的那幅画，不让客户端给别人加分
+  if (full.type === 'aiScored') (full as { playerId: string }).playerId = uid
   const applied = applyAction(state, full, { now, isHost: hostId === uid })
   const settled = tick(applied.state, now)
   const next = settled.state
@@ -1156,7 +1206,8 @@ async function handleAct(admin: Admin, uid: string, body: Record<string, any>): 
   console.log('[uc-command] act', { game: game.id, action: full.type, version: resultVersion })
   const members = await roomMembers(admin, game.room_id)
   return json(
-    snapshotOf({
+    await snapshotOf({
+      admin,
       gameId: game.id,
       gameNumber: game.game_number,
       state: next,
@@ -1173,7 +1224,8 @@ async function handleTick(admin: Admin, uid: string, body: Record<string, any>):
     const members = await roomMembers(admin, game.room_id)
     const { data: room } = await admin.from('rooms').select('host_id').eq('id', game.room_id).maybeSingle()
     return json(
-      snapshotOf({
+      await snapshotOf({
+        admin,
         gameId: game.id,
         gameNumber: game.game_number,
         state: game.state,
@@ -1204,7 +1256,8 @@ async function handleTick(admin: Admin, uid: string, body: Record<string, any>):
   const members = await roomMembers(admin, game.room_id)
   const { data: room } = await admin.from('rooms').select('host_id').eq('id', game.room_id).maybeSingle()
   return json(
-    snapshotOf({
+    await snapshotOf({
+      admin,
       gameId: game.id,
       gameNumber: game.game_number,
       state: settled.state,
@@ -1238,7 +1291,8 @@ async function handleCurrent(admin: Admin, uid: string, body: Record<string, any
   const members = await roomMembers(admin, roomId)
   const { data: room } = await admin.from('rooms').select('host_id').eq('id', roomId).maybeSingle()
   return json({
-    snapshot: snapshotOf({
+    snapshot: await snapshotOf({
+      admin,
       gameId: loaded.id,
       gameNumber: loaded.game_number,
       state: loaded.state,
@@ -1300,6 +1354,7 @@ Deno.serve(async (req: Request) => {
     return fail(error)
   }
 })
+
 
 
 

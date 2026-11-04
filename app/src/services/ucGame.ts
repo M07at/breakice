@@ -1,4 +1,4 @@
-﻿import { roomApi } from '../platform'
+import { roomApi } from '../platform'
 import { PlatformError } from '../platform/types'
 import { SupabaseRoomApi } from '../platform/supabase'
 import { installPlayerPort } from '../modules/undercover/player'
@@ -28,6 +28,56 @@ async function invoke<T>(body: Record<string, unknown>): Promise<T> {
   return (roomApi as SupabaseRoomApi).invokeFunction<T>('/functions/v1/uc-command', body)
 }
 
+function requireApi(): SupabaseRoomApi {
+  if (roomApi.mode !== 'supabase') {
+    throw new PlatformError('NOT_CONFIGURED', '画作上传需要 Supabase 后端')
+  }
+  return roomApi as SupabaseRoomApi
+}
+
+/**
+ * 画作上传 + 建档：返回 Storage 路径（写进引擎的 drawingRef）和 artworks.id（用来要 AI 评分）。
+ * 路径必须是 {room_id}/{game_id}/{turn_key}/{user_id}.png —— 0005 的桶策略拿第一段当房间号校验，
+ * 第一段写成 game_id 会被 RLS 直接拒绝。
+ */
+export async function prepareHybridArtwork(
+  gameId: string,
+  turnKey: string,
+  filePath: string,
+): Promise<{ storagePath: string; artworkId: string }> {
+  const api = requireApi()
+  if (!activeRoomId) throw new PlatformError('UNKNOWN', '缺少房间信息，无法上传画作')
+  const userId = await api.currentUserId()
+  const storagePath = `${activeRoomId}/${gameId}/${turnKey}/${userId}.png`
+  await api.uploadArtwork(storagePath, filePath)
+  const artworkId = await api.rpcCall<string>('submit_artwork', {
+    p_game_id: gameId,
+    p_turn_key: turnKey,
+    p_storage_path: storagePath,
+  })
+  return { storagePath, artworkId }
+}
+
+/** 把 artworks 里的路径换成临时可访问地址（私有桶，默认 1 小时） */
+export async function resolveArtworkUrls(
+  items: { id: string; preview: string }[],
+): Promise<Record<string, string>> {
+  if (roomApi.mode !== 'supabase' || items.length === 0) return {}
+  const api = roomApi as SupabaseRoomApi
+  const pairs = await Promise.all(
+    items.map(async (item) => {
+      // 只有真实画作是路径；模拟适配器放的是图形符号，跳过
+      if (!item.preview || !item.preview.includes('/')) return [item.id, ''] as const
+      try {
+        return [item.id, await api.signedArtworkUrl(item.preview)] as const
+      } catch {
+        return [item.id, ''] as const
+      }
+    }),
+  )
+  return Object.fromEntries(pairs.filter(([, url]) => url))
+}
+
 function createPort(gameId: string, variant: Variant): UcPlayerPort {
   return {
     label: '房间联机',
@@ -35,13 +85,43 @@ function createPort(gameId: string, variant: Variant): UcPlayerPort {
     load: () => invoke<UcPlayerSnapshot>({ op: 'tick', game_id: gameId }),
     getMyWord: (id) => invoke({ op: 'word', game_id: id }),
     act: (id, action, meta) => invoke<UcPlayerSnapshot>({ op: 'act', game_id: id, action, meta }),
-    submitDrawing: (id, drawing, meta) =>
-      invoke<UcPlayerSnapshot>({
+    submitDrawing: async (id, drawing, meta) => {
+      const submitted = await invoke<UcPlayerSnapshot>({
         op: 'act',
         game_id: id,
         action: { type: 'drawingSubmitted', turnKey: meta.expectedTurnKey, drawingRef: drawing.preview },
         meta,
-      }),
+      })
+      // 画作已入库，再要一次 AI 评分；评分失败/超时不影响回合推进
+      if (!drawing.artworkId) return submitted
+      try {
+        const ai = await requireApi().scoreArtwork(drawing.artworkId)
+        if (ai?.status === 'success' && typeof ai.total === 'number') {
+          const view = submitted.view
+          return await invoke<UcPlayerSnapshot>({
+            op: 'act',
+            game_id: id,
+            action: {
+              type: 'aiScored',
+              playerId: submitted.playerId,
+              turnKey: meta.expectedTurnKey,
+              score: ai.total,
+            },
+            meta: {
+              requestId: `${meta.requestId ?? 'draw'}-ai`,
+              expectedVersion: view.version,
+              expectedPhase: view.phase,
+              expectedRound: view.round,
+              expectedTurnKey: view.turnKey,
+            },
+          })
+        }
+        console.warn('[uc] AI 评分未成功', ai?.status)
+      } catch (error) {
+        console.warn('[uc] AI 评分异常', error)
+      }
+      return submitted
+    },
     replay: (requestId) => {
       if (!activeRoomId) throw new PlatformError('UNKNOWN', '请回到房间重新开始')
       return invoke<UcPlayerSnapshot>({

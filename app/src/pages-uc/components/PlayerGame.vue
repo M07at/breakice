@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <view class="uc-page">
     <view class="uc-header"><text class="uc-eyebrow">破冰局 / {{ snapshot?.view.variant === 'draw' ? '你画我猜谁是卧底' : '谁是卧底' }}</text><view class="uc-row"><text class="uc-title">{{ title }}</text><text v-if="snapshot?.view.phaseDeadline" class="player-clock">{{ remaining }}秒</text></view><text class="uc-subtitle">{{ port?.label ?? '个人游戏界面' }}</text></view>
     <view v-if="snapshot" class="uc-note identity">你是 {{ seatOf(snapshot.playerId) }} 号 · {{ nameOf(snapshot.playerId) }} <text v-if="rights?.isHost">（主持人）</text></view>
@@ -31,15 +31,15 @@
           <button v-if="rights.canFinish && snapshot.view.variant === 'classic'" class="uc-button" :disabled="locked" @tap="send({ type: 'turnDone' })">我说完了 →</button>
           <text v-if="!rights.canFinish" class="uc-note personal-wait">{{ rights.me?.alive ? '等待你的发言回合' : '你正在旁观' }}</text>
         </view>
-        <MockDrawingAdapter v-if="snapshot.view.variant === 'draw' && rights.canFinish" :key="snapshot.gameId + snapshot.view.turnKey + snapshot.playerId" :editable="!locked" @submit="submitDrawing" />
+        <HybridDrawAdapter v-if="snapshot.view.variant === 'draw' && rights.canFinish" :key="snapshot.gameId + snapshot.view.turnKey + snapshot.playerId" :game-id="snapshot.gameId" :turn-key="snapshot.view.turnKey" :editable="!locked" @submit="submitDrawing" />
         <view v-if="rights.me?.alive" class="uc-card"><text class="uc-label">我的词卡</text><text v-if="secret" class="secret-word small">{{ secret.isBlank ? '你是白板' : secret.word }}</text><button class="uc-button uc-secondary" :disabled="locked" @tap="secret ? hideSecret() : reveal()">{{ secret ? '遮住我的词语' : '私密查看我的词语' }}</button></view>
         <view class="uc-card"><text class="uc-label">发言顺序</text><view v-for="(id, i) in snapshot.view.speakOrder" :key="id" class="player-line"><text>{{ seatOf(id) }} 号 · {{ nameOf(id) }}</text><text class="uc-muted">{{ i < speakerIndex ? '已发言' : id === snapshot.view.currentSpeakerId ? '正在发言' : '等待' }}</text></view></view>
       </template>
 
       <view v-if="snapshot.view.variant === 'draw' && ['review', 'vote', 'reveal', 'ended'].includes(snapshot.view.phase)" class="uc-card">
         <text class="uc-label">{{ snapshot.view.phase === 'review' ? '作品回顾 · 倒计时后自动投票' : '本轮画作' }}</text>
-        <text class="uc-muted">作品为模拟图形；缺席或超时未交的画手没有作品。评分失败或超时不会阻塞投票。</text>
-        <view v-for="art in (snapshot.artworks ?? []).filter(a => snapshot!.view.phase === 'ended' || a.turnKey === snapshot!.view.turnKey)" :key="art.id" class="final-player"><text>{{ nameOf(art.playerId) }}</text><text class="gallery-picture">{{ art.preview }}</text><text class="uc-muted">{{ art.status === 'pending' ? '模拟评分等待中' : art.status === 'success' ? '模拟评分完成' : art.status === 'failed' ? '评分失败，已跳过' : '评分超时，已跳过' }}{{ art.score !== undefined ? ' · ' + art.score + '分' : '' }}</text></view>
+        <text class="uc-muted">缺席或超时未交的画手没有作品。AI 评分失败或超时不会阻塞投票。</text>
+        <view v-for="art in (snapshot.artworks ?? []).filter(a => snapshot!.view.phase === 'ended' || a.turnKey === snapshot!.view.turnKey)" :key="art.id" class="final-player"><text>{{ nameOf(art.playerId) }}</text><image v-if="artworkUrls[art.id]" class="gallery-image" :src="artworkUrls[art.id]" mode="widthFix" /><text v-else class="gallery-picture">{{ art.preview }}</text><text class="uc-muted">{{ art.status === 'pending' ? 'AI 评分中…' : art.status === 'success' ? 'AI 评分完成' : art.status === 'failed' ? '评分失败，已跳过' : '评分超时，已跳过' }}{{ art.score !== undefined ? ' · ' + art.score + '分' : '' }}</text></view>
         <text v-if="!snapshot.artworks?.length" class="uc-muted">本轮暂无已提交画作，仍会按时进入投票。</text>
       </view>
       <view v-if="snapshot.view.phase === 'vote'" class="uc-card">
@@ -77,7 +77,7 @@
 </template>
 
 <script setup lang="ts">
-import MockDrawingAdapter from './MockDrawingAdapter.vue'
+import HybridDrawAdapter from './HybridDrawAdapter.vue'
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { onHide, onLoad, onShow } from '@dcloudio/uni-app'
 import { isUcError, ROLE_LABEL } from '@/modules/undercover'
@@ -85,6 +85,7 @@ import type { UcClientAction, UcCommandMeta, UcSecretView } from '@/modules/unde
 import { getPlayerPort, installPlayerPort, playerPermissions, shouldAcceptPlayerSnapshot } from '@/modules/undercover/player'
 import type { DrawingSubmission, UcPlayerPort, UcPlayerSnapshot } from '@/modules/undercover/player'
 import { createPlayerPreviewPort, previewOrigin } from '@/modules/local/player-preview'
+import { resolveArtworkUrls } from '@/services/ucGame'
 
 const props = defineProps<{ query: Record<string,string|undefined>; variant: 'classic' | 'draw' }>()
 const port = ref<UcPlayerPort | null>(null)
@@ -142,6 +143,20 @@ function receive(next: UcPlayerSnapshot) {
   clock.value = Date.now()
   connected.value = true
   if (rights.value?.me?.hasVoted || (selected.value && !candidates.value.some(p => p.id === selected.value))) selected.value = undefined
+  void syncArtworkUrls(next)
+}
+
+/** 真实画作在私有桶里，拿到 artworks 后换成临时地址；拿不到就退回占位文本 */
+const artworkUrls = ref<Record<string, string>>({})
+async function syncArtworkUrls(next: UcPlayerSnapshot) {
+  const items = (next.artworks ?? []).filter((art) => !artworkUrls.value[art.id])
+  if (items.length === 0) return
+  try {
+    const resolved = await resolveArtworkUrls(items.map((art) => ({ id: art.id, preview: art.preview })))
+    if (Object.keys(resolved).length > 0) artworkUrls.value = { ...artworkUrls.value, ...resolved }
+  } catch (error) {
+    console.warn('解析画作地址失败', error)
+  }
 }
 async function load() {
   if (!port.value || polling || disposed) return
@@ -239,6 +254,7 @@ onUnmounted(() => { disposed = true; hideSecret(); if (timer) clearInterval(time
 <style>
 @import '../classic.css';
 .gallery-picture { display:block; text-align:center; font-size:64rpx; padding:24rpx; }
+.gallery-image { display:block; width:100%; margin:12rpx 0; border-radius:12rpx; background:#fff; }
 .identity { font-weight: 700; }
 .person { display: block; margin: 28rpx 0; font-size: 38rpx; font-weight: 800; line-height: 1.5; }
 .personal-word { text-align: center; }
@@ -251,3 +267,7 @@ onUnmounted(() => { disposed = true; hideSecret(); if (timer) clearInterval(time
 .player-clock { font-size: 40rpx; font-weight: 700; white-space: nowrap; }
 .final-player { padding: 20rpx 0; border-bottom: 2rpx solid #edf0e7; }
 </style>
+
+
+
+

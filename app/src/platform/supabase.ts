@@ -314,6 +314,52 @@ export class SupabaseRoomApi implements RoomApi {
     return result as T
   }
 
+  /** 当前登录用户 id（画作路径、上报身份用） */
+  async currentUserId(): Promise<string> {
+    const session = await this.ensureSession()
+    return session.userId
+  }
+
+  /** 把本地图片上传到 artworks 私有桶；路径约定 {game_id}/{turn_key}/{user_id}.png */
+  async uploadArtwork(storagePath: string, filePath: string): Promise<void> {
+    const session = await this.ensureSession()
+    const encoded = storagePath.split('/').map(encodeURIComponent).join('/')
+    await new Promise<void>((resolve, reject) => {
+      uni.uploadFile({
+        url: `${baseUrl()}/storage/v1/object/artworks/${encoded}`,
+        filePath,
+        name: 'file',
+        header: {
+          apikey: env.supabaseAnonKey,
+          Authorization: `Bearer ${session.accessToken}`,
+          'x-upsert': 'true',
+        },
+        success: (response) => {
+          const status = Number(response.statusCode)
+          if (status >= 200 && status < 300) resolve()
+          else reject(new PlatformError('UNKNOWN', `画作上传失败（HTTP ${status}）`))
+        },
+        fail: () => reject(new PlatformError('NETWORK', '画作上传失败，请检查网络')),
+      })
+    })
+  }
+
+  /** 取得私有桶里一张画的临时访问地址（默认 1 小时） */
+  async signedArtworkUrl(storagePath: string, expiresIn = 3600): Promise<string> {
+    const encoded = storagePath.split('/').map(encodeURIComponent).join('/')
+    const data = await this.call<{ signedURL?: string }>(`/storage/v1/object/sign/artworks/${encoded}`, {
+      method: 'POST',
+      body: { expiresIn },
+    })
+    if (!data?.signedURL) throw new PlatformError('UNKNOWN', '拿不到画作地址')
+    return `${baseUrl()}/storage/v1${data.signedURL}`
+  }
+
+  /** 调 ai-score Edge Function；失败/超时都会返回 status，不抛错 */
+  async scoreArtwork(artworkId: string): Promise<{ status?: string; total?: number; comment?: string }> {
+    return this.invokeFunction('/functions/v1/ai-score', { artwork_id: artworkId })
+  }
+
   private async call<T>(path: string, options: { method?: 'GET' | 'POST' | 'DELETE'; body?: unknown } = {}): Promise<T> {
     const session = await this.ensureSession()
     try {

@@ -4,7 +4,13 @@ import type { UcPublicView, UcSecretView } from './view'
 
 export type MockScoreMode = 'success' | 'failed' | 'timeout'
 export interface HybridArtwork { id: string; playerId: string; turnKey: string; preview: string; status: 'pending' | MockScoreMode; score?: number }
-export interface DrawingSubmission { preview: string; scoreMode: MockScoreMode }
+export interface DrawingSubmission {
+  /** 模拟适配器放图形符号；真实画布放 Storage 路径 {game_id}/{turn_key}/{user_id}.png */
+  preview: string
+  scoreMode: MockScoreMode
+  /** 真实画布上传后拿到的 artworks.id，端口用它触发 AI 评分 */
+  artworkId?: string
+}
 export interface UcPlayerSnapshot {
   sessionId: string
   gameId: string
