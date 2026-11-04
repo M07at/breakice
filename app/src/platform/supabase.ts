@@ -135,7 +135,9 @@ function describeError(data: unknown, status: number): string {
     const detail = errorText(data).slice(0, 80)
     return detail ? `登录失效：${detail}` : `登录失效（HTTP ${status}）`
   }
-  return `服务器返回 ${status}`
+  // 引擎/业务错误（至少需要 4 名玩家、还有玩家没有准备……）直接把服务端原话给用户
+  const detail = errorText(data).slice(0, 100)
+  return detail || `服务器返回 ${status}`
 }
 
 /** 没有头像字段时，按座位号生成一个稳定的形象，保证列表里不出现空白 */
