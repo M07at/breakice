@@ -1,4 +1,4 @@
-<script setup lang="ts">
+﻿<script setup lang="ts">
 import { ref } from 'vue'
 import { useRoomStore } from '../../stores/room'
 import Avatar from '../../components/Avatar.vue'
@@ -17,13 +17,19 @@ async function submit() {
     uni.showToast({ title: '请填写房间名', icon: 'none' })
     return
   }
+  // 用全局 loading 而不是按钮的 :loading：后者会在跳转同帧 patch Button 的插槽，
+  // uni-app H5 运行时会抛 "Cannot assign to read only property '_'"，页面就卡住不跳。
+  uni.showLoading({ title: '创建中…', mask: true })
   try {
     await roomStore.create({
       name: roomName.value.trim(),
       maxPlayers: Number(maxPlayers.value) || 20,
     })
-    uni.redirectTo({ url: '/pages/room/index' })
+    uni.hideLoading()
+    // 用 reLaunch 直接落到房间页：清掉创建页，避免从房间返回时又回到表单
+    uni.reLaunch({ url: '/pages/room/index' })
   } catch (issue) {
+    uni.hideLoading()
     uni.showToast({ title: roomStore.error || toErrorMessage(issue), icon: 'none' })
   }
 }
@@ -64,7 +70,7 @@ async function submit() {
       <text class="tip">• 选择玩法并控制游戏开始</text>
     </view>
 
-    <button class="btn btn-primary submit-btn" :loading="roomStore.busy" @click="submit">创建并进入房间</button>
+    <button class="btn btn-primary submit-btn" @click="submit">创建并进入房间</button>
   </view>
 </template>
 

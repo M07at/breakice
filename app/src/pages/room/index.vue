@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, nextTick, ref, watch } from 'vue'
 import { onLoad, onShareAppMessage, onShow } from '@dcloudio/uni-app'
 import { useRoomStore } from '../../stores/room'
 import PlayerList from '../../components/PlayerList.vue'
@@ -54,6 +54,7 @@ async function hostStart(gameType: GameType) {
   }
   try {
     await roomStore.begin(gameType)
+    await nextTick()
     openPage(gameUrl(gameType))
   } catch (issue) {
     uni.showToast({ title: toErrorMessage(issue), icon: 'none' })

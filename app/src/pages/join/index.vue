@@ -1,4 +1,4 @@
-<script setup lang="ts">
+﻿<script setup lang="ts">
 import { ref } from 'vue'
 import { onLoad } from '@dcloudio/uni-app'
 import { useRoomStore } from '../../stores/room'
@@ -40,10 +40,16 @@ async function submit() {
     uni.showToast({ title: '请输入房间号', icon: 'none' })
     return
   }
+  // 用全局 loading 而不是按钮的 :loading：后者会在跳转同帧 patch Button 的插槽，
+  // uni-app H5 运行时会抛 "Cannot assign to read only property '_'"，页面就卡住不跳。
+  uni.showLoading({ title: '加入中…', mask: true })
   try {
     await roomStore.join({ code: roomCode.value.trim() })
-    uni.redirectTo({ url: '/pages/room/index' })
+    uni.hideLoading()
+    // 用 reLaunch 直接落到房间页：清掉加入页，避免从房间返回时又回到表单
+    uni.reLaunch({ url: '/pages/room/index' })
   } catch (issue) {
+    uni.hideLoading()
     uni.showToast({ title: roomStore.error || toErrorMessage(issue), icon: 'none' })
   }
 }
@@ -73,7 +79,7 @@ async function submit() {
       </view>
     </view>
 
-    <button class="btn btn-primary submit-btn" :loading="roomStore.busy" @click="submit">加入房间</button>
+    <button class="btn btn-primary submit-btn" @click="submit">加入房间</button>
     <text class="safe-note">加入即表示你同意在本次活动中使用这个昵称</text>
   </view>
 </template>

@@ -25,5 +25,9 @@ export default defineConfig({
   server: {
     host: '0.0.0.0',
     port: 5173,
+    watch: {
+      // 编辑器/工具原子写入时会在源码目录里建临时目录，Vite 监听它会抛 EBUSY 把 dev server 打挂
+      ignored: ['**/*.tmpdir/**', '**/.*.tmpdir/**'],
+    },
   },
 })
