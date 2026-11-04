@@ -5,7 +5,7 @@ import { useRoomStore } from '../../stores/room'
 import PlayerList from '../../components/PlayerList.vue'
 import RoomCodeCard from '../../components/RoomCodeCard.vue'
 import Leaderboard from '../../components/leaderboard/leaderboard.vue'
-import { bankUrl, drawSetupUrl } from '../../services/gameEntry'
+import { bankUrl } from '../../services/gameEntry'
 import { adoptUndercoverRound, endUndercoverRound, PLAYER_PAGE, startUndercoverRound } from '../../services/ucGame'
 import { fetchRoomLeaderboard } from '../../services/scoreBoard'
 import { toErrorMessage } from '../../platform/types'
@@ -71,9 +71,12 @@ function openPage(url: string) {
   })
 }
 
-/** 真心话大冒险 / 你画我猜：页面自己开局，路由带上房间人数 */
+/** 真心话大冒险 / 你画我猜：页面自己开局，你画我猜走联机页并带上房间号 */
 function gameUrl(gameType: GameType): string {
-  if (gameType === 'drawing') return drawSetupUrl(roomStore.memberCount, room.value?.id)
+  if (gameType === 'drawing') {
+    const roomId = room.value?.id ?? ''
+    return roomId ? `/pages-draw/live?room=${encodeURIComponent(roomId)}` : '/pages-draw/live'
+  }
   return '/pages/game/index'
 }
 
@@ -81,26 +84,14 @@ const isUndercover = (gameType: GameType | null) => gameType === 'undercover' ||
 const variantOf = (gameType: GameType): 'classic' | 'draw' => (gameType === 'hybrid' ? 'draw' : 'classic')
 
 /**
- * 你画我猜目前只有单机版：B 的房间后端跑在客户端，多台设备各自开一局、互相看不到。
- * 在它接入服务端之前，这里明确告诉主持人是单机，避免误以为是联机。
+ * 你画我猜走房间联机页：主持人跑权威后端并发布视图，其他人投指令。
+ * 单机流程（pages-draw/setup）仍然保留，从别处进入时不受影响。
  */
-function confirmLocalDraw() {
-  uni.showModal({
-    title: '你画我猜（单机演示）',
-    content: '联机版还没接入服务端：接下来只有你这台设备进入游戏，其他玩家的手机不会同步，他们也可以各自点开单机玩。',
-    confirmText: '单机试玩',
-    cancelText: '再等等',
-    success: (result) => {
-      if (result.confirm) void startLocalDraw()
-    },
-  })
-}
-
 async function startLocalDraw() {
   try {
     await roomStore.begin('drawing')
     await nextTick()
-    openPage(drawSetupUrl(roomStore.memberCount, room.value?.id))
+    openPage(gameUrl('drawing'))
   } catch (issue) {
     uni.showToast({ title: toErrorMessage(issue), icon: 'none' })
   }
@@ -126,7 +117,7 @@ async function hostStart(gameType: GameType) {
     return
   }
   if (gameType === 'drawing') {
-    confirmLocalDraw()
+    await startLocalDraw()
     return
   }
 
@@ -186,11 +177,7 @@ async function enterCurrentGame() {
     }
     return
   }
-  if (gameType === 'drawing' && !roomStore.isHost) {
-    // 单机版没有服务端房间，其他人跟进去只会各开一局，不如说清楚
-    uni.showToast({ title: '你画我猜是单机演示，本局只在主持人设备上进行', icon: 'none' })
-    return
-  }
+
   openPage(gameUrl(gameType))
 }
 
@@ -308,7 +295,7 @@ onShareAppMessage(() => ({
       </view>
       <view :class="['game-choice', 'available', { dimmed: !roomStore.allReady }]" @click="hostStart('drawing')">
         <text class="choice-icon">🎨</text>
-        <view class="choice-copy"><text class="choice-title">你画我猜</text><text class="choice-desc">轮流作画，聊天抢答，AI 评分与排行榜（单机演示）</text></view>
+        <view class="choice-copy"><text class="choice-title">你画我猜</text><text class="choice-desc">轮流作画，聊天抢答，AI 评分与排行榜</text></view>
         <text class="choice-arrow">›</text>
       </view>
       <view class="tool-row" @click="openBank">
@@ -547,6 +534,8 @@ onShareAppMessage(() => ({
 }
 .build-tag { display: block; margin-top: 4rpx; color: var(--muted); font-size: 19rpx; }
 </style>
+
+
 
 
 

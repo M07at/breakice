@@ -143,6 +143,13 @@ export interface LocalDrawRoomOptions {
   scorer?: AiScorer
   now?: () => number
   /**
+   * 联机用：直接给定玩家名单（房间真实成员 + 真实 id）。
+   * 不传时按 playerCount 生成「我 / 玩家2 / 玩家3」，行为与单机一致。
+   */
+  players?: { id: string; name: string }[]
+  /** 联机用：我是名单里的哪一个（默认本机身份） */
+  meId?: string
+  /**
    * 抽词的数据源，默认用系统题库（`sys_draw`）。
    * 单测里注入假数据，就不用依赖题库的具体实现。
    */
@@ -175,7 +182,7 @@ export function maskAnswer(text: string, answer: string): string {
  * 用来开发和单机演示；真正的联机是 A 的远程实现。
  */
 export class LocalDrawRoomBackend implements DrawRoomBackend {
-  readonly meId = LOCAL_USER_ID
+  readonly meId: string
 
   /** 我在这块画布上画 */
   readonly actor: DrawEngine
@@ -217,6 +224,8 @@ export class LocalDrawRoomBackend implements DrawRoomBackend {
   private pendingSubmit: Promise<void> | null = null
 
   constructor(options: LocalDrawRoomOptions) {
+    // 联机时「我」是房间名单里的真实身份，单机时仍是本机身份
+    this.meId = options.meId ?? LOCAL_USER_ID
     this.variant = options.variant
     this.customText = options.customText ?? ''
     this.scorer = options.scorer ?? new MockAiScorer()
@@ -224,9 +233,13 @@ export class LocalDrawRoomBackend implements DrawRoomBackend {
     this.listItems =
       options.listItems ?? (() => bankRepo().listItems('sys_draw') as Promise<BankItem<'draw'>[]>)
     this.gameId = `local-draw-${this.now().toString(36)}`
-    this.players = Array.from({ length: Math.max(2, options.playerCount) }, (_, i) =>
-      i === 0 ? { id: LOCAL_USER_ID, name: '我' } : { id: `local-${i + 1}`, name: `玩家${i + 1}` },
-    )
+    // 联机时用房间真实名单；单机时保持原来的生成规则
+    const roster = options.players && options.players.length >= 2 ? options.players : null
+    this.players = roster
+      ? roster.map((player) => ({ id: player.id, name: player.name }))
+      : Array.from({ length: Math.max(2, options.playerCount) }, (_, i) =>
+          i === 0 ? { id: LOCAL_USER_ID, name: '我' } : { id: `local-${i + 1}`, name: `玩家${i + 1}` },
+        )
 
     const names: Record<string, string> = {}
     const seats: Record<string, number> = {}
@@ -518,3 +531,5 @@ export function disposeDrawRoom(room: LocalDrawRoomBackend | null = current): vo
   room.dispose()
   if (current === room) current = null
 }
+
+
