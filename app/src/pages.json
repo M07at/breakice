@@ -41,6 +41,12 @@
       "root": "pages-uc",
       "pages": [
         {
+          "path": "canvas-test",
+          "style": {
+            "navigationBarTitleText": "画布自测（开发用）"
+          }
+        },
+        {
           "path": "hybrid",
           "style": {
             "navigationBarTitleText": "你画我猜谁是卧底"

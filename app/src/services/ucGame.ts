@@ -1,4 +1,4 @@
-import { roomApi } from '../platform'
+﻿import { roomApi } from '../platform'
 import { PlatformError } from '../platform/types'
 import { SupabaseRoomApi } from '../platform/supabase'
 import { installPlayerPort } from '../modules/undercover/player'
@@ -44,7 +44,9 @@ export async function prepareHybridArtwork(
   gameId: string,
   turnKey: string,
   filePath: string,
-): Promise<{ storagePath: string; artworkId: string }> {
+): Promise<{ storagePath: string; artworkId?: string }> {
+  // 本机调试（没配 Supabase）：不上传，直接用本地临时文件当预览，方便验画布
+  if (roomApi.mode !== 'supabase') return { storagePath: filePath }
   const api = requireApi()
   if (!activeRoomId) throw new PlatformError('UNKNOWN', '缺少房间信息，无法上传画作')
   const userId = await api.currentUserId()
@@ -178,4 +180,5 @@ export async function endUndercoverRound(): Promise<void> {
   })
   activeGameId = ''
 }
+
 
