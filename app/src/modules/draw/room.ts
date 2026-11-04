@@ -409,13 +409,13 @@ export class LocalDrawRoomBackend implements DrawRoomBackend {
 
     if (isCorrect && !this.guesses.some((g) => g.playerId === actor)) {
       const seconds = Math.max(0, Math.round((this.now() - (this.endsAt - DRAW_SECONDS * 1000)) / 1000))
-      this.guesses.push({ playerId: this.meId, seconds })
+      this.guesses.push({ playerId: actor, seconds })
     }
 
     this.messageSeq += 1
     const message: DrawMessage = {
       id: `m${this.messageSeq}`,
-      playerId: this.meId,
+      playerId: actor,
       playerName: player.name,
       shortId: `#${this.players.indexOf(player) + 1}`,
       text: isCorrect ? `${player.name} 回答正确` : maskAnswer(raw, answer),
@@ -535,6 +535,7 @@ export function disposeDrawRoom(room: LocalDrawRoomBackend | null = current): vo
   room.dispose()
   if (current === room) current = null
 }
+
 
 
 
