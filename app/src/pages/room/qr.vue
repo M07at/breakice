@@ -1,4 +1,4 @@
-<script setup lang="ts">
+﻿<script setup lang="ts">
 /**
  * 房间二维码（独立页）。
  *
@@ -81,6 +81,7 @@ async function generateWxCode() {
           <QrCode :text="qrText" :size="220" canvas-id="room-code-qr" />
         </view>
         <text class="hint">在小程序里点「加入房间 → 扫描二维码」可识别</text>
+        <text class="warn">微信「扫一扫」扫这张只会显示一串文本，打不开小程序——那是正常的，微信不认识自定义链接。想让微信直接打开，必须点下面的按钮生成「微信小程序码」。</text>
       </template>
 
       <button class="btn" :disabled="wxLoading" @click="generateWxCode">
@@ -167,4 +168,6 @@ async function generateWxCode() {
   text-align: center;
   word-break: break-all;
 }
+.warn { margin-top: 8rpx; padding: 12rpx 16rpx; border-radius: 10rpx; color: #7c2d12; background: #fef3c7; font-size: 20rpx; line-height: 1.5; }
 </style>
+
