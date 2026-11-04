@@ -16,6 +16,7 @@
     "test:quality": "node --test ../scripts/quality-gates.test.mjs",
     "check:size": "node ../scripts/check-mp-size.mjs dist/build/mp-weixin",
     "check:secrets": "node ../scripts/check-secrets.mjs . ../scripts",
+    "check:backend": "node ../scripts/check-supabase.mjs",
     "verify": "node ../scripts/verify.mjs",
     "doctor": "node ../scripts/doctor.mjs",
     "release:manifest": "node ../scripts/release-manifest.mjs"
