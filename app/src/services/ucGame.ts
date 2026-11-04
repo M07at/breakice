@@ -1,6 +1,7 @@
 import { roomApi } from '../platform'
 import { PlatformError } from '../platform/types'
 import { SupabaseRoomApi } from '../platform/supabase'
+import { UcError } from '../modules/undercover/errors'
 import { installPlayerPort } from '../modules/undercover/player'
 import type { UcPlayerPort, UcPlayerSnapshot } from '../modules/undercover/player'
 import type { Variant } from '../modules/undercover'
@@ -20,12 +21,47 @@ export const PLAYER_PAGE: Record<Variant, string> = {
 
 let activeRoomId = ''
 let activeGameId = ''
+/** 本局补了几个机器人：重开（原班人马再来一局）要沿用同样的数量 */
+let activeBots = 0
+
+/** 服务端可能返回游戏错误码：把它还原成 C 的 UcError，页面才能显示具体原因 */
+const UC_ERROR_CODES = [
+  'PLAYER_COUNT',
+  'BAD_CONFIG',
+  'WRONG_PHASE',
+  'NOT_YOUR_TURN',
+  'NOT_ELIGIBLE',
+  'ALREADY_VOTED',
+  'INVALID_TARGET',
+  'HOST_ONLY',
+  'UNKNOWN_PLAYER',
+  'DEADLINE_PASSED',
+  'STALE_STATE',
+  'BAD_REQUEST',
+  'REQUEST_CONFLICT',
+  'GAME_ACTIVE',
+  'GAME_NOT_FOUND',
+] as const
+
+function rethrowAsUcError(issue: unknown): never {
+  const message = issue instanceof Error ? issue.message : String(issue)
+  const code = UC_ERROR_CODES.find((item) => message.includes(item))
+  if (code) {
+    const cleaned = message.split(code).join('').trim()
+    throw new UcError(code, cleaned || message)
+  }
+  throw issue
+}
 
 async function invoke<T>(body: Record<string, unknown>): Promise<T> {
   if (roomApi.mode !== 'supabase') {
     throw new PlatformError('NOT_CONFIGURED', '联机谁是卧底需要 Supabase 后端，请先在 .env.local 里配置')
   }
-  return (roomApi as SupabaseRoomApi).invokeFunction<T>('/functions/v1/uc-command', body)
+  try {
+    return await (roomApi as SupabaseRoomApi).invokeFunction<T>('/functions/v1/uc-command', body)
+  } catch (issue) {
+    rethrowAsUcError(issue)
+  }
 }
 
 function requireApi(): SupabaseRoomApi {
@@ -126,10 +162,12 @@ function createPort(gameId: string, variant: Variant): UcPlayerPort {
     },
     replay: (requestId) => {
       if (!activeRoomId) throw new PlatformError('UNKNOWN', '请回到房间重新开始')
+      // 重开必须沿用上一局的机器人数量，否则单人房会变成「1 人 + 0 机器人」被服务端拒掉
       return invoke<UcPlayerSnapshot>({
         op: 'start',
         room_id: activeRoomId,
         variant,
+        bots: activeBots,
         request_id: requestId,
       })
     },
@@ -137,6 +175,8 @@ function createPort(gameId: string, variant: Variant): UcPlayerPort {
 }
 
 function install(snapshot: UcPlayerSnapshot, variant: Variant) {
+  // 从名单里数出机器人数量：重开时要沿用，否则单人房会凑不够 4 人被服务端拒掉
+  activeBots = snapshot.players.filter((player) => player.name.startsWith('机器人')).length
   installPlayerPort(createPort(snapshot.gameId, variant), variant)
 }
 
@@ -181,6 +221,7 @@ export async function endUndercoverRound(): Promise<void> {
   })
   activeGameId = ''
 }
+
 
 
 
