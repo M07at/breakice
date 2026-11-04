@@ -22,6 +22,14 @@ const GAME_LABEL: Record<GameType, string> = {
 
 const missingReady = computed(() => Math.max(0, roomStore.memberCount - roomStore.readyCount))
 
+/** 每个玩法的最低人数：点之前先拦一道，别让用户白等一次服务端往返 */
+const MIN_PLAYERS: Record<GameType, number> = {
+  'truth-or-dare': 2,
+  undercover: 4,
+  hybrid: 4,
+  drawing: 2,
+}
+
 onLoad(async () => {
   if (!roomStore.room) await roomStore.restore()
 })
@@ -50,6 +58,11 @@ const isUndercover = (gameType: GameType | null) => gameType === 'undercover' ||
 const variantOf = (gameType: GameType): 'classic' | 'draw' => (gameType === 'hybrid' ? 'draw' : 'classic')
 
 async function hostStart(gameType: GameType) {
+  const minPlayers = MIN_PLAYERS[gameType]
+  if (roomStore.memberCount < minPlayers) {
+    uni.showToast({ title: `${GAME_LABEL[gameType]}至少要 ${minPlayers} 人`, icon: 'none' })
+    return
+  }
   if (!roomStore.allReady) {
     uni.showToast({ title: `还有 ${missingReady.value} 人没准备`, icon: 'none' })
     return

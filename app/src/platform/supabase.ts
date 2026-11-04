@@ -1,5 +1,5 @@
 import { env } from '../config/env'
-import { getSavedProfile } from '../services/avatarService'
+import { getSavedProfile, normalizeAvatar } from '../services/avatarService'
 import type { AvatarConfig, GameType, Player, Room } from '../types/room'
 import { PlatformError } from './types'
 import type { CreateRoomInput, Identity, RoomApi, Unsubscribe } from './types'
@@ -344,8 +344,8 @@ export class SupabaseRoomApi implements RoomApi {
       avatar: patch.avatar ?? current.avatar,
     }
     const session = await this.ensureSession()
-    // 小程序端不支持 PATCH，昵称走 0006 里的 set_my_nickname
-    await this.rpc<void>('set_my_nickname', { p_nickname: next.nickname })
+    // 昵称和形象一起写进 profiles（0009），房间/游戏里才能和首页一致
+    await this.rpc<void>('set_my_profile', { p_nickname: next.nickname, p_avatar: next.avatar })
     return { id: session.userId, nickname: next.nickname, avatar: next.avatar }
   }
 
@@ -397,9 +397,16 @@ export class SupabaseRoomApi implements RoomApi {
         'rooms',
         `id=eq.${roomId}&select=id,code,title,host_id,max_players,status,game_type`,
       ),
-      this.select<{ user_id: string; seat: number; role: string; ready: boolean; online: boolean; profiles?: { nickname?: string } }[]>(
+      this.select<{
+        user_id: string
+        seat: number
+        role: string
+        ready: boolean
+        online: boolean
+        profiles?: { nickname?: string; avatar?: AvatarConfig | null }
+      }[]>(
         'room_members',
-        `room_id=eq.${roomId}&left_at=is.null&select=user_id,seat,role,ready,online,profiles(nickname)&order=seat`,
+        `room_id=eq.${roomId}&left_at=is.null&select=user_id,seat,role,ready,online,profiles(nickname,avatar)&order=seat`,
       ),
     ])
     const room = rooms?.[0]
@@ -408,7 +415,8 @@ export class SupabaseRoomApi implements RoomApi {
     const players: Player[] = (members ?? []).map((member) => ({
       id: member.user_id,
       nickname: member.profiles?.nickname || `玩家${member.seat}`,
-      avatar: avatarForSeat(member.seat),
+      // 用玩家在首页设置的形象；没设过（或老数据）才按座位号兜底生成
+      avatar: member.profiles?.avatar ? normalizeAvatar(member.profiles.avatar) : avatarForSeat(member.seat),
       isHost: member.role === 'host' || member.user_id === room.host_id,
       isReady: member.ready,
       online: member.online,

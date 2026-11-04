@@ -24,10 +24,11 @@ export const PLAYER_ROUTE: Record<UndercoverVariant, string> = {
   draw: '/pages-uc/hybrid-player',
 }
 
-/** B：你画我猜（常规 / Emoji / 自定义），人数可以由房间名单带过去 */
+/** B：你画我猜（常规 / Emoji / 自定义）；人数由房间决定，开设页只选版本 */
 export function drawSetupUrl(memberCount?: number): string {
   const count = Math.round(Number(memberCount) || 0)
-  return count >= 2 && count <= 12 ? `/pages-draw/setup?count=${count}` : '/pages-draw/setup'
+  // lock=1：进入游戏后不允许再改人数
+  return count >= 2 && count <= 12 ? `/pages-draw/setup?count=${count}&lock=1` : '/pages-draw/setup'
 }
 
 /** 房间里的玩家顺序即座位顺序：1 号位是主持人，与 C 的规则一致。 */
@@ -46,3 +47,4 @@ export function undercoverSetupUrl(variant: UndercoverVariant, players?: Player[
 export function bankUrl(): string {
   return '/pages-bank/index'
 }
+

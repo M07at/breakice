@@ -1,4 +1,7 @@
 <script setup lang="ts">
+import { computed } from 'vue'
+import QrCode from './QrCode.vue'
+
 const props = defineProps<{ code: string; roomName: string }>()
 
 function copyCode() {
@@ -11,6 +14,13 @@ function copyCode() {
 function shareRoom() {
   uni.showToast({ title: '请使用右上角分享给朋友', icon: 'none' })
 }
+
+/**
+ * 二维码里放的是带房间号的深链文本。
+ * 小程序里用「加入房间 → 扫描二维码」扫它，applyRoomCode 会解析出 code 参数。
+ * 注意：这不是微信「小程序码」，小程序码需要服务端用 access_token 调接口生成。
+ */
+const qrText = computed(() => `break-ice-hall://join?code=${props.code}`)
 </script>
 
 <template>
@@ -24,11 +34,9 @@ function shareRoom() {
         <button class="mini-btn secondary" @click="shareRoom">分享房间</button>
       </view>
     </view>
-    <view class="qr-placeholder" aria-label="二维码占位">
-      <view class="qr-grid">
-        <text>▦</text>
-      </view>
-      <text>扫码加入</text>
+    <view class="qr-wrap">
+      <QrCode :text="qrText" :size="118" canvas-id="room-code-qr" />
+      <text class="qr-tip">扫码加入</text>
     </view>
   </view>
 </template>
@@ -91,28 +99,20 @@ function shareRoom() {
   background: #fff;
 }
 
-.qr-placeholder {
+.qr-wrap {
   display: flex;
   flex: 0 0 auto;
   flex-direction: column;
   align-items: center;
-  gap: 6rpx;
+  gap: 8rpx;
   margin-left: 18rpx;
-  color: rgba(255, 255, 255, 0.85);
-  font-size: 19rpx;
+  padding: 10rpx;
+  border-radius: 14rpx;
+  background: #fff;
 }
 
-.qr-grid {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 126rpx;
-  height: 126rpx;
-  border: 8rpx solid #fff;
-  border-radius: 10rpx;
-  color: var(--brand);
-  background: #fff;
-  font-size: 92rpx;
-  line-height: 1;
+.qr-tip {
+  color: var(--muted);
+  font-size: 19rpx;
 }
 </style>

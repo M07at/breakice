@@ -18,11 +18,15 @@
 
     <view class="section">
       <view class="section-title">人数</view>
-      <view class="row">
+      <view v-if="locked" class="row">
+        <text class="count">{{ count }} 人</text>
+      </view>
+      <view v-else class="row">
         <button size="mini" :disabled="count <= 2" @tap="count--">−</button>
         <text class="count">{{ count }} 人</text>
         <button size="mini" :disabled="count >= 12" @tap="count++">+</button>
       </view>
+      <text v-if="locked" class="hint">本局人数由房间决定，房间里的人都会参加</text>
     </view>
 
     <view v-if="variant === 'custom'" class="section">
@@ -47,6 +51,8 @@ const variant = ref<DrawVariant>('classic')
 const count = ref(4)
 const customText = ref('')
 const starting = ref(false)
+/** 从房间进来时锁定人数：这一局就是房间里这些人 */
+const locked = ref(false)
 
 // 从房间进入时用房间人数预填，房间是这一局的单位
 onMounted(() => {
@@ -54,6 +60,7 @@ onMounted(() => {
   const current = pages[pages.length - 1] as unknown as { options?: Record<string, string> } | undefined
   const raw = Number(current?.options?.count)
   if (Number.isFinite(raw)) count.value = Math.min(12, Math.max(2, Math.round(raw)))
+  locked.value = current?.options?.lock === '1'
 })
 
 async function start() {
