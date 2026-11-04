@@ -1,4 +1,4 @@
-import { roomApi } from '../platform'
+﻿import { roomApi } from '../platform'
 import type { Unsubscribe } from '../platform/types'
 import type { GameType, Room, TruthTurn } from '../types/room'
 
@@ -68,7 +68,8 @@ export function fetchRoom(roomId: string): Promise<Room> {
   return roomApi.getRoom(roomId)
 }
 
-export function watchRoom(roomId: string, onChange: (room: Room) => void): Unsubscribe {
+export function watchRoom(roomId: string, onChange: (room: Room | null) => void): Unsubscribe {
   return roomApi.watch(roomId, onChange)
 }
+
 

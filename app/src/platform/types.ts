@@ -45,7 +45,8 @@ export interface RoomApi {
   /** 主持人关闭房间 */
   closeRoom(roomId: string): Promise<void>
   getRoom(roomId: string): Promise<Room>
-  watch(roomId: string, onChange: (room: Room) => void): Unsubscribe
+  watch(roomId: string, onChange: (room: Room | null) => void): Unsubscribe
+  /** onChange 收到 null 表示房间已关闭（房主退出） */
 }
 
 export type PlatformErrorCode =
@@ -75,5 +76,6 @@ export function toErrorMessage(error: unknown): string {
   if (error instanceof Error) return error.message
   return '操作失败，请重试'
 }
+
 
 

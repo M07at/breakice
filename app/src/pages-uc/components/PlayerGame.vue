@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <view class="uc-page">
     <view class="uc-header"><text class="uc-eyebrow">破冰局 / {{ snapshot?.view.variant === 'draw' ? '你画我猜谁是卧底' : '谁是卧底' }}</text><view class="uc-row"><text class="uc-title">{{ title }}</text><text v-if="snapshot?.view.phaseDeadline" class="player-clock">{{ remaining }}秒</text></view><text class="uc-subtitle">{{ port?.label ?? '个人游戏界面' }}</text></view>
     <view v-if="snapshot" class="uc-note identity">你是 {{ seatOf(snapshot.playerId) }} 号 · {{ nameOf(snapshot.playerId) }} <text v-if="rights?.isHost">（主持人）</text></view>
@@ -145,6 +145,14 @@ function receive(next: UcPlayerSnapshot) {
   connected.value = true
   if (rights.value?.me?.hasVoted || (selected.value && !candidates.value.some(p => p.id === selected.value))) selected.value = undefined
   void syncArtworkUrls(next)
+
+  // 一局结束：给 3 秒看结算，然后自动回大厅（大厅已经重置为未准备）
+  if (next.view.phase === 'ended' && !endedTimer) {
+    endedTimer = setTimeout(() => {
+      disposed = true
+      uni.navigateBack({ delta: 1, fail: () => uni.reLaunch({ url: '/pages/room/index' }) })
+    }, 3000)
+  }
 }
 
 /** 真实画作在私有桶里，拿到 artworks 后换成临时地址；拿不到就退回占位文本 */
@@ -250,9 +258,11 @@ onMounted(async () => {
 })
 onHide(() => { active = false; hideSecret() })
 onShow(() => { active = true; if (port.value) void load() })
-onUnmounted(() => { disposed = true; hideSecret(); if (timer) clearInterval(timer); offLive?.() })
+onUnmounted(() => { disposed = true; hideSecret(); if (timer) clearInterval(timer); if (endedTimer) clearTimeout(endedTimer); offLive?.() })
 /** 同房间有人行动时立刻拉一次，不用等轮询 */
 let offLive: (() => void) | null = null
+/** 结束后自动回大厅的定时器 */
+let endedTimer: ReturnType<typeof setTimeout> | null = null
 </script>
 
 <style>
@@ -271,6 +281,7 @@ let offLive: (() => void) | null = null
 .player-clock { font-size: 40rpx; font-weight: 700; white-space: nowrap; }
 .final-player { padding: 20rpx 0; border-bottom: 2rpx solid #edf0e7; }
 </style>
+
 
 
 

@@ -125,7 +125,10 @@ describe('本机房间', () => {
     useDevice('dev-host', '主持人')
     const created = await api.createRoom({ title: '测试房', maxPlayers: 8 })
     const seen: string[] = []
-    const stop = api.watch(created.id, (room) => seen.push(`${room.phase}:${room.players.length}`))
+    const stop = api.watch(created.id, (room) => {
+      if (!room) return
+      seen.push(`${room.phase}:${room.players.length}`)
+    })
     expect(seen.at(-1)).toBe('lobby:1')
 
     useDevice('dev-guest', '小明')
@@ -134,3 +137,4 @@ describe('本机房间', () => {
     stop()
   })
 })
+

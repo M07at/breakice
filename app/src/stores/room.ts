@@ -15,6 +15,8 @@ const ROOM_ID_KEY = 'break-ice-room-id-v1'
  */
 export const useRoomStore = defineStore('room', () => {
   const room = ref<Room | null>(null)
+/** 房间被关闭（房主退出）：页面据此跳回主界面 */
+const roomClosed = ref(false)
   const currentPlayerId = ref('')
   const busy = ref(false)
   const error = ref('')
@@ -53,6 +55,12 @@ let liveUnsubscribe: (() => void) | null = null
   function subscribe(roomId: string) {
     unsubscribe?.()
     unsubscribe = roomService.watchRoom(roomId, (next) => {
+      if (!next) {
+        // 房主退出会关房：其余人收到 null，标记后由页面跳回主界面
+        roomClosed.value = true
+        clear()
+        return
+      }
       room.value = next
       if (!currentPlayerId.value) currentPlayerId.value = roomService.currentIdentity().id
     })
@@ -241,6 +249,7 @@ let liveUnsubscribe: (() => void) | null = null
 
   return {
     room,
+    roomClosed,
     members,
     currentPlayer,
     currentPlayerId,
@@ -264,6 +273,8 @@ let liveUnsubscribe: (() => void) | null = null
     clear,
   }
 })
+
+
 
 
 

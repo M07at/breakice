@@ -1,4 +1,4 @@
-<script setup lang="ts">
+﻿<script setup lang="ts">
 import { computed, nextTick, ref, watch } from 'vue'
 import { onLoad, onShareAppMessage, onShow } from '@dcloudio/uni-app'
 import { useRoomStore } from '../../stores/room'
@@ -38,6 +38,16 @@ onLoad(async () => {
   if (!roomStore.room) await roomStore.restore()
   await loadLeaderboard()
 })
+
+/** 房主退出后房间会被关闭，这里统一把所有人送回主界面 */
+watch(
+  () => roomStore.roomClosed,
+  (closed) => {
+    if (!closed) return
+    uni.showToast({ title: '主持人已关闭房间', icon: 'none' })
+    setTimeout(() => uni.reLaunch({ url: '/pages/home/index' }), 800)
+  },
+)
 
 onShow(() => {
   if (roomStore.room) void roomStore.restore()
@@ -557,6 +567,7 @@ onShareAppMessage(() => ({
 }
 .build-tag { display: block; margin-top: 4rpx; color: var(--muted); font-size: 19rpx; }
 </style>
+
 
 
 

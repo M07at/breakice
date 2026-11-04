@@ -247,7 +247,7 @@ export class LocalRoomApi implements RoomApi {
     return toRoom(load(roomId))
   }
 
-  watch(roomId: string, onChange: (room: Room) => void): Unsubscribe {
+  watch(roomId: string, onChange: (room: Room | null) => void): Unsubscribe {
     const set = listeners.get(roomId) ?? new Set()
     set.add(onChange)
     listeners.set(roomId, set)
@@ -263,6 +263,7 @@ export class LocalRoomApi implements RoomApi {
     }
   }
 }
+
 
 
 

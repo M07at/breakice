@@ -1,4 +1,4 @@
-﻿import { env } from '../config/env'
+import { env } from '../config/env'
 import { getSavedProfile, normalizeAvatar } from '../services/avatarService'
 import type { AvatarConfig, GameType, Player, Room, TruthTurn } from '../types/room'
 import { PlatformError } from './types'
@@ -477,7 +477,7 @@ export class SupabaseRoomApi implements RoomApi {
         status: string
         game_type: string
         settings?: { truth?: TruthTurn | null } | null
-      }[]>('rooms', `id=eq.${roomId}&select=id,code,title,host_id,max_players,status,game_type,settings`),
+      }[]>('rooms', `id=eq.${roomId}&closed_at=is.null&select=id,code,title,host_id,max_players,status,game_type,settings`),
       this.select<{
         user_id: string
         seat: number
@@ -518,7 +518,7 @@ export class SupabaseRoomApi implements RoomApi {
     }
   }
 
-  watch(roomId: string, onChange: (room: Room) => void): Unsubscribe {
+  watch(roomId: string, onChange: (room: Room | null) => void): Unsubscribe {
     let stopped = false
     let timer: ReturnType<typeof setInterval> | undefined
     let last = ''
@@ -533,8 +533,14 @@ export class SupabaseRoomApi implements RoomApi {
           onChange(room)
         }
         await this.rpc<unknown>('heartbeat', { p_room_id: roomId }).catch(() => undefined)
-      } catch {
-        // 网络抖动或房间已关闭：下一轮再试
+      } catch (issue) {
+        // 房主退出会关房，其他人这里拿到 ROOM_NOT_FOUND：通知上层回主界面
+        if (issue instanceof PlatformError && issue.code === 'ROOM_NOT_FOUND') {
+          stopped = true
+          if (timer) clearInterval(timer)
+          onChange(null)
+        }
+        // 其它情况（网络抖动）留到下一轮重试
       }
     }
 

@@ -125,6 +125,7 @@ const viewerEngine = new DrawEngine({ by: 'live-viewer' })
 const viewCanvasRef = ref<{ paint(): void } | null>(null)
 let painterPump: ChunkPump | null = null
 let offStroke: (() => void) | null = null
+let endedTimer: ReturnType<typeof setTimeout> | null = null
 
 onLoad((options) => {
   roomId.value = String(options?.room ?? '')
@@ -134,6 +135,13 @@ onLoad((options) => {
 function adoptView(next: DrawRoomView) {
   serverOffset.value = next.serverTime - Date.now()
   clockTick.value = Date.now()
+  // 一局结束：颁奖台停留 8 秒后自动回大厅
+  if (next.phase === 'ended' && !endedTimer) {
+    endedTimer = setTimeout(() => {
+      uni.navigateBack({ delta: 1, fail: () => uni.reLaunch({ url: '/pages/room/index' }) })
+    }, 8000)
+  }
+
   // 换了一轮就清掉上一轮读到的题面
   if (lastRoundKey !== next.roundKey) {
     lastRoundKey = next.roundKey
@@ -644,6 +652,9 @@ async function endSession() {
   color: #8a8f9c;
   font-size: 22rpx;
 }</style>
+
+
+
 
 
 
