@@ -1,4 +1,4 @@
-#!/usr/bin/env node
+﻿#!/usr/bin/env node
 /**
  * 验收 uc-command（服务端谁是卧底引擎）。
  *
@@ -290,6 +290,31 @@ async function main() {
     bad('人机补位', String(e.message).slice(0, 200))
   }
 
+  console.log('\n[12] 再来一局（重开）')
+  try {
+    const solo = tokens[0]
+    const again = await rpc('create_room', { p_title: '重开房', p_game_type: 'lobby', p_max_players: 8, p_settings: {} }, solo)
+    const againRoomId = again[0].room_id
+    await rpc('set_ready', { p_room_id: againRoomId, p_ready: true }, solo)
+
+    const first = await uc({ op: 'start', room_id: againRoomId, variant: 'classic', bots: 3, request_id: 'replay-1' }, solo)
+    if (!first.ok) throw new Error(`首局失败 ${first.status} ${first.text.slice(0, 140)}`)
+    await uc({ op: 'act', game_id: first.data.gameId, action: { type: 'endGame' }, meta: { requestId: 'replay-end' } }, solo)
+
+    // 模拟客户端真实行为：带机器人重开
+    const second = await uc({ op: 'start', room_id: againRoomId, variant: 'classic', bots: 3, request_id: 'replay-2' }, solo)
+    if (second.ok && second.data.players.length >= 4) ok('带机器人重开成功', `玩家 ${second.data.players.length} 人`)
+    else bad('带机器人重开', `${second.status} ${second.text.slice(0, 160)}`)
+
+    // 模拟漏传机器人（修复前的客户端行为）
+    await uc({ op: 'act', game_id: second.data?.gameId, action: { type: 'endGame' }, meta: { requestId: 'replay-end-2' } }, solo)
+    const third = await uc({ op: 'start', room_id: againRoomId, variant: 'classic', request_id: 'replay-3' }, solo)
+    if (third.ok && third.data.players.length >= 4) ok('不带机器人也能自动补齐重开', `玩家 ${third.data.players.length} 人`)
+    else bad('自动补齐重开', `HTTP ${third.status} ${third.text.slice(0, 120)}`)
+  } catch (e) {
+    bad('重开', String(e.message).slice(0, 200))
+  }
+
   summary()
 }
 
@@ -302,4 +327,6 @@ main().catch((e) => {
   console.error(e)
   process.exit(1)
 })
+
+
 
