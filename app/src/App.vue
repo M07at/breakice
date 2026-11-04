@@ -1,8 +1,12 @@
 <script setup lang="ts">
 import { onLaunch } from '@dcloudio/uni-app'
 
+/** 构建标识：改这里 + 重新构建，控制台就能确认跑的是不是最新包 */
+const BUILD_ID = 'v17-1105'
+
 onLaunch(() => {
-  // Supabase 登录和重连恢复由后端适配层接入后启用。
+  // 每次启动都打一条，方便从控制台截图判断版本
+  console.log(`[破冰局] build ${BUILD_ID}`)
 })
 </script>
 

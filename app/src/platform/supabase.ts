@@ -1,4 +1,4 @@
-import { env } from '../config/env'
+﻿import { env } from '../config/env'
 import { getSavedProfile, normalizeAvatar } from '../services/avatarService'
 import type { AvatarConfig, GameType, Player, Room } from '../types/room'
 import { PlatformError } from './types'
@@ -307,11 +307,18 @@ export class SupabaseRoomApi implements RoomApi {
 
   /** 调用 Edge Function（带登录态），给 uc-command 这类游戏指令用 */
   async invokeFunction<T>(path: string, body: unknown): Promise<T> {
-    const result = await this.call<{ error?: { code?: string; message?: string } }>(path, { method: 'POST', body })
-    if (result && typeof result === 'object' && result.error) {
-      throw new PlatformError('UNKNOWN', result.error.message ?? '游戏服务返回错误')
+    try {
+      const result = await this.call<{ error?: { code?: string; message?: string } }>(path, { method: 'POST', body })
+      if (result && typeof result === 'object' && result.error) {
+        throw new PlatformError('UNKNOWN', result.error.message ?? '游戏服务返回错误')
+      }
+      return result as T
+    } catch (issue) {
+      // 把服务端返回的原因打出来，排查时不用再翻 Network 面板
+      const op = body && typeof body === 'object' ? (body as { op?: string }).op : undefined
+      console.error(`[uc-command] ${path}#${op ?? '?'} 失败`, issue instanceof Error ? issue.message : issue)
+      throw issue
     }
-    return result as T
   }
 
   /** 当前登录用户 id（画作路径、上报身份用） */
@@ -516,3 +523,4 @@ export class SupabaseRoomApi implements RoomApi {
     }
   }
 }
+
