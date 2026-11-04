@@ -31,6 +31,10 @@
           <button v-if="rights.canFinish && snapshot.view.variant === 'classic'" class="uc-button" :disabled="locked" @tap="send({ type: 'turnDone' })">我说完了 →</button>
           <text v-if="!rights.canFinish" class="uc-note personal-wait">{{ rights.me?.alive ? '等待你的发言回合' : '你正在旁观' }}</text>
         </view>
+        <view v-if="snapshot.view.variant === 'draw' && !rights.canFinish && snapshot.view.phase === 'describe'" class="uc-card">
+          <text class="uc-label">{{ nameOf(snapshot.view.currentSpeakerId) }} 正在画</text>
+          <DrawCanvas ref="hybridCanvas" :engine="hybridViewer" mode="watch" variant="classic" @error="error = $event" />
+        </view>
         <HybridDrawAdapter v-if="snapshot.view.variant === 'draw' && rights.canFinish" :key="snapshot.gameId + snapshot.view.turnKey + snapshot.playerId" :game-id="snapshot.gameId" :turn-key="snapshot.view.turnKey" :editable="!locked" @submit="submitDrawing" />
         <view v-if="rights.me?.alive" class="uc-card"><text class="uc-label">我的词卡</text><text v-if="secret" class="secret-word small">{{ secret.isBlank ? '你是白板' : secret.word }}</text><button class="uc-button uc-secondary" :disabled="locked" @tap="secret ? hideSecret() : reveal()">{{ secret ? '遮住我的词语' : '私密查看我的词语' }}</button></view>
         <view class="uc-card"><text class="uc-label">发言顺序</text><view v-for="(id, i) in snapshot.view.speakOrder" :key="id" class="player-line"><text>{{ seatOf(id) }} 号 · {{ nameOf(id) }}</text><text class="uc-muted">{{ i < speakerIndex ? '已发言' : id === snapshot.view.currentSpeakerId ? '正在发言' : '等待' }}</text></view></view>
@@ -86,6 +90,9 @@ import { getPlayerPort, installPlayerPort, playerPermissions, shouldAcceptPlayer
 import type { DrawingSubmission, UcPlayerPort, UcPlayerSnapshot } from '@/modules/undercover/player'
 import { createPlayerPreviewPort, previewOrigin } from '@/modules/local/player-preview'
 import { onLivePoke, pokeRoom } from '@/services/liveRoom'
+import DrawCanvas from '@/components/draw-canvas/draw-canvas.vue'
+import { DrawEngine } from '@/modules/draw/engine'
+import type { DrawChunk } from '@/modules/draw/types'
 import { resolveArtworkUrls } from '@/services/ucGame'
 
 const props = defineProps<{ query: Record<string,string|undefined>; variant: 'classic' | 'draw' }>()
@@ -144,6 +151,12 @@ function receive(next: UcPlayerSnapshot) {
   clock.value = Date.now()
   connected.value = true
   if (rights.value?.me?.hasVoted || (selected.value && !candidates.value.some(p => p.id === selected.value))) selected.value = undefined
+    // 换一轮就清空观战画布，别把上一轮的笔画带过来
+  if (next.view.turnKey !== lastHybridTurn) {
+    lastHybridTurn = next.view.turnKey
+    hybridViewer.reset()
+    hybridCanvas.value?.paint()
+  }
   void syncArtworkUrls(next)
 
   // 一局结束：给 3 秒看结算，然后自动回大厅（大厅已经重置为未准备）
@@ -251,7 +264,15 @@ onMounted(async () => {
     port.value = getPlayerPort(props.variant)
     if (!port.value) { error.value = '请打开分配给自己的加入链接，或返回测试入口创建联调游戏。'; return }
     await load()
-    offLive = onLivePoke(() => { if (!disposed && !polling) void load() })
+    offLive = onLivePoke((event, payload) => {
+      // 融合玩法：画手的笔画实时重放到观战画布
+      if (event === 'hybrid-stroke') {
+        const chunk = (payload as { chunk?: DrawChunk }).chunk
+        if (chunk && hybridViewer.applyChunk(chunk) > 0) hybridCanvas.value?.paint()
+        return
+      }
+      if (!disposed && !polling) void load()
+    })
     let ticks = 0
     timer = setInterval(() => { clock.value = Date.now(); if (active && ++ticks % 3 === 0) void load() }, 250)
   } catch (e) { error.value = isUcError(e) || e instanceof Error ? e.message : '连接游戏失败' }
@@ -263,6 +284,10 @@ onUnmounted(() => { disposed = true; hideSecret(); if (timer) clearInterval(time
 let offLive: (() => void) | null = null
 /** 结束后自动回大厅的定时器 */
 let endedTimer: ReturnType<typeof setTimeout> | null = null
+/** 融合玩法的观战画布：重放画手广播来的笔画 */
+const hybridViewer = new DrawEngine({ by: 'hybrid-viewer' })
+const hybridCanvas = ref<{ paint(): void } | null>(null)
+let lastHybridTurn = ''
 </script>
 
 <style>
@@ -281,6 +306,9 @@ let endedTimer: ReturnType<typeof setTimeout> | null = null
 .player-clock { font-size: 40rpx; font-weight: 700; white-space: nowrap; }
 .final-player { padding: 20rpx 0; border-bottom: 2rpx solid #edf0e7; }
 </style>
+
+
+
 
 
 
