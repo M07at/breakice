@@ -10,6 +10,7 @@ import { createRng } from '../shared/random'
 import type { Rng } from '../shared/random'
 import { LOCAL_USER_ID, bankRepo } from '../local/session'
 import { ScoreBook } from '../score'
+import type { ScoreConfigPatch } from '../score'
 import type { LeaderboardRow } from '../score/types'
 import type { BankItem } from '../bank'
 import { MockAiScorer } from './ai'
@@ -149,6 +150,8 @@ export interface LocalDrawRoomOptions {
   players?: { id: string; name: string }[]
   /** 联机用：我是名单里的哪一个（默认本机身份） */
   meId?: string
+  /** 计分规则：不传用 B 的默认值；联机时按产品要求覆盖 */
+  scoreConfig?: ScoreConfigPatch
   /**
    * 抽词的数据源，默认用系统题库（`sys_draw`）。
    * 单测里注入假数据，就不用依赖题库的具体实现。
@@ -257,7 +260,7 @@ export class LocalDrawRoomBackend implements DrawRoomBackend {
       names[player.id] = player.name
       seats[player.id] = index
     })
-    this.board = new ScoreBook({ names, seats })
+    this.board = new ScoreBook({ names, seats, ...(options.scoreConfig ?? {}) })
 
     this.actor = new DrawEngine({ by: this.meId })
     this.viewer = new DrawEngine({ by: 'viewer' })
@@ -545,6 +548,8 @@ export function disposeDrawRoom(room: LocalDrawRoomBackend | null = current): vo
   room.dispose()
   if (current === room) current = null
 }
+
+
 
 
 

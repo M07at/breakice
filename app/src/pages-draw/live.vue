@@ -1,4 +1,4 @@
-<script setup lang="ts">
+﻿<script setup lang="ts">
 /**
  * 你画我猜 · 房间联机页。
  *
@@ -11,6 +11,7 @@
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { onLoad } from '@dcloudio/uni-app'
 import DrawCanvas from '@/components/draw-canvas/draw-canvas.vue'
+import Avatar from '@/components/Avatar.vue'
 import { DrawEngine } from '@/modules/draw/engine'
 import { ChunkPump } from '@/modules/draw/sync'
 import type { DrawChunk } from '@/modules/draw/types'
@@ -31,6 +32,14 @@ interface CanvasApi {
   paint(): void
   reset(): void
 }
+
+/**
+ * 你画我猜的计分规则（产品口径）：
+ * - 答对一题 +200（不按速度衰减）
+ * - 作画者：每有一人猜对 +100
+ * - AI 评分（100 分制）直接加在作画者身上，上限放宽到 2000
+ */
+const DRAW_SCORE = { aiWeight: 1, painterCap: 2000, perGuesser: 100, guesserBase: 200, guesserPerSecond: 0 }
 
 const roomId = ref('')
 const meId = ref('')
@@ -75,6 +84,16 @@ function labelOf(id: string, fallback = ''): string {
 function toneOf(id: string): string {
   const seat = seatOf(id)
   return seat > 0 ? `tone-${seat % 6}` : ''
+}
+
+/** 房间成员的形象（颁奖台用），从房间接口取 */
+const avatarById = ref<Record<string, import('@/types/room').AvatarConfig>>({})
+const ranking = computed(() => view.value?.ranking ?? [])
+const podium = computed(() => ranking.value.slice(0, 3))
+const restRows = computed(() => ranking.value.slice(3))
+const ended = computed(() => view.value?.phase === 'ended')
+function avatarOf(id: string) {
+  return avatarById.value[id] ?? { color: 1, body: 1, mouth: 1, eyes: 1, hat: 1 }
 }
 
 const painterName = computed(() => {
@@ -168,6 +187,7 @@ onMounted(async () => {
   try {
     const room = await fetchRoom(roomId.value)
     roomName.value = room.name
+    avatarById.value = Object.fromEntries(room.players.map((player) => [player.id, player.avatar]))
     // 用 currentUserId 而不是 identity()：后者在会话尚未建立时会返回 unauthenticated
     meId.value =
       roomApi.mode === 'supabase'
@@ -188,6 +208,7 @@ onMounted(async () => {
         variant: 'classic',
         players: room.players.map((player) => ({ id: player.id, name: player.nickname })),
         meId: meId.value,
+        scoreConfig: DRAW_SCORE,
       })
       publisher = createDrawPublisher({
         roomId: roomId.value,
@@ -369,6 +390,26 @@ async function endSession() {
         <DrawCanvas ref="viewCanvasRef" :engine="viewerEngine" mode="watch" variant="classic" @error="error = $event" />
       </view>
 
+            <view v-if="ended" class="surface">
+        <text class="label">最终排名</text>
+        <view class="podium">
+          <view v-for="(row, index) in podium" :key="row.playerId" class="podium-item" :class="'place-' + (index + 1)">
+            <text class="medal">{{ index === 0 ? '🥇' : index === 1 ? '🥈' : '🥉' }}</text>
+            <Avatar :avatar="avatarOf(row.playerId)" size="large" />
+            <text class="pname" :class="toneOf(row.playerId)">{{ row.name }} #{{ seatOf(row.playerId) }}</text>
+            <text class="pscore">{{ row.total }}</text>
+          </view>
+        </view>
+        <view v-if="restRows.length" class="rank-table">
+          <view class="tr th"><text>排名</text><text>昵称</text><text>得分</text></view>
+          <view v-for="row in restRows" :key="row.playerId" class="tr">
+            <text>{{ row.rank }}</text>
+            <text :class="toneOf(row.playerId)">{{ row.name }} #{{ seatOf(row.playerId) }}</text>
+            <text>{{ row.total }}</text>
+          </view>
+        </view>
+      </view>
+
       <view v-if="view.panel.length" class="surface">
         <text class="label">本轮作品</text>
         <view v-for="entry in view.panel" :key="entry.playerId" class="panel-row">
@@ -532,7 +573,82 @@ async function endSession() {
 .tone-2 { color: #c2410c; }
 .tone-3 { color: #15803d; }
 .tone-4 { color: #7c3aed; }
-.tone-5 { color: #b45309; }</style>
+.tone-5 { color: #b45309; }/* 颁奖台：1/2/3 名高度递减，图片用 Avatar 组件 */
+.podium {
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  gap: 16rpx;
+  margin: 16rpx 0 24rpx;
+}
+.podium-item {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  align-items: center;
+  padding: 16rpx 8rpx;
+  border-radius: 16rpx;
+  background: linear-gradient(180deg, #f5f7ff, #eef1fb);
+}
+.podium-item.place-1 {
+  order: 2;
+  padding-top: 24rpx;
+  background: linear-gradient(180deg, #fff7e0, #ffe9b8);
+}
+.podium-item.place-2 {
+  order: 1;
+  background: linear-gradient(180deg, #f3f5fa, #e3e7f0);
+}
+.podium-item.place-3 {
+  order: 3;
+  background: linear-gradient(180deg, #fdf1e7, #f6ddc8);
+}
+.medal {
+  font-size: 40rpx;
+}
+.pname {
+  margin-top: 6rpx;
+  font-size: 22rpx;
+  text-align: center;
+}
+.pscore {
+  margin-top: 4rpx;
+  color: #172033;
+  font-size: 32rpx;
+  font-weight: 800;
+}
+.rank-table {
+  margin-top: 8rpx;
+}
+.tr {
+  display: flex;
+  align-items: center;
+  gap: 12rpx;
+  padding: 12rpx 8rpx;
+  border-bottom: 1rpx solid #f0f1f5;
+  font-size: 24rpx;
+}
+.tr text:first-child {
+  width: 60rpx;
+  color: #8a8f9c;
+}
+.tr text:nth-child(2) {
+  flex: 1;
+}
+.tr text:last-child {
+  width: 100rpx;
+  text-align: right;
+  font-weight: 700;
+}
+.tr.th {
+  color: #8a8f9c;
+  font-size: 22rpx;
+}</style>
+
+
+
+
+
 
 
 
