@@ -4,14 +4,42 @@ import { onLoad, onShareAppMessage, onShow } from '@dcloudio/uni-app'
 import { useRoomStore } from '../../stores/room'
 import PlayerList from '../../components/PlayerList.vue'
 import RoomCodeCard from '../../components/RoomCodeCard.vue'
+import Leaderboard from '../../components/leaderboard/leaderboard.vue'
 import { bankUrl, drawSetupUrl } from '../../services/gameEntry'
 import { adoptUndercoverRound, endUndercoverRound, PLAYER_PAGE, startUndercoverRound } from '../../services/ucGame'
+import { fetchRoomLeaderboard } from '../../services/scoreBoard'
 import { toErrorMessage } from '../../platform/types'
+import type { LeaderboardRow } from '../../modules/score'
 import type { GameType } from '../../types/room'
 
 const roomStore = useRoomStore()
 const room = computed(() => roomStore.room)
 const notice = ref('')
+/** 本房累计积分（由 uc-command 结算时写入 scores，0010 聚合） */
+const leaderboard = ref<LeaderboardRow[]>([])
+const leaderboardVersion = ref(0)
+
+async function loadLeaderboard() {
+  const roomId = room.value?.id
+  if (!roomId) return
+  try {
+    const rows = await fetchRoomLeaderboard(roomId)
+    leaderboard.value = rows
+    if (rows.length) leaderboardVersion.value += 1
+  } catch (error) {
+    console.warn('读取积分榜失败', error)
+  }
+}
+
+onLoad(async () => {
+  if (!roomStore.room) await roomStore.restore()
+  await loadLeaderboard()
+})
+
+onShow(() => {
+  if (roomStore.room) void roomStore.restore()
+  void loadLeaderboard()
+})
 
 const GAME_LABEL: Record<GameType, string> = {
   'truth-or-dare': '真心话大冒险',
@@ -29,14 +57,6 @@ const MIN_PLAYERS: Record<GameType, number> = {
   hybrid: 4,
   drawing: 2,
 }
-
-onLoad(async () => {
-  if (!roomStore.room) await roomStore.restore()
-})
-
-onShow(() => {
-  if (roomStore.room) void roomStore.restore()
-})
 
 function openPage(url: string) {
   uni.navigateTo({
@@ -159,6 +179,7 @@ async function finishRound() {
     }
   }
   await roomStore.finishGame()
+  await loadLeaderboard()
   notice.value = '本局已结束，房间回到大厅'
 }
 
@@ -202,6 +223,10 @@ onShareAppMessage(() => ({
         <text class="live-label">● 实时同步</text>
       </view>
       <PlayerList :players="room.players" :max-players="room.maxPlayers" show-host-badge />
+    </view>
+
+    <view v-if="leaderboard.length" class="surface leaderboard-surface">
+      <Leaderboard :rows="leaderboard" :version="leaderboardVersion" :me="roomStore.currentPlayerId" :limit="5" />
     </view>
 
     <view v-if="!roomStore.playing" class="surface ready-surface">
@@ -321,7 +346,8 @@ onShareAppMessage(() => ({
 .ready-surface,
 .host-surface,
 .playing-surface,
-.waiting-surface {
+.waiting-surface,
+.leaderboard-surface {
   margin-top: 24rpx;
 }
 

@@ -333,6 +333,11 @@ export class SupabaseRoomApi implements RoomApi {
     return this.call<T>(`/rest/v1/rpc/${name}`, { method: 'POST', body: args })
   }
 
+  /** 公开的 RPC 调用（排行榜这类只读查询用） */
+  async rpcCall<T>(name: string, args: Record<string, unknown> = {}): Promise<T> {
+    return this.rpc<T>(name, args)
+  }
+
   private select<T>(table: string, query: string): Promise<T> {
     return this.call<T>(`/rest/v1/${table}?${query}`)
   }

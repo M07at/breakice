@@ -1,4 +1,4 @@
-﻿// 破冰局 · uc-command：服务端谁是卧底引擎
+// 破冰局 · uc-command：服务端谁是卧底引擎
 //
 // 这个文件会被 scripts/build-uc-command.mjs 拼在上面的引擎代码之后，
 // 所以这里**不要写 import**，直接用内联进来的 createGame / applyAction / tick / toPublicView / UcError。
@@ -111,6 +111,31 @@ function snapshotOf(input: {
     view: toPublicView(input.state),
     serverNow: Date.now(),
   }
+}
+
+type ScoreRow = { game_id: string; user_id: string; points: number; reason: string; ref: string }
+
+/**
+ * 把引擎事件里的计分落库。
+ * ref 用「本次提交的请求号 + 事件序号」，配合 unique(game_id,user_id,reason,ref) 保证重放不会重复加分。
+ */
+async function writeScores(admin: Admin, gameId: string, events: UcEvent[], refBase: string): Promise<void> {
+  const rows: ScoreRow[] = []
+  events.forEach((event, index) => {
+    if (event.type !== 'score') return
+    rows.push({
+      game_id: gameId,
+      user_id: event.playerId,
+      points: Math.round(event.points),
+      reason: event.reason,
+      ref: `${refBase}:${index}`,
+    })
+  })
+  if (rows.length === 0) return
+  const { error } = await admin
+    .from('scores')
+    .upsert(rows, { onConflict: 'game_id,user_id,reason,ref', ignoreDuplicates: true })
+  if (error) console.warn('[uc-command] 写积分失败', error.message)
 }
 
 async function loadGame(admin: Admin, gameId: string) {
@@ -274,6 +299,9 @@ async function handleAct(admin: Admin, uid: string, body: Record<string, any>): 
       .is('acknowledged_at', null)
   }
 
+  // 引擎在事件里给出了建议分值，这里落库；唯一约束 (game_id,user_id,reason,ref) 负责去重
+  await writeScores(admin, game.id, [...applied.events, ...settled.events], requestId)
+
   console.log('[uc-command] act', { game: game.id, action: full.type, version: resultVersion })
   const members = await roomMembers(admin, game.room_id)
   return json(
@@ -315,6 +343,7 @@ async function handleTick(admin: Admin, uid: string, body: Record<string, any>):
       p_view: view,
       p_version: settled.state.version,
     })
+    await writeScores(admin, game.id, settled.events, `${game.id}:v${settled.state.version}`)
     if (ended) {
       await admin.from('games').update({ status: 'ended', ended_at: new Date().toISOString() }).eq('id', game.id)
       await admin.from('rooms').update({ status: 'lobby' }).eq('id', game.room_id)

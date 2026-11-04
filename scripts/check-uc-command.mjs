@@ -223,7 +223,19 @@ async function main() {
     bad('投票流程', String(e.message).slice(0, 200))
   }
 
-  console.log('\n[9] 收尾')
+  console.log('\n[9] 积分落库')
+  try {
+    const board = await rpc('room_leaderboard', { p_room_id: roomId }, host)
+    if (Array.isArray(board) && board.length > 0 && board.some((row) => Number(row.points) > 0)) {
+      ok('积分榜有数据', board.map((row) => `${row.nickname}:${row.points}`).join('  '))
+    } else {
+      bad('积分榜有数据', JSON.stringify(board).slice(0, 200))
+    }
+  } catch (e) {
+    bad('room_leaderboard', String(e.message).slice(0, 200))
+  }
+
+  console.log('\n[10] 收尾')
   try {
     // 投票可能直接把胜负打出来（phase=ended），这时不需要再结束一次
     const probe = await uc({ op: 'tick', game_id: gameId }, host)
