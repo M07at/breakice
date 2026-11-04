@@ -32,7 +32,9 @@ function scanCode() {
 }
 
 onLoad((options) => {
-  if (options?.code) applyRoomCode(String(options.code))
+  // 微信小程序码带的是 scene=房间号；普通二维码/分享链接带的是 code
+  const raw = options?.scene ? decodeURIComponent(String(options.scene)) : options?.code ? String(options.code) : ''
+  if (raw) applyRoomCode(raw)
 })
 
 async function submit() {
