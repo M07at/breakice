@@ -317,6 +317,40 @@ async function loadGame(admin: Admin, gameId: string) {
   }
 }
 
+/**
+ * 把「已经离开房间」的玩家从局内摘掉。
+ *
+ * 退出房间走的是 leave_room，games.state 不会自动更新；这里按房间成员表对账，
+ * 否则轮到他发言/投票时整局要卡到倒计时结束。客户端不需要配合上报。
+ */
+async function settleDeparted(
+  admin: Admin,
+  roomId: string,
+  state: UcState,
+  now: number,
+): Promise<{ state: UcState; events: UcEvent[] }> {
+  const members = await roomMembers(admin, roomId)
+  const present = new Set(members.map((m) => m.user_id))
+  const gone = state.players.filter((p) => p.alive && !present.has(p.id))
+  if (gone.length === 0) return { state, events: [] }
+
+  let next = state
+  const events: UcEvent[] = []
+  for (const player of gone) {
+    try {
+      const applied = applyAction(next, { type: 'playerLeft', playerId: player.id } as UcAction, {
+        now,
+        isHost: false,
+      })
+      next = applied.state
+      events.push(...applied.events)
+    } catch (error) {
+      console.warn('[uc-command] 移除离场玩家失败', player.id, String(error))
+    }
+  }
+  return { state: next, events }
+}
+
 async function handleStart(admin: Admin, uid: string, body: Record<string, any>): Promise<Response> {
   const roomId = String(body.room_id ?? '')
   const variant: Variant = body.variant === 'draw' ? 'draw' : 'classic'
@@ -413,8 +447,12 @@ async function handleAct(admin: Admin, uid: string, body: Record<string, any>): 
   }
   // 身份只认 token：无论客户端传什么 by，都用当前登录用户覆盖
   if (action.type === 'playerLeft') {
-    const { data: hostRow } = await admin.from('rooms').select('host_id').eq('id', game.room_id).maybeSingle()
-    if (hostRow?.host_id !== uid) throw new ApiError(403, 'HOST_ONLY', '只有主持人可以请出玩家')
+    // 自己退出随时可以；请别人出局只有主持人能做
+    const who = String((action as { playerId?: string }).playerId ?? uid)
+    if (who !== uid) {
+      const { data: hostRow } = await admin.from('rooms').select('host_id').eq('id', game.room_id).maybeSingle()
+      if (hostRow?.host_id !== uid) throw new ApiError(403, 'HOST_ONLY', '只有主持人可以请出玩家')
+    }
   }
 
   if (meta.expectedVersion !== undefined && Number(meta.expectedVersion) !== state.version) {
@@ -432,10 +470,14 @@ async function handleAct(admin: Admin, uid: string, body: Record<string, any>): 
   const hostId = room?.host_id ?? ''
   const now = Date.now()
 
+  // 先把"已经离开房间"的人从局内摘掉，否则他那一轮会一直卡到倒计时结束
+  const departed = await settleDeparted(admin, game.room_id, state, now)
+  const baseState = departed.state
+
   const full = { ...(action as object), by: uid } as UcAction
   // AI 评分只能代表自己交的那幅画，不让客户端给别人加分
   if (full.type === 'aiScored') (full as { playerId: string }).playerId = uid
-  const applied = applyAction(state, full, { now, isHost: hostId === uid })
+  const applied = applyAction(baseState, full, { now, isHost: hostId === uid })
   const settled = tick(applied.state, now)
   const next = settled.state
   const view = toPublicView(next)
@@ -471,7 +513,7 @@ async function handleAct(admin: Admin, uid: string, body: Record<string, any>): 
   }
 
   // 引擎在事件里给出了建议分值，这里落库；唯一约束 (game_id,user_id,reason,ref) 负责去重
-  await writeScores(admin, game.id, [...applied.events, ...settled.events], requestId)
+  await writeScores(admin, game.id, [...departed.events, ...applied.events, ...settled.events], requestId)
 
   console.log('[uc-command] act', { game: game.id, action: full.type, version: resultVersion })
   // 轮到机器人就立刻替它走完，回到真人回合再返回
@@ -509,7 +551,10 @@ async function handleTick(admin: Admin, uid: string, body: Record<string, any>):
     )
   }
 
-  const settled = tick(game.state, Date.now())
+  const tickNow = Date.now()
+  // 每 2 秒一次的轮询顺便对账：有人退出房间就把他从局内摘掉
+  const departed = await settleDeparted(admin, game.room_id, game.state, tickNow)
+  const settled = tick(departed.state, tickNow)
   if (settled.state.version !== game.state.version) {
     const view = toPublicView(settled.state)
     const ended = settled.state.phase === 'ended'
@@ -519,7 +564,7 @@ async function handleTick(admin: Admin, uid: string, body: Record<string, any>):
       p_view: view,
       p_version: settled.state.version,
     })
-    await writeScores(admin, game.id, settled.events, `${game.id}:v${settled.state.version}`)
+    await writeScores(admin, game.id, [...departed.events, ...settled.events], `${game.id}:v${settled.state.version}`)
     if (ended) {
       await admin.from('games').update({ status: 'ended', ended_at: new Date().toISOString() }).eq('id', game.id)
       await admin.from('rooms').update({ status: 'lobby' }).eq('id', game.room_id)
@@ -629,6 +674,8 @@ Deno.serve(async (req: Request) => {
     return fail(error)
   }
 })
+
+
 
 
 

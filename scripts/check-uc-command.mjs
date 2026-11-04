@@ -63,7 +63,7 @@ async function mustCall(path, options) {
   return res.data
 }
 
-const anonSession = async () => (await mustCall('/auth/v1/signup', { method: 'POST', body: {} })).access_token
+const anonSession = async () => mustCall('/auth/v1/signup', { method: 'POST', body: {} })
 const rpc = (name, args, token) => mustCall(`/rest/v1/rpc/${name}`, { method: 'POST', token, body: args })
 
 async function uc(body, token) {
@@ -80,8 +80,13 @@ async function main() {
 
   console.log('[1] 准备 4 个账号与房间')
   const tokens = []
+  const userIds = []
   try {
-    for (let i = 0; i < 4; i++) tokens.push(await anonSession())
+    for (let i = 0; i < 4; i++) {
+      const session = await anonSession()
+      tokens.push(session.access_token)
+      userIds.push(session.user?.id ?? '')
+    }
     ok('4 个匿名账号')
   } catch (e) {
     bad('匿名登录', String(e.message).slice(0, 160))
@@ -259,6 +264,31 @@ async function main() {
     else bad('房间回到大厅', JSON.stringify(rooms))
   } catch (e) {
     bad('收尾', String(e.message).slice(0, 200))
+  }
+
+  console.log('\n[11] 中途退出同步')
+  try {
+    const room2 = await rpc('create_room', { p_title: '退房测试', p_game_type: 'lobby', p_max_players: 8, p_settings: {} }, tokens[0])
+    const room2Id = room2[0].room_id
+    const code2 = room2[0].room_code
+    for (let i = 1; i < 4; i++) await rpc('join_room', { p_code: code2 }, tokens[i])
+    for (const t of tokens) await rpc('set_ready', { p_room_id: room2Id, p_ready: true }, t)
+
+    const started = await uc({ op: 'start', room_id: room2Id, variant: 'classic', request_id: 'leave-start' }, tokens[0])
+    if (!started.ok) throw new Error(`开局失败 ${started.status} ${started.text.slice(0, 140)}`)
+
+    // 4 号玩家直接退出房间（相当于关掉小程序 / 点退出）
+    await rpc('leave_room', { p_room_id: room2Id }, tokens[3])
+    const after = await uc({ op: 'tick', game_id: started.data.gameId }, tokens[0])
+    if (!after.ok) throw new Error(`tick 失败 ${after.status} ${after.text.slice(0, 140)}`)
+
+    const leaver = after.data.view.players.find((p) => p.id === userIds[3])
+    if (leaver && leaver.alive === false) ok('退出房间的人被自动移出对局', `剩余 ${after.data.view.players.filter((p) => p.alive).length} 人存活`)
+    else bad('退出房间的人被移出对局', JSON.stringify(leaver))
+
+    await uc({ op: 'act', game_id: started.data.gameId, action: { type: 'endGame' }, meta: { requestId: 'leave-end' } }, tokens[0])
+  } catch (e) {
+    bad('中途退出同步', String(e.message).slice(0, 200))
   }
 
   summary()
