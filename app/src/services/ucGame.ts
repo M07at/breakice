@@ -1,4 +1,4 @@
-import { roomApi } from '../platform'
+﻿import { roomApi } from '../platform'
 import { PlatformError } from '../platform/types'
 import { SupabaseRoomApi } from '../platform/supabase'
 import { UcError } from '../modules/undercover/errors'
@@ -21,9 +21,6 @@ export const PLAYER_PAGE: Record<Variant, string> = {
 
 let activeRoomId = ''
 let activeGameId = ''
-/** 本局补了几个机器人：重开（原班人马再来一局）要沿用同样的数量 */
-let activeBots = 0
-
 /** 服务端可能返回游戏错误码：把它还原成 C 的 UcError，页面才能显示具体原因 */
 const UC_ERROR_CODES = [
   'PLAYER_COUNT',
@@ -167,7 +164,6 @@ function createPort(gameId: string, variant: Variant): UcPlayerPort {
         op: 'start',
         room_id: activeRoomId,
         variant,
-        bots: activeBots,
         request_id: requestId,
       })
     },
@@ -175,19 +171,16 @@ function createPort(gameId: string, variant: Variant): UcPlayerPort {
 }
 
 function install(snapshot: UcPlayerSnapshot, variant: Variant) {
-  // 从名单里数出机器人数量：重开时要沿用，否则单人房会凑不够 4 人被服务端拒掉
-  activeBots = snapshot.players.filter((player) => player.name.startsWith('机器人')).length
   installPlayerPort(createPort(snapshot.gameId, variant), variant)
 }
 
 /** 主持人开局：服务端建局、发牌，然后把端口装好，页面直接进玩家端 */
-export async function startUndercoverRound(roomId: string, variant: Variant, bots = 0): Promise<UcPlayerSnapshot> {
+export async function startUndercoverRound(roomId: string, variant: Variant): Promise<UcPlayerSnapshot> {
   activeRoomId = roomId
   const snapshot = await invoke<UcPlayerSnapshot>({
     op: 'start',
     room_id: roomId,
     variant,
-    bots,
     request_id: `start-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
   })
   install(snapshot, variant)
@@ -221,6 +214,7 @@ export async function endUndercoverRound(): Promise<void> {
   })
   activeGameId = ''
 }
+
 
 
 

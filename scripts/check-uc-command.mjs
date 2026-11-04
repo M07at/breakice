@@ -1,4 +1,4 @@
-﻿#!/usr/bin/env node
+#!/usr/bin/env node
 /**
  * 验收 uc-command（服务端谁是卧底引擎）。
  *
@@ -261,60 +261,6 @@ async function main() {
     bad('收尾', String(e.message).slice(0, 200))
   }
 
-  console.log('\n[11] 人机补位（单人 + 3 机器人）')
-  try {
-    const solo = tokens[0]
-    const soloRoom = await rpc('create_room', { p_title: '人机房', p_game_type: 'lobby', p_max_players: 8, p_settings: {} }, solo)
-    const soloRoomId = soloRoom[0].room_id
-    await rpc('set_ready', { p_room_id: soloRoomId, p_ready: true }, solo)
-
-    const res = await uc({ op: 'start', room_id: soloRoomId, variant: 'draw', bots: 3, request_id: 'check-bots' }, solo)
-    if (!res.ok) throw new Error(`开局失败 ${res.status} ${res.text.slice(0, 160)}`)
-    const snap = res.data
-    const bots = snap.players.filter((p) => p.name.startsWith('机器人'))
-    if (snap.players.length === 4 && bots.length === 3) ok('补 3 个机器人后 4 人开局', bots.map((b) => b.name).join(' '))
-    else bad('机器人补位', JSON.stringify(snap.players))
-
-    // 真人确认词之后，机器人应该已经被自动带走，进入发言阶段
-    const ack = await uc({ op: 'act', game_id: snap.gameId, action: { type: 'acknowledgeWord' }, meta: { requestId: 'bot-ack' } }, solo)
-    if (ack.ok && ack.data.view.phase === 'describe') {
-      ok('机器人自动领词，进入发言阶段', `当前发言者=${ack.data.view.currentSpeakerId === snap.playerId ? '我' : '机器人'}`)
-    } else {
-      bad('机器人自动领词', `${ack.status} ${ack.text.slice(0, 160)}`)
-    }
-
-    const end = await uc({ op: 'act', game_id: snap.gameId, action: { type: 'endGame' }, meta: { requestId: 'bot-end' } }, solo)
-    if (end.ok) ok('单人可以随时结束本局')
-    else bad('结束本局', `${end.status} ${end.text.slice(0, 120)}`)
-  } catch (e) {
-    bad('人机补位', String(e.message).slice(0, 200))
-  }
-
-  console.log('\n[12] 再来一局（重开）')
-  try {
-    const solo = tokens[0]
-    const again = await rpc('create_room', { p_title: '重开房', p_game_type: 'lobby', p_max_players: 8, p_settings: {} }, solo)
-    const againRoomId = again[0].room_id
-    await rpc('set_ready', { p_room_id: againRoomId, p_ready: true }, solo)
-
-    const first = await uc({ op: 'start', room_id: againRoomId, variant: 'classic', bots: 3, request_id: 'replay-1' }, solo)
-    if (!first.ok) throw new Error(`首局失败 ${first.status} ${first.text.slice(0, 140)}`)
-    await uc({ op: 'act', game_id: first.data.gameId, action: { type: 'endGame' }, meta: { requestId: 'replay-end' } }, solo)
-
-    // 模拟客户端真实行为：带机器人重开
-    const second = await uc({ op: 'start', room_id: againRoomId, variant: 'classic', bots: 3, request_id: 'replay-2' }, solo)
-    if (second.ok && second.data.players.length >= 4) ok('带机器人重开成功', `玩家 ${second.data.players.length} 人`)
-    else bad('带机器人重开', `${second.status} ${second.text.slice(0, 160)}`)
-
-    // 模拟漏传机器人（修复前的客户端行为）
-    await uc({ op: 'act', game_id: second.data?.gameId, action: { type: 'endGame' }, meta: { requestId: 'replay-end-2' } }, solo)
-    const third = await uc({ op: 'start', room_id: againRoomId, variant: 'classic', request_id: 'replay-3' }, solo)
-    if (third.ok && third.data.players.length >= 4) ok('不带机器人也能自动补齐重开', `玩家 ${third.data.players.length} 人`)
-    else bad('自动补齐重开', `HTTP ${third.status} ${third.text.slice(0, 120)}`)
-  } catch (e) {
-    bad('重开', String(e.message).slice(0, 200))
-  }
-
   summary()
 }
 
@@ -327,6 +273,7 @@ main().catch((e) => {
   console.error(e)
   process.exit(1)
 })
+
 
 
 

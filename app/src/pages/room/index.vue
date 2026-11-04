@@ -1,4 +1,4 @@
-﻿<script setup lang="ts">
+<script setup lang="ts">
 import { computed, nextTick, ref, watch } from 'vue'
 import { onLoad, onShareAppMessage, onShow } from '@dcloudio/uni-app'
 import { useRoomStore } from '../../stores/room'
@@ -120,8 +120,7 @@ async function hostStart(gameType: GameType) {
   // 临时诊断：页面上能看到点击走到哪一步
   debugLine.value = `点击 ${gameType}｜人数=${roomStore.memberCount}｜已准备=${String(roomStore.allReady)}｜房间=${room.value?.id ? '有' : '无'}`
 
-  // 谁是卧底 / 融合玩法可以用机器人补位，人数不够也能开局
-  if (roomStore.memberCount < minPlayers && !isUndercover(gameType)) {
+  if (roomStore.memberCount < minPlayers) {
     uni.showToast({ title: `${GAME_LABEL[gameType]}至少要 ${minPlayers} 人`, icon: 'none' })
     debugLine.value += '｜拦截:人数不足'
     return
@@ -144,16 +143,11 @@ async function hostStart(gameType: GameType) {
       return
     }
     const variant = variantOf(gameType)
-    const shortfall = Math.max(0, Math.min(3, 4 - roomStore.memberCount))
     try {
-      // 人数不足直接补机器人，不再弹窗确认：少一个可能失败的环节
-      if (shortfall > 0) {
-        uni.showToast({ title: `人数不足，已补 ${shortfall} 个机器人`, icon: 'none' })
-      }
-      debugLine.value += `｜补位=${shortfall}｜请求中`
+      debugLine.value += '｜请求中'
       uni.showLoading({ title: '正在开局…', mask: true })
       try {
-        await startUndercoverRound(room.value.id, variant, shortfall)
+        await startUndercoverRound(room.value.id, variant)
       } finally {
         uni.hideLoading()
       }
@@ -565,6 +559,7 @@ onShareAppMessage(() => ({
 .debug-line { display: block; margin: 6rpx 0 14rpx; padding: 8rpx 12rpx; border-radius: 8rpx; color: #7c2d12; background: #fef3c7; font-size: 20rpx; word-break: break-all; }
 .build-tag { display: block; margin-top: 4rpx; color: var(--muted); font-size: 19rpx; }
 </style>
+
 
 
 

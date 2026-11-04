@@ -1183,18 +1183,10 @@ async function handleStart(admin: Admin, uid: string, body: Record<string, any>)
   const members = await roomMembers(admin, roomId)
   if (members.some((m) => !m.ready)) throw new UcError('BAD_CONFIG', '还有玩家没有准备')
 
-  // 人不够就用机器人补位：客户端显式给了数量就按它补，没给（比如「再来一局」）就自动补到 4 人。
-  // 不能让这一步成为失败点——它只是把局凑够，不是业务规则。
+  // 谁是卧底至少要 4 个真人：不自动补机器人，人数不够就明确拒绝
   const rosterIds = members.map((m) => m.user_id)
-  const requested = Math.round(Number(body.bots ?? 0))
-  const shortfall = Math.max(0, 4 - rosterIds.length)
-  const botCount = Math.max(0, Math.min(3, Number.isFinite(requested) && requested > 0 ? requested : shortfall))
-  if (botCount > 0) {
-    const bots = await ensureBots(admin, botCount)
-    rosterIds.push(...bots.map((bot) => bot.user_id))
-  }
   if (rosterIds.length < 4) {
-    throw new UcError('PLAYER_COUNT', `还差 ${4 - rosterIds.length} 人才能开局（机器人最多补 3 个）`)
+    throw new UcError('PLAYER_COUNT', `还差 ${4 - rosterIds.length} 人才能开局，谁是卧底至少要 4 人`)
   }
 
   const { data: active } = await admin
