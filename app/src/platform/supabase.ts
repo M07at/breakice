@@ -218,21 +218,41 @@ export class SupabaseRoomApi implements RoomApi {
       method: 'POST',
       body: { code, nickname: getSavedProfile().nickname },
     })
-    // 线上部署的函数版本可能和仓库里的返回结构不一致，这里几种常见形状都认
+    // 线上部署的函数版本可能和仓库里的返回结构不一致：
+    // 可能在顶层，也可能包在 session / data / result / payload 里，甚至再嵌套一层。
     const data = (raw ?? {}) as Record<string, any>
-    const nested = (data.session ?? data.data ?? {}) as Record<string, any>
-    const accessToken =
-      data.access_token ?? nested.access_token ?? data.accessToken ?? data.token ?? data.jwt ?? nested.token
-    const refreshToken = data.refresh_token ?? nested.refresh_token ?? data.refreshToken ?? nested.refreshToken ?? ''
-    const expiresIn = Number(data.expires_in ?? nested.expires_in ?? data.expiresIn ?? 3600)
-    const userId =
-      data.user_id ?? nested.user_id ?? data.user?.id ?? nested.user?.id ?? data.profile?.id ?? nested.profile?.id
+    const layers: Record<string, any>[] = [
+      data,
+      data.session,
+      data.data,
+      data.result,
+      data.payload,
+      data.data?.session,
+      data.result?.session,
+      data.payload?.session,
+      data.data?.data,
+    ].filter((item): item is Record<string, any> => Boolean(item) && typeof item === 'object')
+
+    const pick = (...keys: string[]): unknown => {
+      for (const layer of layers) {
+        for (const key of keys) {
+          const value = layer[key]
+          if (value !== undefined && value !== null && value !== '') return value
+        }
+      }
+      return undefined
+    }
+
+    const accessToken = pick('access_token', 'accessToken', 'token', 'jwt')
+    const refreshToken = pick('refresh_token', 'refreshToken') ?? ''
+    const expiresIn = Number(pick('expires_in', 'expiresIn') ?? 3600)
+    const userId = pick('user_id', 'userId') ?? pick('id') ?? data.user?.id ?? data.profile?.id ?? data.data?.user?.id
 
     if (!accessToken || !userId) {
       console.warn('[wechat-auth] 返回结构无法识别', raw)
       throw new PlatformError(
         'AUTH_REQUIRED',
-        `微信登录返回缺少字段（拿到的是：${Object.keys(data).join(', ') || '空'}）`,
+        `微信登录返回缺少字段（顶层 keys：${Object.keys(data).join(', ') || '空'}）`,
       )
     }
     // 只打印 JWT 的声明部分（role / exp / iss），不含签名，用来判断 PostgREST 为什么拒绝
