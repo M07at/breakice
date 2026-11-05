@@ -1,4 +1,4 @@
-#!/usr/bin/env node
+﻿#!/usr/bin/env node
 /**
  * 机器人补位的验收脚本：
  *   1. 线上 uc-command 是不是新版（op=version 里带 bots 标记）
@@ -49,17 +49,23 @@ const main = async () => {
   console.log(`项目：${BASE}\n`)
 
   console.log('[1] 线上函数版本')
-  const ver = await call('/functions/v1/uc-command', { method: 'POST', body: { op: 'version' } })
+  // version 也要求登录态，先拿一个匿名会话
+  const probeUser = await call('/auth/v1/signup', { method: 'POST', body: {} })
+  const ver = await call('/functions/v1/uc-command', {
+    method: 'POST',
+    token: probeUser.data.access_token,
+    body: { op: 'version' },
+  })
   const version = ver.data?.version ?? '(读不到)'
   if (String(version).includes('bots')) ok('线上是带机器人补位的版本', version)
-  else bad('线上函数还是旧版，请重新部署 uc-command', version)
+  else bad('线上函数还是旧版，请重新部署 uc-command', `HTTP ${ver.status} ${JSON.stringify(ver.data).slice(0, 120)}`)
 
   console.log('\n[2] 两个真人 + 两个机器人开局')
   const host = await call('/auth/v1/signup', { method: 'POST', body: {} })
   const guest = await call('/auth/v1/signup', { method: 'POST', body: {} })
   const created = await rpc('create_room', { p_title: '机器人验收', p_game_type: 'lobby', p_max_players: 8, p_settings: {} }, host.data.access_token)
   const roomId = created.data[0].room_id
-  const code = created.data[0].code
+  const code = created.data[0].room_code
   await rpc('join_room', { p_code: code }, guest.data.access_token)
   for (const token of [host.data.access_token, guest.data.access_token]) {
     await rpc('set_ready', { p_room_id: roomId, p_ready: true }, token)
@@ -105,3 +111,5 @@ main().catch((e) => {
   console.error(e)
   process.exit(1)
 })
+
+
