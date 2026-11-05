@@ -84,7 +84,9 @@ export async function prepareHybridArtwork(
   const api = requireApi()
   if (!activeRoomId) throw new PlatformError('UNKNOWN', '缺少房间信息，无法上传画作')
   const userId = await api.currentUserId()
-  const storagePath = `${activeRoomId}/${gameId}/${turnKey}/${userId}.png`
+  // 作品键可能带 #（轮次#玩家），# 在 URL 里是片段分隔符，存储路径里必须换掉
+  const safeKey = turnKey.replace(/#/g, '-')
+  const storagePath = `${activeRoomId}/${gameId}/${safeKey}/${userId}.png`
   await api.uploadArtwork(storagePath, filePath)
   const artworkId = await api.rpcCall<string>('submit_artwork', {
     p_game_id: gameId,
