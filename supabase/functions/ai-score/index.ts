@@ -58,17 +58,18 @@ function promptFor(word: string | null) {
 // 这里是服务端的精简副本：Edge Function 不能 import 前端模块。
 // ---------------------------------------------------------------------------
 const WORD_TO_CLASS: Record<string, string> = {
-  苹果: "apple", 香蕉: "banana", 自行车: "bicycle", 单车: "bicycle", 书: "book", 书本: "book",
-  水桶: "bucket", 公交车: "bus", 巴士: "bus", 相机: "camera", 照相机: "camera", 汽车: "car",
-  小汽车: "car", 猫: "cat", 小猫: "cat", 椅子: "chair", 云: "cloud", 白云: "cloud", 杯子: "cup",
-  钻石: "diamond", 狗: "dog", 小狗: "dog", 门: "door", 眼睛: "eye", 鱼: "fish", 花: "flower",
-  脚: "foot", 叉子: "fork", 吉他: "guitar", 锤子: "hammer", 帽子: "hat", 房子: "house", 钥匙: "key",
-  刀: "knife", 梯子: "ladder", 叶子: "leaf", 月亮: "moon", 山: "mountain", 蘑菇: "mushroom",
-  裤子: "pants", 铅笔: "pencil", 猪: "pig", 披萨: "pizza", 剪刀: "scissors", 衬衫: "shirt",
-  鞋: "shoe", 鞋子: "shoe", 勺子: "spoon", 星星: "star", 太阳: "sun", 树: "tree", 雨伞: "umbrella",
-  轮子: "wheel",
-  对牛弹琴: "cow", 守株待兔: "rabbit", 井底之蛙: "frog", 狐假虎威: "tiger", 亡羊补牢: "sheep",
-  画蛇添足: "snake", 杯弓蛇影: "snake", 草木皆兵: "tree",
+  苹果: "apple", 香蕉: "banana", 面包: "bread", 西兰花: "broccoli", 芦笋: "asparagus",
+  蓝莓: "blueberry", 黑莓: "blackberry", 生日蛋糕: "birthday cake", 蛋糕: "birthday cake",
+  蚂蚁: "ant", 蜜蜂: "bee", 熊: "bear", 鸟: "bird", 蝙蝠: "bat",
+  飞机: "airplane", 救护车: "ambulance", 自行车: "bicycle", 单车: "bicycle",
+  背包: "backpack", 望远镜: "binoculars",
+  闹钟: "alarm clock", 斧头: "axe", 斧子: "axe", 绷带: "bandage", 棒球: "baseball",
+  棒球棒: "baseball bat", 篮球: "basketball", 篮子: "basket", 浴缸: "bathtub",
+  床: "bed", 皮带: "belt", 长椅: "bench", 书: "book", 书本: "book",
+  回旋镖: "boomerang", 瓶盖: "bottlecap", 领结: "bowtie", 手链: "bracelet",
+  大脑: "brain", 桥: "bridge", 扫帚: "broom", 水桶: "bucket", 桶: "bucket",
+  手臂: "arm", 天使: "angel", 胡子: "beard",
+  海滩: "beach", 谷仓: "barn", 动物迁徙: "animal migration", 铁砧: "anvil",
 }
 
 function expectedClassFor(word: string): string {

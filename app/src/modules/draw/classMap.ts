@@ -1,143 +1,136 @@
 /**
- * 词 → drawzy 的英文类别（Quick, Draw! 45 类）。
+ * 中文词 → drawzy 的英文类别。
  *
- * drawzy 的识别模型只认识英文标签，而我们的题库是中文，所以必须有一层映射，
- * 否则「AI 猜中」永远不成立、所有人都是 0 分。
+ * drawzy 的识别模型只认下面这 45 个英文标签（Quick, Draw! 子集，A–bucket），
+ * 题库里对不上的词**永远不可能被判为猜中**，所以：
+ * - 抽词只从能映射的词里挑（`canScoreWithAi`）
+ * - 映射值必须逐字出现在 `DRAWZY_CLASSES` 里
  *
- * 规则：
- * - 一个中文词映射到一个英文类别；成语取其中**最主要的可画物体**
- * - 映射不到的返回 null，这类词不参与 AI 评分（按「没猜中」处理或直接跳过）
- * - 英文类别必须和 drawzy 的 45 类拼写一致（见 top_five_sketch_classes）
+ * 这份清单来自 drawzy 的 `app/utils/constant/globals.py`，是**权威列表**。
+ * 服务端 `supabase/functions/ai-score/index.ts` 有一份精简副本，改这里要同步改那边。
  */
 
-/** drawzy 支持的 45 个类别（Quick, Draw! 子集，拼写以此为准） */
+/** drawzy 支持的 45 个类别（顺序与官方一致） */
 export const DRAWZY_CLASSES = [
   'airplane',
   'alarm clock',
+  'ambulance',
+  'angel',
+  'animal migration',
+  'ant',
+  'anvil',
   'apple',
+  'arm',
+  'asparagus',
   'axe',
+  'backpack',
   'banana',
+  'bandage',
+  'barn',
+  'baseball bat',
+  'baseball',
+  'basket',
+  'basketball',
+  'bat',
+  'bathtub',
+  'beach',
+  'bear',
+  'beard',
+  'bed',
+  'bee',
+  'belt',
+  'bench',
   'bicycle',
+  'binoculars',
+  'bird',
+  'birthday cake',
+  'blackberry',
+  'blueberry',
   'book',
+  'boomerang',
+  'bottlecap',
+  'bowtie',
+  'bracelet',
+  'brain',
+  'bread',
+  'bridge',
+  'broccoli',
+  'broom',
   'bucket',
-  'bus',
-  'camera',
-  'car',
-  'cat',
-  'chair',
-  'cloud',
-  'cup',
-  'diamond',
-  'dog',
-  'door',
-  'eye',
-  'fish',
-  'flower',
-  'foot',
-  'fork',
-  'guitar',
-  'hammer',
-  'hat',
-  'house',
-  'key',
-  'knife',
-  'ladder',
-  'leaf',
-  'moon',
-  'mountain',
-  'mushroom',
-  'pants',
-  'pencil',
-  'pig',
-  'pizza',
-  'scissors',
-  'shirt',
-  'shoe',
-  'spoon',
-  'star',
-  'sun',
-  'tree',
-  'umbrella',
-  'wheel',
 ] as const
 
-/** 中文词 → 英文类别。命中不了就返回 null。 */
+/**
+ * 能画的词 → 英文类别。
+ * 优先挑「一个词就对应一个物体」的，尽量避免需要画多步的抽象词。
+ */
 const WORD_TO_CLASS: Record<string, string> = {
-  // 单字 / 日常物体
+  // 食物
   苹果: 'apple',
   香蕉: 'banana',
+  面包: 'bread',
+  西兰花: 'broccoli',
+  芦笋: 'asparagus',
+  蓝莓: 'blueberry',
+  黑莓: 'blackberry',
+  生日蛋糕: 'birthday cake',
+  蛋糕: 'birthday cake',
+  // 动物
+  蚂蚁: 'ant',
+  蜜蜂: 'bee',
+  熊: 'bear',
+  鸟: 'bird',
+  蝙蝠: 'bat',
+  // 交通与出行
+  飞机: 'airplane',
+  救护车: 'ambulance',
   自行车: 'bicycle',
   单车: 'bicycle',
+  背包: 'backpack',
+  望远镜: 'binoculars',
+  // 生活物件
+  闹钟: 'alarm clock',
+  斧头: 'axe',
+  斧子: 'axe',
+  绷带: 'bandage',
+  棒球: 'baseball',
+  棒球棒: 'baseball bat',
+  篮球: 'basketball',
+  篮子: 'basket',
+  浴缸: 'bathtub',
+  床: 'bed',
+  皮带: 'belt',
+  长椅: 'bench',
   书: 'book',
-  书本: 'book',
+  书本书: 'book',
+  回旋镖: 'boomerang',
+  瓶盖: 'bottlecap',
+  领结: 'bowtie',
+  手链: 'bracelet',
+  大脑: 'brain',
+  桥: 'bridge',
+  扫帚: 'broom',
   水桶: 'bucket',
-  公交车: 'bus',
-  巴士: 'bus',
-  相机: 'camera',
-  照相机: 'camera',
-  汽车: 'car',
-  小汽车: 'car',
-  猫: 'cat',
-  小猫: 'cat',
-  椅子: 'chair',
-  云: 'cloud',
-  白云: 'cloud',
-  杯子: 'cup',
-  钻石: 'diamond',
-  狗: 'dog',
-  小狗: 'dog',
-  门: 'door',
-  眼睛: 'eye',
-  鱼: 'fish',
-  花: 'flower',
-  脚: 'foot',
-  叉子: 'fork',
-  吉他: 'guitar',
-  锤子: 'hammer',
-  帽子: 'hat',
-  房子: 'house',
-  钥匙: 'key',
-  刀: 'knife',
-  梯子: 'ladder',
-  叶子: 'leaf',
-  月亮: 'moon',
-  山: 'mountain',
-  蘑菇: 'mushroom',
-  裤子: 'pants',
-  铅笔: 'pencil',
-  猪: 'pig',
-  披萨: 'pizza',
-  披萨饼: 'pizza',
-  剪刀: 'scissors',
-  衬衫: 'shirt',
-  鞋: 'shoe',
-  鞋子: 'shoe',
-  勺子: 'spoon',
-  星星: 'star',
-  太阳: 'sun',
-  树: 'tree',
-  雨伞: 'umbrella',
-  轮子: 'wheel',
-
-  // 成语 / 短语：取最主要的可画物体
-  对牛弹琴: 'cow',
-  画蛇添足: 'snake',
-  守株待兔: 'rabbit',
-  井底之蛙: 'frog',
-  狐假虎威: 'tiger',
-  亡羊补牢: 'sheep',
-  杯弓蛇影: 'snake',
-  掩耳盗铃: 'bell',
-  刻舟求剑: 'boat',
-  草木皆兵: 'tree',
-  火上浇油: 'fire',
-  水滴石穿: 'water',
-  三心二意: 'heart',
+  桶: 'bucket',
+  // 身体与他人
+  手臂: 'arm',
+  天使: 'angel',
+  胡子: 'beard',
+  // 场景
+  海滩: 'beach',
+  谷仓: 'barn',
+  动物迁徙: 'animal migration',
+  铁砧: 'anvil',
 }
 
 /**
+ * 抽词候选：就是上面这些中文词。
+ * 你画我猜只用这批词，保证 AI 评分能判"猜中"。
+ */
+export const DRAW_WORD_POOL: string[] = Object.keys(WORD_TO_CLASS)
+
+/**
  * 取某个词对应的英文类别。
- * 先查完整映射，再尝试「包含关系」（例如「一大苹果」→ apple），都没有就返回 null。
+ * 先查完整映射，再尝试包含关系（最长键优先），都没有返回 null。
  */
 export function expectedClassFor(word: string): string | null {
   const text = word.trim()
@@ -145,7 +138,6 @@ export function expectedClassFor(word: string): string | null {
   const direct = WORD_TO_CLASS[text]
   if (direct) return direct
 
-  // 命中子串：最长优先，避免「小汽车」被「汽车」抢先
   const candidates = Object.keys(WORD_TO_CLASS)
     .filter((key) => text.includes(key) || key.includes(text))
     .sort((a, b) => b.length - a.length)
@@ -155,4 +147,9 @@ export function expectedClassFor(word: string): string | null {
 /** 这个词能不能参与 AI 评分 */
 export function canScoreWithAi(word: string): boolean {
   return expectedClassFor(word) !== null
+}
+
+/** 从一个词表里筛出能参与 AI 评分的词 */
+export function filterScorable(words: readonly string[]): string[] {
+  return words.filter((word) => canScoreWithAi(word))
 }

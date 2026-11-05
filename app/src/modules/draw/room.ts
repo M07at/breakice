@@ -150,6 +150,8 @@ export interface LocalDrawRoomOptions {
   players?: { id: string; name: string }[]
   /** 联机用：我是名单里的哪一个（默认本机身份） */
   meId?: string
+  /** 抽词过滤：例如只保留 AI 认得出的词，联机时由页面传入 */
+  listFilter?: (words: string[]) => string[]
   /** 计分规则：不传用 B 的默认值；联机时按产品要求覆盖 */
   scoreConfig?: ScoreConfigPatch
   /**
@@ -203,6 +205,7 @@ export class LocalDrawRoomBackend implements DrawRoomBackend {
   private readonly scorer: AiScorer
   private readonly now: () => number
   private readonly listItems: () => Promise<BankItem<'draw'>[]>
+  private readonly listFilter: ((words: string[]) => string[]) | null = null
   private readonly players: DrawRoomPlayer[]
   private readonly board: ScoreBook
   private readonly listeners = new Set<(view: DrawRoomView) => void>()
