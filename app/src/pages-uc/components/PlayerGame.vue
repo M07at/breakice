@@ -43,7 +43,8 @@
       <view v-if="snapshot.view.variant === 'draw' && ['review', 'vote', 'reveal', 'ended'].includes(snapshot.view.phase)" class="uc-card">
         <text class="uc-label">{{ snapshot.view.phase === 'review' ? '作品回顾 · 倒计时后自动投票' : '本轮画作' }}</text>
         <text class="uc-muted">缺席或超时未交的画手没有作品。AI 评分失败或超时不会阻塞投票。</text>
-        <view v-for="(art, index) in galleryArtworks" :key="art.id" class="final-player"><text>第 {{ index + 1 }} 位 · {{ nameOf(art.playerId) }}</text><image v-if="artworkUrls[art.id]" class="gallery-image" :src="artworkUrls[art.id]" mode="widthFix" /><text v-else class="gallery-picture">{{ art.preview }}</text><text class="uc-muted">{{ art.status === 'pending' ? 'AI 评分中…' : art.status === 'success' ? 'AI 评分完成' : art.status === 'failed' ? '评分失败，已跳过' : '评分超时，已跳过' }}{{ art.score !== undefined ? ' · ' + art.score + '分' : '' }}</text></view>
+        <view v-for="(art, index) in galleryArtworks" :key="art.id" class="final-player"><text>第 {{ index + 1 }} 位 · {{ nameOf(art.playerId) }}</text><image v-if="artworkUrls[art.id]" class="gallery-image" :src="artworkUrls[art.id]" mode="widthFix" /><text v-else class="gallery-picture">{{ art.preview }}</text><text v-if="guessText(art)" class="uc-muted">{{ guessText(art) }}</text>
+          <text class="uc-muted">{{ art.status === 'pending' ? 'AI 评分中…' : art.status === 'success' ? 'AI 评分完成' : art.status === 'failed' ? '评分失败，已跳过' : '评分超时，已跳过' }}{{ art.score !== undefined ? ' · ' + art.score + '分' : '' }}</text></view>
         <view v-if="relayFinal && artworkUrls[relayFinal.id]" class="final-player">
           <text>完整接力画（{{ nameOf(relayFinal.playerId) }}）</text>
           <image class="gallery-image" :src="artworkUrls[relayFinal.id]" mode="widthFix" />
@@ -153,6 +154,20 @@ const relayFinal = computed(() => {
   const list = galleryArtworks.value
   return list.length > 0 ? list[list.length - 1] : null
 })
+
+/**
+ * 画作上的 AI 猜测信息。服务端接上画图识别后，artworks 行会带 aiGuess / aiSeconds；
+ * 现在没有就返回空串，不占位置。
+ */
+function guessText(art: Record<string, unknown>) {
+  const guess = art.aiGuess as string | undefined
+  const seconds = art.aiSeconds as number | undefined
+  if (!guess && seconds === undefined) return ''
+  const parts: string[] = []
+  if (guess) parts.push('AI 猜：' + guess)
+  if (seconds !== undefined) parts.push('用时 ' + seconds.toFixed(1) + ' 秒')
+  return parts.join(' · ')
+}
 
 const playersWithoutArtwork = computed(() => {
   const drawn = new Set(galleryArtworks.value.map((a) => a.playerId))
