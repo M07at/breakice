@@ -35,7 +35,7 @@
           <text class="uc-label">{{ nameOf(snapshot.view.currentSpeakerId) }} 正在画</text>
           <DrawCanvas ref="hybridCanvas" :engine="hybridViewer" mode="watch" variant="classic" @error="error = $event" />
         </view>
-        <HybridDrawAdapter ref="hybridAdapter" v-if="snapshot.view.variant === 'draw' && rights.canFinish" :key="snapshot.gameId + snapshot.view.turnKey + snapshot.playerId" :game-id="snapshot.gameId" :turn-key="snapshot.view.turnKey" :editable="!locked" @submit="submitDrawing" />
+        <HybridDrawAdapter ref="hybridAdapter" v-if="snapshot.view.variant === 'draw' && rights.canFinish" :key="snapshot.gameId + snapshot.view.turnKey + snapshot.playerId" :game-id="snapshot.gameId" :turn-key="snapshot.view.turnKey" :player-id="snapshot.playerId" :editable="!locked" @submit="submitDrawing" />
         <view v-if="rights.me?.alive" class="uc-card"><text class="uc-label">我的词卡</text><text v-if="secret" class="secret-word small">{{ secret.isBlank ? '你是白板' : secret.word }}</text><button class="uc-button uc-secondary" :disabled="locked" @tap="secret ? hideSecret() : reveal()">{{ secret ? '遮住我的词语' : '私密查看我的词语' }}</button></view>
         <view class="uc-card"><text class="uc-label">发言顺序</text><view v-for="(id, i) in snapshot.view.speakOrder" :key="id" class="player-line"><text>{{ seatOf(id) }} 号 · {{ nameOf(id) }}</text><text class="uc-muted">{{ i < speakerIndex ? '已发言' : id === snapshot.view.currentSpeakerId ? '正在发言' : '等待' }}</text></view></view>
       </template>
@@ -134,7 +134,7 @@ const galleryArtworks = computed(() => {
   const all = snapshot.value?.artworks ?? []
   if (snapshot.value?.view.phase === 'ended') return all
   const round = String(snapshot.value?.view.round ?? '')
-  return all.filter((art) => art.turnKey.split('-')[0] === round)
+  return all.filter((art) => art.turnKey.split(/[-#]/)[0] === round)
 })
 
 const playersWithoutArtwork = computed(() => {

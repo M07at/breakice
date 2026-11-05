@@ -19,6 +19,8 @@ import type { DrawChunk } from '@/modules/draw/types'
 const props = defineProps<{
   gameId: string
   turnKey: string
+  /** 作画者 id：artworks 的唯一键是 (game_id, turn_key)，同一轮多人作画必须区分 */
+  playerId: string
   editable: boolean
 }>()
 
@@ -39,7 +41,8 @@ const errorText = ref('')
 const scoreMode = ref<HybridArtwork['status']>('success')
 
 const engine = new DrawEngine({ by: `hybrid-${props.gameId}-${props.turnKey}` })
-
+/** 同一轮里每位玩家各有一幅，用 轮次#玩家 作为作品键 */
+const artworkKey = `${props.turnKey}#${props.playerId}`
 // 笔画实时广播：同房其他人用观战画布重放，别等到交画才看到
 painterPump = new ChunkPump(
   engine,
@@ -75,7 +78,7 @@ async function submit() {
     const filePath = await canvasRef.value.exportPng()
     if (!filePath) throw new Error('画布还没画东西')
 
-    const { storagePath, artworkId } = await prepareHybridArtwork(props.gameId, props.turnKey, filePath)
+    const { storagePath, artworkId } = await prepareHybridArtwork(props.gameId, artworkKey, filePath)
     emit('submit', { preview: storagePath, scoreMode: scoreMode.value === 'pending' ? 'success' : scoreMode.value, artworkId })
   } catch (error) {
     errorText.value = error instanceof Error ? error.message : '提交失败，请重试'
