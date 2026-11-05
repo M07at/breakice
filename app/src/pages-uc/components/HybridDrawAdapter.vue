@@ -56,6 +56,9 @@ onUnmounted(() => {
 })
 const canSubmit = computed(() => props.editable && !submitting.value)
 
+// 交给父组件在倒计时结束时调用：画完不再手动点
+defineExpose({ submitNow: () => submit() })
+
 async function submit() {
   if (!canSubmit.value || !canvasRef.value) return
   submitting.value = true
@@ -89,9 +92,7 @@ function clearCanvas() {
 
     <view class="draw-actions">
       <button class="uc-link" :disabled="!editable || submitting" @tap="clearCanvas">清空</button>
-      <button class="uc-button" :disabled="!canSubmit" @tap="submit">
-        {{ submitting ? '正在上传…' : '提交画作 →' }}
-      </button>
+      
     </view>
 
     <text v-if="errorText" class="uc-note">{{ errorText }}</text>
@@ -117,5 +118,6 @@ function clearCanvas() {
   flex: 1;
 }
 </style>
+
 
 

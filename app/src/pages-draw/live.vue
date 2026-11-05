@@ -8,7 +8,7 @@
  *
  * 只有本页用于房间模式；B 原来的 setup/play 单机流程不受影响。
  */
-import { computed, onMounted, onUnmounted, ref } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { onLoad } from '@dcloudio/uni-app'
 import DrawCanvas from '@/components/draw-canvas/draw-canvas.vue'
 import Avatar from '@/components/Avatar.vue'
@@ -111,6 +111,16 @@ const hintText = computed(() => {
   if (!hint) return ''
   return `${hint.chars} 个字${hint.category ? ` · ${hint.category}` : ''}`
 })
+/** 倒计时结束自动交画：画完不用手动点，和产品规则一致 */
+let autoSubmitArmed = true
+const autoSubmit = () => {
+  const snapshot = view.value
+  if (!snapshot || snapshot.phase !== 'drawing') return
+  if (!myTurn.value || busy.value || !autoSubmitArmed) return
+  autoSubmitArmed = false
+  void submitDrawing()
+}
+
 const remain = computed(() => {
   const snapshot = view.value
   if (!snapshot || snapshot.phase !== 'drawing') return 0
@@ -119,6 +129,10 @@ const remain = computed(() => {
 })
 
 /** 联机用的单人画布引擎：只画自己的这一张 */
+watch(remain, (value) => {
+  if (value <= 0) autoSubmit()
+})
+
 const painterEngine = new DrawEngine({ by: 'live-painter' })
 /** 观战画布：把作画者广播来的分片重放出来 */
 const viewerEngine = new DrawEngine({ by: 'live-viewer' })
@@ -652,6 +666,7 @@ async function endSession() {
   color: var(--muted);
   font-size: 22rpx;
 }</style>
+
 
 
 

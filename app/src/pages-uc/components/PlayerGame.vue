@@ -35,7 +35,7 @@
           <text class="uc-label">{{ nameOf(snapshot.view.currentSpeakerId) }} 正在画</text>
           <DrawCanvas ref="hybridCanvas" :engine="hybridViewer" mode="watch" variant="classic" @error="error = $event" />
         </view>
-        <HybridDrawAdapter v-if="snapshot.view.variant === 'draw' && rights.canFinish" :key="snapshot.gameId + snapshot.view.turnKey + snapshot.playerId" :game-id="snapshot.gameId" :turn-key="snapshot.view.turnKey" :editable="!locked" @submit="submitDrawing" />
+        <HybridDrawAdapter ref="hybridAdapter" v-if="snapshot.view.variant === 'draw' && rights.canFinish" :key="snapshot.gameId + snapshot.view.turnKey + snapshot.playerId" :game-id="snapshot.gameId" :turn-key="snapshot.view.turnKey" :editable="!locked" @submit="submitDrawing" />
         <view v-if="rights.me?.alive" class="uc-card"><text class="uc-label">我的词卡</text><text v-if="secret" class="secret-word small">{{ secret.isBlank ? '你是白板' : secret.word }}</text><button class="uc-button uc-secondary" :disabled="locked" @tap="secret ? hideSecret() : reveal()">{{ secret ? '遮住我的词语' : '私密查看我的词语' }}</button></view>
         <view class="uc-card"><text class="uc-label">发言顺序</text><view v-for="(id, i) in snapshot.view.speakOrder" :key="id" class="player-line"><text>{{ seatOf(id) }} 号 · {{ nameOf(id) }}</text><text class="uc-muted">{{ i < speakerIndex ? '已发言' : id === snapshot.view.currentSpeakerId ? '正在发言' : '等待' }}</text></view></view>
       </template>
@@ -82,7 +82,7 @@
 
 <script setup lang="ts">
 import HybridDrawAdapter from './HybridDrawAdapter.vue'
-import { computed, onMounted, onUnmounted, ref } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { onHide, onLoad, onShow } from '@dcloudio/uni-app'
 import { isUcError, ROLE_LABEL } from '@/modules/undercover'
 import type { UcClientAction, UcCommandMeta, UcSecretView } from '@/modules/undercover'
@@ -285,6 +285,17 @@ let offLive: (() => void) | null = null
 let endedTimer: ReturnType<typeof setTimeout> | null = null
 /** 融合玩法的观战画布：重放画手广播来的笔画 */
 const hybridViewer = new DrawEngine({ by: 'hybrid-viewer' })
+/** 融合玩法画布：倒计时结束时自动提交，不再让玩家点按钮 */
+const hybridAdapter = ref<{ submitNow: () => void } | null>(null)
+let hybridSubmitted = false
+watch(remaining, (value) => {
+  const view = snapshot.value?.view
+  if (!view || view.variant !== 'draw' || !rights.value?.canFinish) return
+  if (value > 0 || hybridSubmitted) return
+  hybridSubmitted = true
+  hybridAdapter.value?.submitNow()
+})
+watch(() => snapshot.value?.view.turnKey, () => { hybridSubmitted = false })
 const hybridCanvas = ref<{ paint(): void } | null>(null)
 let lastHybridTurn = ''
 </script>
@@ -305,6 +316,9 @@ let lastHybridTurn = ''
 .player-clock { font-size: 40rpx; font-weight: 700; white-space: nowrap; }
 .final-player { padding: 20rpx 0; border-bottom: 2rpx solid #edf0e7; }
 </style>
+
+
+
 
 
 
