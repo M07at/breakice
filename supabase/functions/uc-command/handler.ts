@@ -15,7 +15,7 @@ const SUPABASE_URL = Deno.env.get('SUPABASE_URL') ?? ''
 const SERVICE_ROLE = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
 
 /** 部署后可以用 { op: 'version' } 确认线上跑的是哪一版 */
-const HANDLER_VERSION = 'uc-2026-11-05-bots'
+const HANDLER_VERSION = 'uc-2026-11-05-bots2'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -210,10 +210,12 @@ async function driveBots(admin: Admin, gameId: string, maxSteps = 24): Promise<v
     const pick = nextBotAction(game.state, botIds)
     if (!pick) return
 
+    // 只执行机器人自己的动作，不推进时间：
+    // 阶段该不该结束交给引擎（全员行动完）和客户端的 tick 决定，
+    // 否则机器人会在同一次请求里把整局一路推到结算。
     const now = Date.now()
     const applied = applyAction(game.state, pick.action, { now, isHost: false })
-    const settled = tick(applied.state, now)
-    const next = settled.state
+    const next = applied.state
     const ended = next.phase === 'ended'
     const { error } = await admin.rpc('uc_commit_action', {
       p_game_id: gameId,
@@ -230,7 +232,7 @@ async function driveBots(admin: Admin, gameId: string, maxSteps = 24): Promise<v
       console.warn('[uc-command] 机器人提交失败', error.message)
       return
     }
-    await writeScores(admin, gameId, [...applied.events, ...settled.events], `bot-${next.version}`)
+    await writeScores(admin, gameId, applied.events, `bot-${next.version}`)
     if (ended) return
   }
 }
@@ -683,6 +685,9 @@ Deno.serve(async (req: Request) => {
     return fail(error)
   }
 })
+
+
+
 
 
 
