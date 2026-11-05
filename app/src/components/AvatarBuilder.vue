@@ -30,20 +30,25 @@ function step(key: AvatarLayerKey, direction: 1 | -1) {
   const layer = getAvatarLayer(key)
   const next = cycleValue(avatar.value[key], layer.count, direction)
 
-  // 先撤掉动画类，下一帧再和新的图片一起加回来，否则连续点击不会重播
-  slides.value = { ...slides.value, [key]: '' }
-  nextTick(() => {
-    emit('update:modelValue', { ...avatar.value, [key]: next })
-    slides.value = { ...slides.value, [key]: direction === 1 ? 'slide-next' : 'slide-prev' }
-    const existing = slideTimers.get(key)
-    if (existing) clearTimeout(existing)
-    slideTimers.set(
-      key,
-      setTimeout(() => {
-        slides.value = { ...slides.value, [key]: '' }
-      }, 240),
-    )
-  })
+  // 肤色直接替换在雪人上，不播放会把整个身体移走的滑入动画。
+  if (key === 'color') {
+    emit('update:modelValue', { ...avatar.value, color: next })
+  } else {
+    // 先撤掉动画类，下一帧再和新的图片一起加回来，否则连续点击不会重播
+    slides.value = { ...slides.value, [key]: '' }
+    nextTick(() => {
+      emit('update:modelValue', { ...avatar.value, [key]: next })
+      slides.value = { ...slides.value, [key]: direction === 1 ? 'slide-next' : 'slide-prev' }
+      const existing = slideTimers.get(key)
+      if (existing) clearTimeout(existing)
+      slideTimers.set(
+        key,
+        setTimeout(() => {
+          slides.value = { ...slides.value, [key]: '' }
+        }, 240),
+      )
+    })
+  }
 
   hint.value = `${layer.label} ${next}/${layer.count}`
   hintVisible.value = true
@@ -76,6 +81,7 @@ onUnmounted(() => {
           :src="item.src"
           mode="aspectFit"
         />
+        <button class="color-hit-area" aria-label="点击雪人身体更换颜色" @tap="step('color', 1)" />
         <view v-if="hintVisible" class="preview-hint">{{ hint }}</view>
       </view>
 
@@ -85,6 +91,7 @@ onUnmounted(() => {
         </view>
       </view>
     </view>
+    <text class="color-tip">点击雪人身体换颜色</text>
   </view>
 </template>
 
@@ -93,6 +100,8 @@ onUnmounted(() => {
   width: 100%;
   display: flex;
   justify-content: center;
+  flex-direction: column;
+  align-items: center;
 }
 
 .stage {
@@ -143,6 +152,10 @@ onUnmounted(() => {
   width: 100%;
   height: 100%;
 }
+
+.color-hit-area { position: absolute; left: 25%; top: 52%; width: 50%; height: 42%; margin: 0; padding: 0; border: none; border-radius: 45%; background: transparent; }
+.color-hit-area::after { border: none; }
+.color-tip { margin-top: 6rpx; color: #52647a; font-size: 22rpx; }
 
 .preview-layer.slide-next {
   animation: slide-in-next 220ms ease-out;
