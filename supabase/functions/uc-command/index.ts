@@ -869,7 +869,7 @@ const SUPABASE_URL = Deno.env.get('SUPABASE_URL') ?? ''
 const SERVICE_ROLE = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
 
 /** 部署后可以用 { op: 'version' } 确认线上跑的是哪一版 */
-const HANDLER_VERSION = 'uc-2026-11-05-rules2'
+const HANDLER_VERSION = 'uc-2026-11-05-rules3'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -1335,10 +1335,14 @@ async function handleAct(admin: Admin, uid: string, body: Record<string, any>): 
 
   if (meta.expectedVersion !== undefined && Number(meta.expectedVersion) !== state.version) {
     const independent = action.type === 'acknowledgeWord' || action.type === 'vote' || action.type === 'drawingSubmitted'
+    // 交画只要求还在作画阶段：轮次/发言者的时间戳很容易在提交瞬间变化，
+    // 用 turnKey 严格比对会把正常的提交判成过期（人机回合切换快时尤其明显）。
     const sameStage =
-      meta.expectedPhase === state.phase &&
-      Number(meta.expectedRound) === state.round &&
-      meta.expectedTurnKey === currentTurnKey(state)
+      action.type === 'drawingSubmitted'
+        ? meta.expectedPhase === state.phase && state.phase === 'describe'
+        : meta.expectedPhase === state.phase &&
+          Number(meta.expectedRound) === state.round &&
+          meta.expectedTurnKey === currentTurnKey(state)
     if (!(independent && sameStage && Number(meta.expectedVersion) <= state.version)) {
       throw new UcError('STALE_STATE', '局面已经更新，请刷新后再操作')
     }
@@ -1552,6 +1556,7 @@ Deno.serve(async (req: Request) => {
     return fail(error)
   }
 })
+
 
 
 
