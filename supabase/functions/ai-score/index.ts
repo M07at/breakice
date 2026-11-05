@@ -243,7 +243,7 @@ Deno.serve(async (req) => {
       const score = scoreFromGuess({ correct, seconds })
       const comment = describeGuess({ correct, guess: predicted, seconds })
       await finish(
-        { status: "success", score, comment, provider: "drawzy", model: "quickdraw-cnn", ai_guess: predicted, ai_seconds: seconds },
+        { status: "success", total: score, comment, provider: "drawzy", model: "quickdraw-cnn", ai_guess: predicted, ai_seconds: seconds },
         "scored",
       )
       return json({ status: "success", score, comment, guess: predicted, seconds })
