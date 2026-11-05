@@ -19,9 +19,10 @@ import { DrawEngine } from './engine'
 import { ChunkPump, LoopbackTransport } from './sync'
 import { customWord, pickDrawWord, pickEmojiPalette } from './words'
 import type { AiScoreResult, DrawVariant, DrawWord } from './types'
+import { DEFAULT_DRAW_SECONDS, normalizeDrawSeconds } from './settings'
 
 /** 每人作画时长 */
-export const DRAW_SECONDS = 90
+export const DRAW_SECONDS = DEFAULT_DRAW_SECONDS
 /** 每张画揭晓（能看到答案、送花、点差评）持续多久；这段时间不开始下一位 */
 export const REVEAL_SECONDS = 8
 
@@ -76,6 +77,7 @@ export interface DrawRoomView {
   roomId: string
   gameId: string
   variant: DrawVariant
+  drawSeconds?: number
   phase: DrawRoomPhase
   players: DrawRoomPlayer[]
   /** 这一轮该谁画 */
@@ -142,6 +144,7 @@ export interface LocalDrawRoomOptions {
   playerCount: number
   variant: DrawVariant
   customText?: string
+  drawSeconds?: number
   scorer?: AiScorer
   now?: () => number
   /**
@@ -203,6 +206,7 @@ export class LocalDrawRoomBackend implements DrawRoomBackend {
   private readonly gameId: string
   private readonly variant: DrawVariant
   private readonly customText: string
+  private readonly drawSeconds: number
   private readonly scorer: AiScorer
   private readonly now: () => number
   private readonly listItems: () => Promise<BankItem<'draw'>[]>
@@ -245,6 +249,7 @@ export class LocalDrawRoomBackend implements DrawRoomBackend {
     this.meId = options.meId ?? LOCAL_USER_ID
     this.variant = options.variant
     this.customText = options.customText ?? ''
+    this.drawSeconds = normalizeDrawSeconds(options.drawSeconds)
     this.scorer = options.scorer ?? new MockAiScorer()
     this.now = options.now ?? (() => Date.now())
     this.listItems =
@@ -289,6 +294,7 @@ export class LocalDrawRoomBackend implements DrawRoomBackend {
       variant: this.variant,
       playerCount: this.players.length,
       customText: this.customText,
+      drawSeconds: this.drawSeconds,
     }
   }
 
@@ -301,6 +307,7 @@ export class LocalDrawRoomBackend implements DrawRoomBackend {
       gameId: this.gameId,
       variant: this.variant,
       phase: this.phase,
+      drawSeconds: this.drawSeconds,
       players: this.players,
       painterId: this.painterId(),
       roundIndex: this.roundIndex,
@@ -426,7 +433,7 @@ export class LocalDrawRoomBackend implements DrawRoomBackend {
     const isCorrect = canGuess && raw.toLowerCase() === answer.toLowerCase()
 
     if (isCorrect && !this.guesses.some((g) => g.playerId === actor)) {
-      const seconds = Math.max(0, Math.round((this.now() - (this.endsAt - DRAW_SECONDS * 1000)) / 1000))
+      const seconds = Math.max(0, Math.round((this.now() - this.startedAt) / 1000))
       this.guesses.push({ playerId: actor, seconds })
     }
 
@@ -506,7 +513,7 @@ export class LocalDrawRoomBackend implements DrawRoomBackend {
     this.answers[this.painterId()] = this.word?.word ?? ''
     const startedAt = this.now()
     this.startedAt = startedAt
-    this.endsAt = startedAt + DRAW_SECONDS * 1000
+    this.endsAt = startedAt + this.drawSeconds * 1000
     this.phase = 'drawing'
     this.emit()
   }

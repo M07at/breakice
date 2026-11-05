@@ -118,6 +118,11 @@ function pickDrawMode(): Promise<'classic' | 'emoji' | 'custom' | null> {
 async function startLocalDraw() {
   const mode = await pickDrawMode()
   if (!mode) return
+  if (mode === 'custom') {
+    const id = room.value?.id
+    if (id) openPage(`/pages-draw/setup?room=${encodeURIComponent(id)}&variant=custom&count=${roomStore.memberCount}&lock=1`)
+    return
+  }
   try {
     await roomStore.begin('drawing')
     await nextTick()

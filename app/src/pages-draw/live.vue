@@ -18,6 +18,7 @@ import { ChunkPump } from '@/modules/draw/sync'
 import type { DrawChunk } from '@/modules/draw/types'
 import { disposeDrawRoom, startLocalDrawRoom } from '@/modules/draw/room'
 import { filterScorable } from '@/modules/draw/classMap'
+import { DEFAULT_DRAW_SECONDS, normalizeDrawSeconds } from '@/modules/draw/settings'
 import type { DrawRoomView } from '@/modules/draw/room'
 import type { LocalDrawRoomBackend } from '@/modules/draw/room'
 import { roomApi } from '@/platform'
@@ -46,6 +47,8 @@ const DRAW_SCORE = { aiWeight: 1, painterCap: 2000, perGuesser: 100, guesserBase
 const roomId = ref('')
 /** 玩法：普通 / Emoji / 自定义，由主持人在房间页选择 */
 const drawVariant = ref<'classic' | 'emoji' | 'custom'>('classic')
+const customText = ref('')
+const drawSeconds = ref(DEFAULT_DRAW_SECONDS)
 const meId = ref('')
 const isHost = ref(false)
 const roomName = ref('')
@@ -150,6 +153,8 @@ onLoad((options) => {
   roomId.value = String(options?.room ?? '')
   const variant = String(options?.variant ?? '')
   if (variant === 'emoji' || variant === 'custom' || variant === 'classic') drawVariant.value = variant
+  customText.value = String(options?.customText ?? '').trim().slice(0, 20)
+  drawSeconds.value = normalizeDrawSeconds(options?.drawSeconds)
 })
 
 /** 收到新视图时统一处理：校正时钟、刷新画廊图片、同步私有题面 */
@@ -235,6 +240,8 @@ onMounted(async () => {
       localBackend = await startLocalDrawRoom({
         playerCount: room.players.length,
         variant: drawVariant.value,
+        customText: customText.value,
+        drawSeconds: drawSeconds.value,
         // 只抽 AI 认得出的词：其余词永远判不了猜中，等于白画
         listFilter: filterScorable,
         players: room.players.map((player) => ({ id: player.id, name: player.nickname, mbti: player.mbti })),
