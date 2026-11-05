@@ -42,6 +42,8 @@ interface CanvasApi {
 const DRAW_SCORE = { aiWeight: 1, painterCap: 2000, perGuesser: 100, guesserBase: 200, guesserPerSecond: 0 }
 
 const roomId = ref('')
+/** 玩法：普通 / Emoji / 自定义，由主持人在房间页选择 */
+const drawVariant = ref<'classic' | 'emoji' | 'custom'>('classic')
 const meId = ref('')
 const isHost = ref(false)
 const roomName = ref('')
@@ -143,6 +145,8 @@ let endedTimer: ReturnType<typeof setTimeout> | null = null
 
 onLoad((options) => {
   roomId.value = String(options?.room ?? '')
+  const variant = String(options?.variant ?? '')
+  if (variant === 'emoji' || variant === 'custom' || variant === 'classic') drawVariant.value = variant
 })
 
 /** 收到新视图时统一处理：校正时钟、刷新画廊图片、同步私有题面 */
@@ -222,7 +226,7 @@ onMounted(async () => {
       // 主持人：用房间真实名单开局，再把视图发布出去
       localBackend = await startLocalDrawRoom({
         playerCount: room.players.length,
-        variant: 'classic',
+        variant: drawVariant.value,
         players: room.players.map((player) => ({ id: player.id, name: player.nickname })),
         meId: meId.value,
         scoreConfig: DRAW_SCORE,
@@ -402,13 +406,13 @@ async function endSession() {
       </view>
 
       <view v-if="myTurn && view.phase === 'drawing'" class="surface">
-        <DrawCanvas ref="canvasRef" :engine="painterEngine" mode="draw" variant="classic" @error="error = $event" />
+        <DrawCanvas ref="canvasRef" :engine="painterEngine" mode="draw" :variant="drawVariant" @error="error = $event" />
         <button class="primary" :disabled="busy" @click="submitDrawing">{{ busy ? '上传中…' : '交画' }}</button>
       </view>
 
       <view v-else-if="view.phase === 'drawing'" class="surface">
         <text class="label">{{ painterName }} 正在画</text>
-        <DrawCanvas ref="viewCanvasRef" :engine="viewerEngine" mode="watch" variant="classic" @error="error = $event" />
+        <DrawCanvas ref="viewCanvasRef" :engine="viewerEngine" mode="watch" :variant="drawVariant" @error="error = $event" />
       </view>
 
             <view v-if="ended" class="surface">

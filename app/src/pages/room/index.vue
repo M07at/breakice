@@ -97,11 +97,30 @@ const variantOf = (gameType: GameType): 'classic' | 'draw' => (gameType === 'hyb
  * 你画我猜走房间联机页：主持人跑权威后端并发布视图，其他人投指令。
  * 单机流程（pages-draw/setup）仍然保留，从别处进入时不受影响。
  */
+const DRAW_MODES = [
+  { key: 'classic' as const, label: '普通模式' },
+  { key: 'emoji' as const, label: 'Emoji 模式' },
+  { key: 'custom' as const, label: '自定义词库' },
+]
+
+/** 让主持人先选你画我猜的模式，再进游戏 */
+function pickDrawMode(): Promise<'classic' | 'emoji' | 'custom' | null> {
+  return new Promise((resolve) => {
+    uni.showActionSheet({
+      itemList: DRAW_MODES.map((mode) => mode.label),
+      success: (result) => resolve(DRAW_MODES[result.tapIndex]?.key ?? null),
+      fail: () => resolve(null),
+    })
+  })
+}
+
 async function startLocalDraw() {
+  const mode = await pickDrawMode()
+  if (!mode) return
   try {
     await roomStore.begin('drawing')
     await nextTick()
-    openPage(gameUrl('drawing'))
+    openPage(`${gameUrl('drawing')}&variant=${mode}`)
   } catch (issue) {
     uni.showToast({ title: toErrorMessage(issue), icon: 'none' })
   }
