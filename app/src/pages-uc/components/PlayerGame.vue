@@ -137,8 +137,15 @@ const votedCount = computed(() => snapshot.value?.view.players.filter(p => p.can
 const galleryArtworks = computed(() => {
   const all = snapshot.value?.artworks ?? []
   if (snapshot.value?.view.phase === 'ended') return all
-  const round = String(snapshot.value?.view.round ?? '')
-  return all.filter((art) => art.turnKey.split('-')[0] === round || art.turnKey.split('#')[0] === round)
+  const view = snapshot.value?.view
+  const round = String(view?.round ?? '')
+  // 加时赛的作品键是 <轮次>-pk#玩家，必须和普通轮分开，否则两批画混在一起
+  const wantPk = Boolean(view?.pkCandidates)
+  return all.filter((art) => {
+    const isPk = art.turnKey.includes('-pk')
+    if (isPk !== wantPk) return false
+    return art.turnKey.split(/[-#]/)[0] === round
+  })
 })
 
 /** 完整接力画：本轮最后一位作画者的成品 */
