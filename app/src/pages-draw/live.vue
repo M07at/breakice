@@ -519,7 +519,7 @@ async function endSession() {
 }
 .primary {
   margin-top: 16rpx;
-  border-radius: 14rpx;
+  border-radius: var(--radius-md, 20rpx);
   color: var(--surface, #ffffff);
   background: var(--brand);
   font-size: 28rpx;
@@ -570,7 +570,7 @@ async function endSession() {
 }
 .tiny {
   padding: 0 16rpx;
-  border-radius: 10rpx;
+  border-radius: var(--radius-md, 20rpx);
   color: var(--brand);
   background: var(--brand-soft);
   font-size: 22rpx;
@@ -621,7 +621,7 @@ async function endSession() {
   flex-direction: column;
   align-items: center;
   padding: 16rpx 8rpx;
-  border-radius: 16rpx;
+  border-radius: var(--radius-md, 20rpx);
   background: linear-gradient(180deg, #f5f7ff, #eef1fb);
 }
 .podium-item.place-1 {

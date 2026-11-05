@@ -97,7 +97,7 @@ async function start() {
 .choice {
   padding: 20rpx;
   border: 2rpx solid #e6e8f0;
-  border-radius: 14rpx;
+  border-radius: var(--radius-md, 20rpx);
 }
 .choice.active {
   border-color: #3a55e6;

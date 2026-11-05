@@ -435,7 +435,7 @@ function back() {
 .topic-card {
   margin-bottom: 14rpx;
   padding: 20rpx 26rpx 24rpx;
-  border-radius: 20rpx;
+  border-radius: var(--radius-md, 20rpx);
   background: var(--surface, #ffffff);
   box-shadow: 0 6rpx 18rpx rgba(31, 35, 48, 0.06);
   text-align: center;
@@ -495,7 +495,7 @@ function back() {
 .hint-box {
   padding: 18rpx 44rpx;
   border: 2rpx solid #ffe08a;
-  border-radius: 18rpx;
+  border-radius: var(--radius-md, 20rpx);
   background: var(--surface, #ffffff)7d6;
   box-shadow: 0 6rpx 16rpx rgba(255, 200, 60, 0.18);
 }
@@ -511,7 +511,7 @@ function back() {
 .chat-list {
   height: 300rpx;
   padding: 8rpx 0;
-  border-radius: 12rpx;
+  border-radius: var(--radius-md, 20rpx);
   background: #f7f8fc;
 }
 .chat-item {
@@ -537,7 +537,7 @@ function back() {
 .chat-item.correct {
   margin: 8rpx 8rpx;
   border: 2rpx solid #86d6a8;
-  border-radius: 12rpx;
+  border-radius: var(--radius-md, 20rpx);
   background: #eefaf2;
 }
 .chat-correct {
@@ -558,7 +558,7 @@ function back() {
   height: 72rpx;
   padding: 0 20rpx;
   border: 1rpx solid #dfe2ea;
-  border-radius: 12rpx;
+  border-radius: var(--radius-md, 20rpx);
   background: #fafbfd;
   font-size: 28rpx;
 }
@@ -584,14 +584,14 @@ function back() {
   justify-content: center;
   width: 100%;
   height: 75vw;
-  border-radius: 16rpx;
+  border-radius: var(--radius-md, 20rpx);
   background: var(--surface, #ffffff);
   box-shadow: 0 6rpx 18rpx rgba(31, 35, 48, 0.06);
 }
 .board-freeze-img {
   width: 100%;
   height: 100%;
-  border-radius: 16rpx;
+  border-radius: var(--radius-md, 20rpx);
 }
 
 /* 公开答案弹窗 */
@@ -613,7 +613,7 @@ function back() {
   width: 100%;
   max-height: 82vh;
   padding: 24rpx;
-  border-radius: 20rpx;
+  border-radius: var(--radius-md, 20rpx);
   background: var(--surface, #ffffff);
   box-sizing: border-box;
 }
@@ -692,7 +692,7 @@ function back() {
   width: 100%;
   height: 320rpx;
   margin-top: 10rpx;
-  border-radius: 12rpx;
+  border-radius: var(--radius-md, 20rpx);
   background: #f7f8fc;
 }
 .panel-actions {
