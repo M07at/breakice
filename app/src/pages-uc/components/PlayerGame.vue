@@ -35,7 +35,7 @@
           <text class="uc-label">{{ nameOf(snapshot.view.currentSpeakerId) }} 正在画</text>
           <DrawCanvas ref="hybridCanvas" :engine="hybridViewer" mode="watch" variant="classic" @error="error = $event" />
         </view>
-        <HybridDrawAdapter ref="hybridAdapter" v-if="snapshot.view.variant === 'draw' && rights.canFinish" :key="snapshot.gameId + snapshot.view.turnKey + snapshot.playerId" :game-id="snapshot.gameId" :turn-key="snapshot.view.turnKey" :player-id="snapshot.playerId" :editable="!locked" @submit="submitDrawing" />
+        <HybridDrawAdapter ref="hybridAdapter" v-if="snapshot.view.variant === 'draw' && rights.canFinish" :key="snapshot.gameId + snapshot.view.turnKey + snapshot.playerId" :game-id="snapshot.gameId" :turn-key="snapshot.view.turnKey" :player-id="snapshot.playerId" :seed-ops="roundOps" :editable="!locked" @submit="submitDrawing" />
         <view v-if="rights.me?.alive" class="uc-card"><text class="uc-label">我的词卡</text><text v-if="secret" class="secret-word small">{{ secret.isBlank ? '你是白板' : secret.word }}</text><button class="uc-button uc-secondary" :disabled="locked" @tap="secret ? hideSecret() : reveal()">{{ secret ? '遮住我的词语' : '私密查看我的词语' }}</button></view>
         <view class="uc-card"><text class="uc-label">发言顺序</text><view v-for="(id, i) in snapshot.view.speakOrder" :key="id" class="player-line"><text>{{ seatOf(id) }} 号 · {{ nameOf(id) }}</text><text class="uc-muted">{{ i < speakerIndex ? '已发言' : id === snapshot.view.currentSpeakerId ? '正在发言' : '等待' }}</text></view></view>
       </template>
@@ -43,7 +43,11 @@
       <view v-if="snapshot.view.variant === 'draw' && ['review', 'vote', 'reveal', 'ended'].includes(snapshot.view.phase)" class="uc-card">
         <text class="uc-label">{{ snapshot.view.phase === 'review' ? '作品回顾 · 倒计时后自动投票' : '本轮画作' }}</text>
         <text class="uc-muted">缺席或超时未交的画手没有作品。AI 评分失败或超时不会阻塞投票。</text>
-        <view v-for="art in galleryArtworks" :key="art.id" class="final-player"><text>{{ nameOf(art.playerId) }}</text><image v-if="artworkUrls[art.id]" class="gallery-image" :src="artworkUrls[art.id]" mode="widthFix" /><text v-else class="gallery-picture">{{ art.preview }}</text><text class="uc-muted">{{ art.status === 'pending' ? 'AI 评分中…' : art.status === 'success' ? 'AI 评分完成' : art.status === 'failed' ? '评分失败，已跳过' : '评分超时，已跳过' }}{{ art.score !== undefined ? ' · ' + art.score + '分' : '' }}</text></view>
+        <view v-for="(art, index) in galleryArtworks" :key="art.id" class="final-player"><text>第 {{ index + 1 }} 位 · {{ nameOf(art.playerId) }}</text><image v-if="artworkUrls[art.id]" class="gallery-image" :src="artworkUrls[art.id]" mode="widthFix" /><text v-else class="gallery-picture">{{ art.preview }}</text><text class="uc-muted">{{ art.status === 'pending' ? 'AI 评分中…' : art.status === 'success' ? 'AI 评分完成' : art.status === 'failed' ? '评分失败，已跳过' : '评分超时，已跳过' }}{{ art.score !== undefined ? ' · ' + art.score + '分' : '' }}</text></view>
+        <view v-if="relayFinal && artworkUrls[relayFinal.id]" class="final-player">
+          <text>完整接力画（{{ nameOf(relayFinal.playerId) }}）</text>
+          <image class="gallery-image" :src="artworkUrls[relayFinal.id]" mode="widthFix" />
+        </view>
         <view v-for="id in playersWithoutArtwork" :key="'na-' + id" class="final-player"><text>{{ nameOf(id) }} · 本轮没有作画</text><text class="uc-muted">只有轮到发言的人才会画</text></view>
         <text v-if="!snapshot.artworks?.length && !playersWithoutArtwork.length" class="uc-muted">本轮暂无已提交画作，仍会按时进入投票。</text>
       </view>
@@ -137,6 +141,12 @@ const galleryArtworks = computed(() => {
   return all.filter((art) => art.turnKey.split('-')[0] === round || art.turnKey.split('#')[0] === round)
 })
 
+/** 完整接力画：本轮最后一位作画者的成品 */
+const relayFinal = computed(() => {
+  const list = galleryArtworks.value
+  return list.length > 0 ? list[list.length - 1] : null
+})
+
 const playersWithoutArtwork = computed(() => {
   const drawn = new Set(galleryArtworks.value.map((a) => a.playerId))
   return (snapshot.value?.view.players ?? []).map((p) => p.id).filter((id) => !drawn.has(id))
@@ -175,6 +185,7 @@ function receive(next: UcPlayerSnapshot) {
     lastHybridTurn = next.view.turnKey
     hybridViewer.reset()
     hybridCanvas.value?.paint()
+    roundOps.value = []
     // 请画手把当前画布整份补发一次，避免重置前的笔画丢失
     pokeRoom('hybrid-sync')
   }
@@ -294,6 +305,7 @@ onMounted(async () => {
       if (event === 'hybrid-snapshot') {
         const ops = (payload as { ops?: import('@/modules/draw/types').DrawOp[] }).ops
         if (Array.isArray(ops)) {
+          roundOps.value = ops
           hybridViewer.loadSnapshot(ops)
           hybridCanvas.value?.paint()
         }
@@ -350,6 +362,8 @@ function checkAutoSubmit() {
 }
 watch(() => snapshot.value?.view.turnKey, () => { hybridSubmitted = false })
 const hybridCanvas = ref<{ paint(): void } | null>(null)
+/** 本轮已经画好的笔画：轮到下一人时作为接力起点 */
+const roundOps = ref<import('@/modules/draw/types').DrawOp[]>([])
 let lastHybridTurn = ''
 </script>
 
