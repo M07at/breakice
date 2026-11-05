@@ -1,7 +1,13 @@
 import { expect, it } from 'vitest'
 import { LocalDrawRoomBackend } from '../room'
-import { normalizeDrawSeconds } from '../settings'
+import { normalizeDrawSeconds, readDrawPrompt } from '../settings'
 import type { AiScorer } from '../ai'
+
+it('keeps a Chinese custom prompt across encoded navigation and tolerates literal percent signs', () => {
+  expect(readDrawPrompt(encodeURIComponent('苹果'))).toBe('苹果')
+  expect(readDrawPrompt(' 苹果 ')).toBe('苹果')
+  expect(readDrawPrompt('100%')).toBe('100%')
+})
 
 it.each([undefined, null, 0, -30, 45, Infinity, 'invalid'])(
   'uses the ninety-second default for invalid duration %s', value => {

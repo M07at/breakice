@@ -2,6 +2,14 @@ import { describe, expect, it } from 'vitest'
 import { canScoreWithAi, DRAWZY_CLASSES, DRAW_WORD_POOL, expectedClassFor, filterScorable } from '../classMap'
 
 describe('中文词→英文类别映射', () => {
+  it('includes the original model first class so prediction indices do not shift', () => {
+    expect(DRAWZY_CLASSES).toHaveLength(46)
+    expect(DRAWZY_CLASSES[0]).toBe('aircraft carrier')
+    expect(DRAWZY_CLASSES[8]).toBe('apple')
+    expect(DRAWZY_CLASSES[13]).toBe('banana')
+    expect(DRAWZY_CLASSES[45]).toBe('bucket')
+    expect(expectedClassFor('航母')).toBe('aircraft carrier')
+  })
   it('常见单字/物体能映射', () => {
     expect(expectedClassFor('苹果')).toBe('apple')
     expect(expectedClassFor('自行车')).toBe('bicycle')

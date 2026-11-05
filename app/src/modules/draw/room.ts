@@ -105,6 +105,8 @@ export interface DrawRoomView {
   ranking: LeaderboardRow[]
   /** 我这一轮交过了没有 */
   submittedByMe: boolean
+  /** 正在等待已提交画作的评分，主持人暂停换轮。 */
+  scoring?: boolean
   /** 所有该猜的人都猜对了 —— 页面收到就该立刻交画，不用等倒计时 */
   allGuessed: boolean
   /** 聊天和抢答记录（我猜对了会多一条 correct） */
@@ -328,6 +330,7 @@ export class LocalDrawRoomBackend implements DrawRoomBackend {
         : Object.values(this.drawings).filter((d) => d.playerId === this.meId),
       ranking: ended ? this.board.rows() : [],
       submittedByMe: Boolean(this.drawings[this.meId]) && this.painterId() === this.meId,
+      scoring: this.phase === 'drawing' && Boolean(this.pendingSubmit),
       allGuessed: this.isAllGuessed(),
       messages: this.messages,
       panel: ended ? this.buildPanel() : revealing ? this.buildPanel(this.painterId()) : [],
@@ -398,8 +401,12 @@ export class LocalDrawRoomBackend implements DrawRoomBackend {
       // 画完先揭晓这一张（8 秒），期间不开始下一位
       this.enterReveal()
     })()
-    await this.pendingSubmit
-    this.pendingSubmit = null
+    await this.emit()
+    try {
+      await this.pendingSubmit
+    } finally {
+      this.pendingSubmit = null
+    }
     return this.view()
   }
 
@@ -408,6 +415,8 @@ export class LocalDrawRoomBackend implements DrawRoomBackend {
    * 揭晓阶段 → 换下一位，或者全部结束。
    */
   async tick(): Promise<DrawRoomView> {
+    // 真实模型可能耗时数秒，不能在旧画评分期间切换题面或把分记到下一位。
+    if (this.pendingSubmit) return this.view()
     if (this.phase === 'drawing' && this.now() >= this.endsAt) {
       this.enterReveal()
     } else if (this.phase === 'reveal' && this.now() >= this.revealEndsAt) {
@@ -429,7 +438,7 @@ export class LocalDrawRoomBackend implements DrawRoomBackend {
     const actor = actorId ?? this.meId
     const player = this.players.find((p) => p.id === actor) ?? this.players[0]
     const answer = this.word?.word ?? ''
-    const canGuess = this.phase === 'drawing' && this.painterId() !== actor && Boolean(answer)
+    const canGuess = this.phase === 'drawing' && !this.pendingSubmit && this.now() < this.endsAt && this.painterId() !== actor && Boolean(answer)
     const isCorrect = canGuess && raw.toLowerCase() === answer.toLowerCase()
 
     if (isCorrect && !this.guesses.some((g) => g.playerId === actor)) {

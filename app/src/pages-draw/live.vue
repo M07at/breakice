@@ -18,7 +18,8 @@ import { ChunkPump } from '@/modules/draw/sync'
 import type { DrawChunk } from '@/modules/draw/types'
 import { disposeDrawRoom, startLocalDrawRoom } from '@/modules/draw/room'
 import { filterScorable } from '@/modules/draw/classMap'
-import { DEFAULT_DRAW_SECONDS, normalizeDrawSeconds } from '@/modules/draw/settings'
+import { DEFAULT_DRAW_SECONDS, normalizeDrawSeconds, readDrawPrompt } from '@/modules/draw/settings'
+import { createDrawRoomScorer } from '@/services/drawScoring'
 import type { DrawRoomView } from '@/modules/draw/room'
 import type { LocalDrawRoomBackend } from '@/modules/draw/room'
 import { roomApi } from '@/platform'
@@ -153,7 +154,7 @@ onLoad((options) => {
   roomId.value = String(options?.room ?? '')
   const variant = String(options?.variant ?? '')
   if (variant === 'emoji' || variant === 'custom' || variant === 'classic') drawVariant.value = variant
-  customText.value = String(options?.customText ?? '').trim().slice(0, 20)
+  customText.value = readDrawPrompt(options?.customText)
   drawSeconds.value = normalizeDrawSeconds(options?.drawSeconds)
 })
 
@@ -247,6 +248,11 @@ onMounted(async () => {
         players: room.players.map((player) => ({ id: player.id, name: player.nickname, mbti: player.mbti })),
         meId: meId.value,
         scoreConfig: DRAW_SCORE,
+        scorer: createDrawRoomScorer({
+          roomId: roomId.value,
+          api: roomApi as SupabaseRoomApi,
+          painterId: () => localBackend?.currentPainterId() ?? meId.value,
+        }),
       })
       publisher = createDrawPublisher({
         roomId: roomId.value,
@@ -418,13 +424,13 @@ async function endSession() {
     <template v-else>
       <view class="surface turn">
         <text class="label">{{ myTurn ? '轮到你画' : '正在作画' }} · <PlayerIdentity :name="painterName" :mbti="mbtiOf(view?.painterId)" /></text>
-        <text class="muted">{{ hintText }} · 剩余 {{ remain }} 秒</text>
+        <text class="muted">{{ view.scoring ? 'AI 正在识别画作，请稍候…' : `${hintText} · 剩余 ${remain} 秒` }}</text>
         <text v-if="myTurn && myWord" class="word">你的题：{{ myWord.word }}</text>
       </view>
 
       <view v-if="myTurn && view.phase === 'drawing'" class="surface">
-        <DrawCanvas ref="canvasRef" :engine="painterEngine" mode="draw" :variant="drawVariant" @error="error = $event" />
-        <button class="primary" :disabled="busy" @click="submitDrawing">{{ busy ? '上传中…' : '交画' }}</button>
+        <DrawCanvas ref="canvasRef" :engine="painterEngine" :mode="view.scoring ? 'watch' : 'draw'" :variant="drawVariant" @error="error = $event" />
+        <button class="primary" :disabled="busy || view.scoring" @click="submitDrawing">{{ view.scoring ? 'AI 评分中…' : busy ? '上传中…' : '交画' }}</button>
       </view>
 
       <view v-else-if="view.phase === 'drawing'" class="surface">
@@ -458,7 +464,8 @@ async function endSession() {
         <view v-for="entry in view.panel" :key="entry.playerId" class="panel-row">
           <text class="name"><PlayerIdentity :name="entry.name" :mbti="mbtiOf(entry.playerId)" /> {{ entry.shortId }}</text>
           <image v-if="panelUrls[entry.imageRef]" class="shot" :src="panelUrls[entry.imageRef]" mode="widthFix" />
-          <text class="muted">答案：{{ entry.answer }}<template v-if="entry.ai"> · AI {{ entry.ai.score }} 分</template></text>
+          <text class="muted">答案：{{ entry.answer }}<template v-if="entry.ai"> · {{ entry.ai.degraded ? '本轮未计 AI 分' : `AI ${entry.ai.score} 分` }}</template></text>
+          <text v-if="entry.ai?.comment" class="muted">{{ entry.ai.comment }}</text>
           <view class="reactions">
             <button class="tiny" @click="react(entry.playerId, 'flower')">送花 {{ entry.flowers }}</button>
             <button class="tiny" @click="react(entry.playerId, 'dislike')">差评 {{ entry.dislikes }}</button>
@@ -473,8 +480,8 @@ async function endSession() {
           <text class="text">{{ message.text }}</text>
         </view>
         <view v-if="!myTurn" class="input-row">
-          <input v-model="guess" class="input" placeholder="输入你的答案" confirm-type="send" @confirm="sendGuess" />
-          <button class="primary small" @click="sendGuess">发送</button>
+          <input v-model="guess" class="input" :disabled="view.scoring" placeholder="输入你的答案" confirm-type="send" @confirm="sendGuess" />
+          <button class="primary small" :disabled="view.scoring" @click="sendGuess">发送</button>
         </view>
         <text v-else class="muted">这一轮你在画，不能猜自己的题</text>
       </view>

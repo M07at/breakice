@@ -71,6 +71,7 @@ function writeSession(session: Session | null): void {
 
 /** 手机首次登录包含微信与 Supabase 换票，不能套用游戏轮询的短超时。 */
 function requestPolicy(path: string): { timeout: number; label: string } {
+  if (path === '/functions/v1/draw-score' || path === '/functions/v1/ai-score') return { timeout: 60000, label: 'AI 评分' }
   if (path === '/functions/v1/wechat-auth') return { timeout: 45000, label: '微信登录' }
   if (path.startsWith('/auth/v1/')) return { timeout: 45000, label: '登录服务' }
   if (/\/rpc\/set_my_profile(?:_v2)?$/.test(path)) return { timeout: 30000, label: '资料同步' }
@@ -334,8 +335,10 @@ export class SupabaseRoomApi implements RoomApi {
   /** 调用 Edge Function（带登录态），给 uc-command 这类游戏指令用 */
   async invokeFunction<T>(path: string, body: unknown): Promise<T> {
     try {
-      const result = await this.call<{ error?: { code?: string; message?: string } }>(path, { method: 'POST', body })
-      if (result && typeof result === 'object' && result.error) {
+      const result = await this.call<{ error?: { code?: string; message?: string }; status?: string }>(path, { method: 'POST', body })
+      const scoringOutcome = (path === '/functions/v1/draw-score' || path === '/functions/v1/ai-score')
+        && ['failed', 'timeout', 'unsupported', 'pending'].includes(result?.status ?? '')
+      if (result && typeof result === 'object' && result.error && !scoringOutcome) {
         throw new PlatformError('UNKNOWN', result.error.message ?? '游戏服务返回错误')
       }
       return result as T

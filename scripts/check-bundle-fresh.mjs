@@ -1,5 +1,6 @@
 ﻿import { readFileSync, writeFileSync, statSync, readdirSync } from "node:fs"
 import { resolve } from "node:path"
+import { execFileSync } from "node:child_process"
 
 const root = resolve(import.meta.dirname, "..")
 const bundle = resolve(root, "supabase/functions/uc-command/index.ts")
@@ -29,3 +30,4 @@ if (stale.length > 0) {
   process.exit(1)
 }
 console.log("✓ uc-command 产物是最新的")
+execFileSync(process.execPath, [resolve(root, 'scripts/build-draw-score.mjs'), '--check'], { stdio: 'inherit' })

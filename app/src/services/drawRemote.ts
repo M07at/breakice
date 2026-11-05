@@ -69,7 +69,8 @@ export function createDrawPublisher(options: PublisherOptions): Publisher {
     dirty = false
     try {
       const view = await options.backend.view()
-      await options.api.publishView(options.roomId, view)
+      // 主持人自己作画时本机视图含答案；公开频道不能把它发给猜题者。
+      await options.api.publishView(options.roomId, { ...view, word: null, palette: [] })
     } catch (error) {
       // 发布失败就标脏，等下一拍重试，别丢状态
       dirty = true

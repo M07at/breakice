@@ -1,17 +1,18 @@
 /**
  * 中文词 → drawzy 的英文类别。
  *
- * drawzy 的识别模型只认下面这 45 个英文标签（Quick, Draw! 子集，A–bucket），
+ * drawzy 的识别模型只认下面这 46 个英文标签（Quick, Draw! 子集，A–bucket），
  * 题库里对不上的词**永远不可能被判为猜中**，所以：
  * - 抽词只从能映射的词里挑（`canScoreWithAi`）
  * - 映射值必须逐字出现在 `DRAWZY_CLASSES` 里
  *
- * 这份清单来自 drawzy 的 `app/utils/constant/globals.py`，是**权威列表**。
+ * 按 Google QuickDraw 类别顺序补上上游遗漏的 aircraft carrier；真实模型有 46 个输出。
  * 服务端 `supabase/functions/ai-score/index.ts` 有一份精简副本，改这里要同步改那边。
  */
 
-/** drawzy 支持的 45 个类别（顺序与官方一致） */
+/** drawzy 支持的 46 个类别（顺序与训练文件排序一致） */
 export const DRAWZY_CLASSES = [
+  'aircraft carrier',
   'airplane',
   'alarm clock',
   'ambulance',
@@ -64,6 +65,8 @@ export const DRAWZY_CLASSES = [
  * 优先挑「一个词就对应一个物体」的，尽量避免需要画多步的抽象词。
  */
 const WORD_TO_CLASS: Record<string, string> = {
+  航空母舰: 'aircraft carrier',
+  航母: 'aircraft carrier',
   // 食物
   苹果: 'apple',
   香蕉: 'banana',

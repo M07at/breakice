@@ -229,7 +229,7 @@ Deno.serve(async (req) => {
     try {
       const response = await fetch(`${baseUrl}/predict/sketch`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", ...(Deno.env.get('DRAWZY_TOKEN') ? { Authorization: `Bearer ${Deno.env.get('DRAWZY_TOKEN')}` } : {}) },
         body: JSON.stringify({ sketch_data: base64 }),
         // drawzy 首次调用要加载模型，固定给足 45 秒，不依赖 Secret
         signal: AbortSignal.timeout(Math.max(timeoutMs, 45000)),
@@ -248,7 +248,7 @@ Deno.serve(async (req) => {
         { status: "success", total: score, comment, provider: "drawzy", model: "quickdraw-cnn", ai_guess: predicted, ai_seconds: seconds },
         "scored",
       )
-      return json({ status: "success", score, comment, guess: predicted, seconds })
+      return json({ status: "success", score, total: score, comment, guess: predicted, seconds })
     } catch (error) {
       await finish({ status: "failed", error: `DRAWZY_FAILED: ${String(error)}` }, "failed")
       return json({ status: "failed", error: "DRAWZY_FAILED" })

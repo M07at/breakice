@@ -61,3 +61,9 @@ it('includes and normalizes MBTI in the shared room roster', async () => {
   expect(room.players[0]).toMatchObject({ id: 'host', nickname: '阿冰', mbti: 'ENFP' })
   expect(request.mock.calls.some(([options]) => options.url.includes('profiles(nickname,avatar,mbti)'))).toBe(true)
 })
+
+it('preserves unavailable scoring outcomes so the drawing UI can explain them', async () => {
+  const { api, request } = setup()
+  request.mockImplementationOnce(options => options.success({ statusCode: 200, data: { status: 'unsupported', error: 'UNSUPPORTED_WORD' } }))
+  expect(await api.invokeFunction('/functions/v1/draw-score', {})).toMatchObject({ status: 'unsupported', error: 'UNSUPPORTED_WORD' })
+})
