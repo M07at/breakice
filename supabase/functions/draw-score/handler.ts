@@ -32,7 +32,7 @@ Deno.serve(async (req: Request) => {
     const { data: cached, error: cacheError } = await admin.from('draw_ai_scores').select('*').match(key).maybeSingle()
     if (cacheError) return reply({ error: 'SCORING_STORAGE_UNAVAILABLE' }, 503)
     if (cached && cached.image_ref !== imageRef) return reply({ error: 'DRAWING_ALREADY_SUBMITTED' }, 409)
-    if (cached?.result && ['success', 'unsupported'].includes(cached.status) && (cached.result.scoringVersion === 'confidence-v3' || cached.status === 'unsupported')) return reply(cached.result)
+    if (cached?.status === 'success' && cached.result?.scoringVersion === DEEPSEEK_SCORE_VERSION) return reply(cached.result)
     if (cached?.status === 'pending' && Date.now() - Date.parse(cached.updated_at) < 65000) return reply({ status: 'pending' })
 
     const claim = { ...key, image_ref: imageRef, status: 'pending', result: null, updated_at: new Date().toISOString() }
@@ -51,24 +51,11 @@ Deno.serve(async (req: Request) => {
       const { data: privateWord } = await admin.from('draw_words').select('word').eq('room_id', roomId).eq('round_key', roundKey).eq('user_id', view.painterId).maybeSingle()
       if (!privateWord?.word) return await finish({ status: 'failed', error: 'WORD_NOT_READY' })
       const word = String(privateWord.word)
-      const expected = expectedClassFor(word) ?? DRAWZY_CLASSES.find(value => value === word.trim().toLowerCase())
-      if (!expected) return await finish({ status: 'unsupported', error: 'UNSUPPORTED_WORD', comment: '此题不在 AI 识别词库中，本轮不计 AI 分，猜题分正常计算。' })
-      const base = (Deno.env.get('AI_BASE_URL') ?? '').replace(/\/$/, '')
-      if (!base.startsWith('https://')) return await finish({ status: 'failed', error: 'AI_NOT_CONFIGURED' })
-      const started = Date.now()
       const { data: image, error: imageError } = await admin.storage.from('artworks').download(imageRef)
       if (imageError || !image) return await finish({ status: 'failed', error: 'IMAGE_UNAVAILABLE' })
       if (image.size > 1024 * 1024) return await finish({ status: 'failed', error: 'IMAGE_TOO_LARGE' })
       const bytes = new Uint8Array(await image.arrayBuffer())
-      let binary = ''
-      for (const byte of bytes) binary += String.fromCharCode(byte)
-      const headers: Record<string, string> = { 'Content-Type': 'application/json' }
-      const serviceToken = Deno.env.get('DRAWZY_TOKEN')
-      if (serviceToken) headers.Authorization = `Bearer ${serviceToken}`
-      const response = await fetch(`${base}/predict/sketch`, { method: 'POST', headers, body: JSON.stringify({ sketch_data: btoa(binary) }), signal: AbortSignal.timeout(45000) })
-      if (!response.ok) throw new Error(`DRAWZY_HTTP_${response.status}`)
-      const raw = await response.json()
-      return await finish({ ...evaluateRecognition(word, raw), latencyMs: Date.now() - started })
+      return await finish(await scoreDrawingSimilarity(word, bytes))
     } catch (error) {
       const timeout = /timeout|abort/i.test(String(error))
       console.error('[draw-score] provider failed', String(error))

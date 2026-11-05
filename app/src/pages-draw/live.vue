@@ -17,7 +17,6 @@ import { DrawEngine } from '@/modules/draw/engine'
 import { ChunkPump } from '@/modules/draw/sync'
 import type { DrawChunk } from '@/modules/draw/types'
 import { disposeDrawRoom, startLocalDrawRoom } from '@/modules/draw/room'
-import { filterScorable } from '@/modules/draw/classMap'
 import { DEFAULT_DRAW_SECONDS, normalizeDrawSeconds, readDrawPrompt } from '@/modules/draw/settings'
 import { createDrawRoomScorer } from '@/services/drawScoring'
 import type { DrawRoomView } from '@/modules/draw/room'
@@ -260,8 +259,6 @@ onMounted(async () => {
         variant: drawVariant.value,
         customText: customText.value,
         drawSeconds: drawSeconds.value,
-        // 只抽 AI 认得出的词：其余词永远判不了猜中，等于白画
-        listFilter: filterScorable,
         players: room.players.map((player) => ({ id: player.id, name: player.nickname, mbti: player.mbti })),
         meId: meId.value,
         scoreConfig: DRAW_SCORE,
