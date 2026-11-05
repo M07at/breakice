@@ -161,6 +161,11 @@ function adoptView(next: DrawRoomView) {
     remoteWord.value = ''
   }
   view.value = next
+  // 玩法以主持人发布出来的视图为准：其他人是自动进房的，URL 里没有 variant
+  const published = (next as { variant?: string }).variant
+  if (published === 'emoji' || published === 'custom' || published === 'classic') {
+    drawVariant.value = published
+  }
   void syncPanelUrls()
 
   // 主持人：远程玩家作画时，把他的题面发到私有通道（视图里对别人不可见）
