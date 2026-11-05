@@ -1,8 +1,39 @@
 ﻿import { describe, expect, it } from 'vitest'
 import { applyAction, createGame, currentSpeaker, tick } from '../engine'
-import { DEFAULT_CONFIG } from '../rules'
+import { DEFAULT_CONFIG, testBotCount } from '../rules'
 import { createRng } from '../../shared/random'
 import type { UcAction } from '../types'
+
+describe('测试机器人数量', () => {
+  it.each([
+    [1, undefined, 3],
+    [2, undefined, 2],
+    [4, undefined, 0],
+    [1, 5, 5],
+    [1, 6, 5],
+    [1, NaN, 3],
+  ])('%s 位真人，申请 %s 时补 %s 个机器人', (humans, requested, expected) => {
+    expect(testBotCount(humans as number, requested)).toBe(expected)
+  })
+
+  it.each([3, 5])('一位真人和 %s 个机器人仍等待真人确认词语', (count) => {
+    const now = 1000
+    const botIds = Array.from({ length: count }, (_, i) => `bot-${i + 1}`)
+    let state = createGame({
+      playerIds: ['human', ...botIds],
+      pair: { civilian: '苹果', undercover: '梨' },
+      config: { ...DEFAULT_CONFIG, variant: 'classic' },
+      now,
+      rng: createRng(42),
+    }).state
+    for (const id of botIds) {
+      state = applyAction(state, { type: 'acknowledgeWord', by: id }, { now, isHost: false }).state
+    }
+    expect(state.phase).toBe('word')
+    state = applyAction(state, { type: 'acknowledgeWord', by: 'human' }, { now, isHost: true }).state
+    expect(state.phase).toBe('describe')
+  })
+})
 
 /**
  * 复现「机器人补位后一开局就结算」：

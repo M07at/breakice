@@ -385,12 +385,10 @@ async function handleStart(admin: Admin, uid: string, body: Record<string, any>)
   if (members.some((m) => !m.ready)) throw new UcError('BAD_CONFIG', '还有玩家没有准备')
 
   // 人不够时用机器人补位（测试用）：
-  //   客户端显式给 bots 就按它补；没给就算 4 人还差几个（最多 2 个）。
+  //   客户端显式给 bots 就按它补；没给就算 4 人还差几个（最多 5 个）。
   // 机器人是真实的 auth 账号，引擎不需要任何改动。
   const rosterIds = members.map((m) => m.user_id)
-  const requested = Math.round(Number(body.bots ?? 0))
-  const shortfall = Math.max(0, Math.min(2, 4 - rosterIds.length))
-  const botCount = Math.max(0, Math.min(2, Number.isFinite(requested) && requested > 0 ? requested : shortfall))
+  const botCount = testBotCount(rosterIds.length, body.bots)
   if (botCount > 0) {
     const bots = await ensureBots(admin, botCount)
     rosterIds.push(...bots.map((bot) => bot.user_id))

@@ -9,6 +9,7 @@ import { bankUrl } from '../../services/gameEntry'
 import { adoptUndercoverRound, endUndercoverRound, PLAYER_PAGE, startUndercoverRound } from '../../services/ucGame'
 import { fetchRoomLeaderboard } from '../../services/scoreBoard'
 import { toErrorMessage } from '../../platform/types'
+import { testBotCount } from '../../modules/undercover/rules'
 import type { LeaderboardRow } from '../../modules/score'
 import type { GameType } from '../../types/room'
 
@@ -136,7 +137,7 @@ async function hostStart(gameType: GameType) {
   })
   notice.value = ''
 
-  // 谁是卧底 / 融合玩法人数不够时可以用机器人补位（最多补 2 个，方便两个人测试）
+  // 谁是卧底 / 融合玩法自动补足四人局，测试机器人上限为 5 个。
   const canFillBots = isUndercover(gameType)
   if (roomStore.memberCount < minPlayers && !canFillBots) {
     uni.showToast({ title: `${GAME_LABEL[gameType]}至少要 ${minPlayers} 人`, icon: 'none' })
@@ -158,7 +159,7 @@ async function hostStart(gameType: GameType) {
       return
     }
     const variant = variantOf(gameType)
-    const bots = Math.max(0, Math.min(2, 4 - roomStore.memberCount))
+    const bots = testBotCount(roomStore.memberCount)
     try {
       if (bots > 0) uni.showToast({ title: `已补 ${bots} 个机器人`, icon: 'none' })
       uni.showLoading({ title: '正在开局…', mask: true })

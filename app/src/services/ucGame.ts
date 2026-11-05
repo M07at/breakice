@@ -186,7 +186,7 @@ function install(snapshot: UcPlayerSnapshot, variant: Variant) {
 }
 
 /** 主持人开局：服务端建局、发牌，然后把端口装好，页面直接进玩家端 */
-/** bots：人数不够时补几个机器人（测试用，最多 2 个） */
+/** bots：人数不够时补几个机器人（测试用，最多 5 个） */
 export async function startUndercoverRound(roomId: string, variant: Variant, bots = 0): Promise<UcPlayerSnapshot> {
   activeRoomId = roomId
   const snapshot = await invoke<UcPlayerSnapshot>({

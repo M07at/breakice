@@ -44,6 +44,15 @@ export const PLAYER_LIMITS: Record<Variant, { min: number; max: number }> = {
   draw: { min: 4, max: 12 },
 }
 
+/** 开发测试用机器人上限；默认只补足四人局。 */
+export const MAX_TEST_BOTS = 5
+
+export function testBotCount(humanCount: number, requested: unknown = 0): number {
+  const count = Math.round(Number(requested))
+  const shortfall = Math.max(0, 4 - humanCount)
+  return Math.max(0, Math.min(MAX_TEST_BOTS, Number.isFinite(count) && count > 0 ? count : shortfall))
+}
+
 export const VARIANT_LABEL: Record<Variant, string> = {
   classic: '谁是卧底',
   draw: '你画我猜谁是卧底',
