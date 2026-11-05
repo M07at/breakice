@@ -1,4 +1,4 @@
-import { createRng, randomInt, shuffle } from '../shared/random'
+﻿import { createRng, randomInt, shuffle } from '../shared/random'
 import type { Rng } from '../shared/random'
 import { UcError } from './errors'
 import {
@@ -204,9 +204,10 @@ export function currentTurnKey(s: UcState): string {
 }
 
 export function eligibleVoterIds(s: UcState): string[] {
-  return s.players
-    .filter((p) => p.alive && !(s.pkCandidates && s.pkCandidates.includes(p.id)))
-    .map((p) => p.id)
+  // 加时赛的候选人同样有投票权：否则四人全平票时没人能投，
+  // 只会出现「全员弃权」，加时赛就失去意义。
+  // （可选目标仍然限定在 pkCandidates 内，由投票校验把关。）
+  return s.players.filter((p) => p.alive).map((p) => p.id)
 }
 
 function startDescribe(s: UcState, events: UcEvent[], now: number): void {
@@ -462,3 +463,4 @@ function validateConfig(config: UcConfig): void {
     throw new UcError('BAD_CONFIG', '卧底人数必须为正整数')
   }
 }
+

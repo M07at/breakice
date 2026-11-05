@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+﻿import { describe, expect, it } from 'vitest'
 import { createRng } from '../../shared/random'
 import {
   LocalUcBackend,
@@ -239,7 +239,7 @@ describe('投票', () => {
 })
 
 describe('平票加赛', () => {
-  it('平票的人加赛，他们不投票，只能投他们', () => {
+  it('平票的人也能投票，但只能投给候选人', () => {
     let { s, a, b, others } = tiedGame()
     expect(s.phase).toBe('reveal')
     expect(new Set(s.lastResult!.tied)).toEqual(new Set([a, b]))
@@ -249,8 +249,10 @@ describe('平票加赛', () => {
     expect(new Set(s.speakOrder)).toEqual(new Set([a, b]))
     expect(currentTurnKey(s)).toBe('1-pk')
     s = finishDescribe(s)
-    expect(eligibleVoterIds(s)).toEqual(others)
-    expect(codeOf(() => applyAction(s, { type: 'vote', by: a, targetId: b }, PLAYER))).toBe('NOT_ELIGIBLE')
+    // 加时赛候选人同样有投票权（否则四人全平票时没人能投，只会全员弃权）
+    expect(eligibleVoterIds(s).sort()).toEqual([a, b, ...others].sort())
+    expect(codeOf(() => applyAction(s, { type: 'vote', by: a, targetId: b }, PLAYER))).toBeUndefined()
+    // 但目标仍然只能是候选人
     expect(codeOf(() => applyAction(s, { type: 'vote', by: others[0], targetId: others[1] }, PLAYER))).toBe(
       'INVALID_TARGET',
     )
@@ -268,9 +270,10 @@ describe('平票加赛', () => {
   })
 
   it('加赛有最高票就出局', () => {
-    let { s, a } = tiedGame()
+    let { s, a, b } = tiedGame()
     s = finishDescribe(act(s, { type: 'next' }, HOST))
-    s = voteAll(s, () => a).state
+    // 候选人自己也要投票，且不能投自己
+    s = voteAll(s, (id) => (id === a ? b : a)).state
     expect(s.lastResult!.eliminatedId).toBe(a)
   })
 })
@@ -289,14 +292,21 @@ describe('胜负和计分', () => {
     expect(scored(events, 'uc_win_undercover')).toEqual([])
   })
 
-  it('只剩 3 人且卧底还在，卧底胜', () => {
+  it('四人局投错一个平民不结束；只剩两人时才判卧底胜', () => {
     const s = finishDescribe(newGame(4).state)
     const [u] = bad(s)
-    const [c1, c2] = good(s)
-    const { state, events } = voteAll(s, (id) => (id === c1 ? c2 : c1))
+    const [c1, c2, c3] = good(s)
+
+    // 只出局一个平民：还剩 2 平民 + 1 卧底，游戏必须继续
+    const first = voteAll(s, (id) => (id === c1 ? c2 : c1)).state
+    expect(first.winner).toBeNull()
+    expect(first.players.filter((p) => p.alive).length).toBe(3)
+
+    // 再出局一个平民：剩 1 平民 + 1 卧底，卧底胜
+    const next = finishDescribe(act(first, { type: 'next' }, HOST))
+    const { state, events } = voteAll(next, (id) => (id === c2 ? c3 : c2))
     expect(state.winner).toBe('undercover')
     expect(scored(events, 'uc_win_undercover')).toEqual([u])
-    expect(scored(events, 'uc_survive')).toEqual([u])
   })
 
   it('7 人局开白板，投错一个平民不会直接结束；白板不出局平民赢不了', () => {
@@ -504,3 +514,5 @@ describe('LocalUcBackend 单机模式', () => {
     expect(scoreEvents).toEqual([])
   })
 })
+
+

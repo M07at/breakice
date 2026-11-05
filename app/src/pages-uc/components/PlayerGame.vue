@@ -159,13 +159,7 @@ function receive(next: UcPlayerSnapshot) {
   }
   void syncArtworkUrls(next)
 
-  // 一局结束：给 3 秒看结算，然后自动回大厅（大厅已经重置为未准备）
-  if (next.view.phase === 'ended' && !endedTimer) {
-    endedTimer = setTimeout(() => {
-      disposed = true
-      uni.navigateBack({ delta: 1, fail: () => uni.reLaunch({ url: '/pages/room/index' }) })
-    }, 3000)
-  }
+  
 }
 
 /** 真实画作在私有桶里，拿到 artworks 后换成临时地址；拿不到就退回占位文本 */
@@ -311,6 +305,7 @@ let lastHybridTurn = ''
 .player-clock { font-size: 40rpx; font-weight: 700; white-space: nowrap; }
 .final-player { padding: 20rpx 0; border-bottom: 2rpx solid #edf0e7; }
 </style>
+
 
 
 

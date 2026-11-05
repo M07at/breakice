@@ -1,4 +1,4 @@
-import { UcError } from './errors'
+﻿import { UcError } from './errors'
 import type { Ballot, EndReason, Phase, Role, ScoreReason, Side, UcConfig, UcPlayer, Variant } from './types'
 
 export const PHASE_LABEL: Record<Phase, string> = {
@@ -93,8 +93,13 @@ export function checkWinner(players: readonly UcPlayer[]): Side | null {
   const undercover = alive.filter((p) => p.role === 'undercover').length
   const blank = alive.filter((p) => p.role === 'blank').length
   const civilian = alive.length - undercover - blank
+
+  // 卧底阵营全出局 → 平民胜
   if (undercover + blank === 0) return 'civilian'
-  if (undercover >= civilian || alive.length <= 3) return 'undercover'
+  // 平民全出局 → 卧底胜
+  if (civilian === 0) return 'undercover'
+  // 只剩两人（一平民 + 一卧底）→ 卧底胜
+  if (alive.length <= 2) return 'undercover'
   return null
 }
 
@@ -114,3 +119,4 @@ export function aiBonusMultiplier(score: number): number {
   if (score >= 60) return 1
   return 0
 }
+
