@@ -160,7 +160,7 @@ Deno.serve(async (req) => {
     .eq("artwork_id", artworkId)
     .maybeSingle()
 
-  if (existing?.status === "success" && (Deno.env.get('AI_MODE') !== 'guess' || String(existing.model ?? '').includes('confidence-v2'))) return json(existing)
+  if (existing?.status === "success" && (Deno.env.get('AI_MODE') !== 'guess' || String(existing.model ?? '').includes('confidence-v3'))) return json(existing)
   if (existing?.status === "pending") {
     const ageMs = Date.now() - new Date(existing.created_at as string).getTime()
     if (ageMs < DEFAULT_TIMEOUT_MS * 2) return json(existing)
@@ -245,7 +245,7 @@ Deno.serve(async (req) => {
         return json(result)
       }
       await finish(
-        { status: "success", total: result.score, comment: result.comment, provider: "drawzy", model: "quickdraw-confidence-v2", ai_guess: result.guess, ai_seconds: null },
+        { status: "success", total: result.score, comment: result.comment, provider: "drawzy", model: "quickdraw-confidence-v3", ai_guess: result.guess, ai_seconds: null },
         "scored",
       )
       return json(result)

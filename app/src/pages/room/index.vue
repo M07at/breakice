@@ -13,11 +13,11 @@ import { testBotCount } from '../../modules/undercover/rules'
 import { clearRemoteDrawRoom } from '../../services/drawRemoteApi'
 import type { LeaderboardRow } from '../../modules/score'
 import type { GameType } from '../../types/room'
+import { BUILD_ID as BUILD_LABEL } from '../../modules/shared/build'
 
 const roomStore = useRoomStore()
 const room = computed(() => roomStore.room)
 /** 版本标签：改这里就能确认开发者工具里跑的是不是最新包 */
-const BUILD_LABEL = 'v15-1105'
 
 const notice = ref('')
 /** 本房累计积分（由 uc-command 结算时写入 scores，0010 聚合） */

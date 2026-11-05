@@ -32,7 +32,7 @@ Deno.serve(async (req: Request) => {
     const { data: cached, error: cacheError } = await admin.from('draw_ai_scores').select('*').match(key).maybeSingle()
     if (cacheError) return reply({ error: 'SCORING_STORAGE_UNAVAILABLE' }, 503)
     if (cached && cached.image_ref !== imageRef) return reply({ error: 'DRAWING_ALREADY_SUBMITTED' }, 409)
-    if (cached?.result && ['success', 'unsupported'].includes(cached.status) && (cached.result.scoringVersion === 'confidence-v2' || cached.status === 'unsupported')) return reply(cached.result)
+    if (cached?.result && ['success', 'unsupported'].includes(cached.status) && (cached.result.scoringVersion === 'confidence-v3' || cached.status === 'unsupported')) return reply(cached.result)
     if (cached?.status === 'pending' && Date.now() - Date.parse(cached.updated_at) < 65000) return reply({ status: 'pending' })
 
     const claim = { ...key, image_ref: imageRef, status: 'pending', result: null, updated_at: new Date().toISOString() }

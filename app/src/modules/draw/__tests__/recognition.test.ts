@@ -1,9 +1,14 @@
 import { expect, it } from 'vitest'
 import { evaluateRecognition } from '../recognition'
 
-const output = (probability: number) => ({ data: { sketch_class_name: 'banana', class_probabilities: { apple: probability }, top_five_sketch_classes: ['banana', 'apple'] } })
+const output = (probability: number) => ({ data: { sketch_class_name: 'banana', class_probabilities: { apple: probability }, top_five_sketch_classes: ['banana', 'apple'], preprocessing_version: 'canvas-ink-v3' } })
 it.each([[0.005, 1], [0.12, 12], [0.69, 69], [0.97, 97], [0, 0], [1, 100]])('scores target confidence %s as %s rather than awarding a time-based floor', (probability, score) => {
-  expect(evaluateRecognition('苹果', output(probability))).toMatchObject({ status: 'success', score, confidence: probability, scoringVersion: 'confidence-v2' })
+  expect(evaluateRecognition('苹果', output(probability))).toMatchObject({ status: 'success', score, confidence: probability, scoringVersion: 'confidence-v3' })
+})
+it('rejects results from the old thin-stroke preprocessing', () => {
+  const raw = output(.9)
+  raw.data.preprocessing_version = 'old'
+  expect(evaluateRecognition('苹果', raw)).toMatchObject({ status: 'failed', error: 'OUTDATED_PROVIDER_RESULT' })
 })
 it('does not give a high score merely because the target appears among five candidates', () => {
   expect(evaluateRecognition('苹果', output(0.02)).score).toBe(2)

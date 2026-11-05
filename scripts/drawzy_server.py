@@ -12,6 +12,7 @@ from fastapi import FastAPI, Header, HTTPException
 from PIL import Image
 from pydantic import BaseModel, Field
 from tensorflow.keras.models import load_model
+from drawzy_preprocess import prepare_sketch, PREPROCESSING_VERSION
 
 source = Path(os.environ['DRAWZY_SOURCE']).resolve()
 token = os.environ['DRAWZY_TOKEN']
@@ -24,7 +25,6 @@ def module(name, path):
     spec.loader.exec_module(result)
     return result
 
-preprocess = module('drawzy_preprocess', source / 'app/api/endpoints/guess/function.py').preprocess_image
 labels = module('drawzy_labels', source / 'app/utils/constant/globals.py').WORDS_DIR
 # Training sorts Google's bitmap files. Upstream omitted the first class in its labels.
 # Official apple/banana/airplane/bucket samples confirm the resulting one-index shift.
@@ -41,7 +41,7 @@ class Sketch(BaseModel):
 
 @app.get('/health')
 def health():
-    return {'status': 'ready', 'model': 'drawzy-original-cnn', 'classes': len(labels), 'outputs': model.output_shape[-1]}
+    return {'status': 'ready', 'model': 'drawzy-original-cnn', 'classes': len(labels), 'outputs': model.output_shape[-1], 'preprocessing_version': PREPROCESSING_VERSION}
 
 @app.post('/predict/sketch')
 def predict(body: Sketch, authorization: str = Header(default='')):
@@ -50,19 +50,14 @@ def predict(body: Sketch, authorization: str = Header(default='')):
     try:
         data = base64.b64decode(body.sketch_data, validate=True)
         with Image.open(io.BytesIO(data)) as image:
-            if image.width * image.height > 4000000:
-                raise ValueError('IMAGE_TOO_LARGE')
-            if not np.any(np.asarray(image.convert('L')) < 200):
-                raise ValueError('EMPTY_DRAWING')
-        image = preprocess(io.BytesIO(data))
-        # QuickDraw training bitmaps use black background with white ink. The canvas is opposite.
-        array = 1.0 - np.asarray(image, dtype=np.float32)[None, :, :, None] / 255.0
+            array = prepare_sketch(image)[None, :, :, None]
         probabilities = model(array, training=False).numpy()[0]
         top = np.argsort(probabilities)[-5:][::-1]
         return {'status': 'success', 'data': {
             'sketch_class_name': labels[int(top[0])],
             'top_five_sketch_classes': [labels[int(index)] for index in top],
             'class_probabilities': {label: float(probabilities[index]) for index, label in enumerate(labels)},
+            'preprocessing_version': PREPROCESSING_VERSION,
         }}
     except (ValueError, OSError) as error:
         raise HTTPException(422, str(error)) from error

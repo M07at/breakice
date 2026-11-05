@@ -23,7 +23,7 @@ if (Test-Path -LiteralPath $credentialsPath) {
 function Test-Recognizer([string]$Url) {
   try {
     $health = Invoke-RestMethod -Uri "$Url/health" -TimeoutSec 5
-    return $health.status -eq 'ready' -and $health.classes -eq 46
+    return $health.status -eq 'ready' -and $health.classes -eq 46 -and $health.preprocessing_version -eq 'canvas-ink-v3'
   } catch { return $false }
 }
 $localUrl = "http://127.0.0.1:$Port"

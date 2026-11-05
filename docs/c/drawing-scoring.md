@@ -34,7 +34,7 @@
 - 真实评分期间暂停换人，避免截止时间经过后把结果写到下一轮；揭晓时间从评分完成时开始。
 - AI 分数为目标题目类别的模型概率乘以 100 并四舍五入；展示首选识别结果和题目匹配度。
 - 不再按图片下载耗时加分，也不再因为答案出现在前 5 项就保底高分；无效概率或缺失概率明确报评分失败。
-- 新回执标记 `confidence-v2`，旧的成功缓存会重新评分，避免沿用旧算法的高分。`ai-score` 与 `draw-score` 共用生成的识别规则。
+- 新回执标记 `confidence-v3`，要求模型返回 `canvas-ink-v3`；旧的成功缓存会重新评分，避免沿用旧算法或旧预处理结果。`ai-score` 与 `draw-score` 共用生成的识别规则。
 - 不支持的自定义题面、模型失败或超时明确标注「本轮未计 AI 分」，猜题分仍正常计算。联机不再使用假分。
 - 模型并不覆盖任意中文题目；支持类别是 QuickDraw 前 46 类。它是简笔画分类器，不是绘画艺术质量评价器。
 
@@ -43,7 +43,7 @@
 原始代码和权重：[`MobAI-Hackathon/drawzy-ai`](https://github.com/MobAI-Hackathon/drawzy-ai)，
 本机版本 `f7eb2987c404549b66db5ab39e8f81c929f7fe82`。
 标签顺序通过 [Google 官方类别表](https://github.com/googlecreativelab/quickdraw-dataset/blob/master/categories.txt)
-和官方 apple、airplane、banana、bucket 位图样本验证；预处理按训练数据反转前景背景。
+和官方 apple、airplane、banana、bucket 位图样本验证；输入按训练数据转换为黑底白色笔迹。
 运行入口是 `scripts/drawzy_server.py`，只加载原有 CNN，不重新训练模型、不安装 RL 训练依赖。
 
 本机隔离运行目录：`D:\Software Project\.local-services`。
@@ -76,11 +76,39 @@ pwsh -File scripts/start-drawzy-demo.ps1
 - 私有图片地址加载时显示「画作加载中…」，不显示 Storage 文件名。移除重复的「完整接力画」，每张画只在画廊显示一次。
 - 数据库迁移为 `0025_drawing_lifecycle.sql`；`uc_tick` 原子完成游戏与房间收尾，普通画图由主持人调用带局号校验的 `finish_draw_session`。
 
+## v22：真机细线与彩色画笔识别
+
+v21 的低分有可复现的输入原因：800×600 画布上的 4px 线条直接缩成 28×28 后过弱；
+灰度亮度阈值还会忽略黄色等亮色画笔。之前只改评分公式没有修复这一输入问题。
+
+`scripts/drawzy_preprocess.py` 现在把透明背景合成到白底，以 RGB 颜色差提取笔迹，
+裁剪、归一化强度，再按已有线宽自适应保留细线，居中生成模型输入。已粗的线不无条件加粗。
+空白图和超大图片仍明确拒绝。两款游戏沿用同一真实识别置信度，不添加随机分或保底分。
+
+验证命令（使用 `.local-services/drawzy-ai/.venv/Scripts/python.exe`）：
+
+```powershell
+python scripts/test_drawzy_preprocess.py
+python scripts/check_recognizer_canvas.py
+node scripts/check-both-drawing-scores.mjs
+```
+
+5 个预处理测试覆盖细线、黄/蓝/青色、透明背景、空白、大小限制、单点和极细长图。
+模型验收使用 Google QuickDraw 的 4 类、48 幅独立人工简笔画，每幅按小程序尺寸和线宽渲染
+黑、蓝、黄三种颜色（144 个渲染版本）。探索用了另外一组图，验收使用后续 12–24 项。
+旧预处理每色 0/48 首选正确，35–36 幅的分数不超过 1；新预处理每色 40/48 首选正确，
+这组图均不再只有 0/1 分。这是所测四类的结果，不代表全部 46 类或任意用户画作的准确率。
+报告在忽略的 `app/reports/recognizer-canvas-acceptance.json`。
+
+线上普通模式的细线苹果图得到真实 100/100，另一次双模式验收使用真实私密题面与同图，
+`ai-score` 和 `draw-score` 均返回 100/100，缓存复查一致；测试房间已关闭。
+各图仍取决于识别结果，弱相关或错误画作仍可能低分。不支持的题目仍应跳过，分类器不是任意题目的美术质量评审。
+
 ## 验证证据与回滚
 
-- 完整 verify：312 个应用测试、3 个工程检查测试通过，H5/小程序均构建成功；总包约 0.98 MB。
+- 完整 verify：313 个应用测试、3 个工程检查测试通过，H5/小程序均构建成功；总包约 0.98 MB。
 - `node scripts/check-draw-scoring.mjs` 对线上项目创建临时测试账号和房间，用真实图片完成 Storage 上传、模型调用及回执缓存。
-- 同一测试图在旧耗时算法下为 95/100，新算法实测为 22/100，对应模型对 apple 的实际置信度，而不是下载速度或前 5 项保底。
+- 历史 v21 测试图在旧耗时算法下为 95/100，改为原始置信度后为 22/100；v22 继续修复了上述模型输入问题，不能把该历史数值当成当前模型输入验收。
 - 同时验证非主持人拒绝、跨房间图片拒绝、重复请求结果一致，以及不支持的自定义词明确跳过 AI 分。
 - 临时验收房间已关闭；报告位于忽略的 `app/reports/draw-scoring-live-*.json`，不含会话令牌。
 - `node scripts/check-drawing-lifecycle.mjs` 在线验证单人普通画图结束、旧局请求隔离、混合模式作画 → 回顾 → 投票 → 结束、重新开局和主持人提前结束；均检查房间状态与准备状态重置。
