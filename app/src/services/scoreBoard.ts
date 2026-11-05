@@ -1,6 +1,7 @@
 import { roomApi } from '../platform'
 import { SupabaseRoomApi } from '../platform/supabase'
 import type { LeaderboardRow } from '../modules/score'
+import { isMissingRpc } from './profileCompatibility'
 
 /**
  * 房间积分榜。
@@ -12,19 +13,25 @@ import type { LeaderboardRow } from '../modules/score'
 interface RawRow {
   user_id: string
   nickname: string | null
+  mbti?: string | null
   points: number | string | null
   games: number | string | null
 }
 
 export async function fetchRoomLeaderboard(roomId: string): Promise<LeaderboardRow[]> {
   if (!roomId || roomApi.mode !== 'supabase') return []
-  const rows = await (roomApi as SupabaseRoomApi).rpcCall<RawRow[]>('room_leaderboard', { p_room_id: roomId })
+  const api = roomApi as SupabaseRoomApi
+  const rows = await api.rpcCall<RawRow[]>('room_leaderboard_v2', { p_room_id: roomId }).catch(issue => {
+    if (!isMissingRpc(issue, 'room_leaderboard_v2')) throw issue
+    return api.rpcCall<RawRow[]>('room_leaderboard', { p_room_id: roomId })
+  })
   if (!Array.isArray(rows)) return []
 
   const sorted = rows
     .map((row) => ({
       playerId: row.user_id,
       name: row.nickname || '玩家',
+      mbti: row.mbti,
       total: Number(row.points) || 0,
     }))
     .sort((a, b) => b.total - a.total || a.name.localeCompare(b.name, 'zh-Hans-CN'))

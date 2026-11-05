@@ -3,6 +3,8 @@ import { getSavedProfile, normalizeAvatar } from '../services/avatarService'
 import type { AvatarConfig, GameType, Player, Room, TruthTurn } from '../types/room'
 import { PlatformError } from './types'
 import type { CreateRoomInput, Identity, RoomApi, Unsubscribe } from './types'
+import { normalizeMbti } from '../modules/shared/mbti'
+import { isMissingRpc } from '../services/profileCompatibility'
 
 /**
  * Supabase 房间实现 —— 对接 A 的迁移（`supabase/migrations`）。
@@ -189,6 +191,7 @@ export class SupabaseRoomApi implements RoomApi {
     return {
       id: this.session?.userId ?? 'unauthenticated',
       nickname: profile.nickname,
+      mbti: normalizeMbti(profile.mbti),
       avatar: profile.avatar,
     }
   }
@@ -410,16 +413,23 @@ export class SupabaseRoomApi implements RoomApi {
     return this.call<T>(`/rest/v1/${table}?${query}`)
   }
 
-  async setIdentity(patch: Partial<Pick<Identity, 'nickname' | 'avatar'>>): Promise<Identity> {
+  async setIdentity(patch: Partial<Pick<Identity, 'nickname' | 'avatar' | 'mbti'>>): Promise<Identity> {
     const current = getSavedProfile()
     const next = {
       nickname: patch.nickname ?? current.nickname,
       avatar: patch.avatar ?? current.avatar,
+      mbti: normalizeMbti(patch.mbti !== undefined ? patch.mbti : current.mbti),
     }
     const session = await this.ensureSession()
     // 昵称和形象一起写进 profiles（0009），房间/游戏里才能和首页一致
-    await this.rpc<void>('set_my_profile', { p_nickname: next.nickname, p_avatar: next.avatar })
-    return { id: session.userId, nickname: next.nickname, avatar: next.avatar }
+    try {
+      await this.rpc<void>('set_my_profile_v2', { p_nickname: next.nickname, p_avatar: next.avatar, p_mbti: next.mbti })
+    } catch (issue) {
+      if (!isMissingRpc(issue, 'set_my_profile_v2')) throw issue
+      await this.rpc<void>('set_my_profile', { p_nickname: next.nickname, p_avatar: next.avatar })
+      uni.showToast({ title: 'MBTI 尚未同步，请更新服务端资料接口', icon: 'none' })
+    }
+    return { id: session.userId, ...next }
   }
 
   async createRoom(input: CreateRoomInput): Promise<Room> {
@@ -486,10 +496,10 @@ export class SupabaseRoomApi implements RoomApi {
         role: string
         ready: boolean
         online: boolean
-        profiles?: { nickname?: string; avatar?: AvatarConfig | null }
+        profiles?: { nickname?: string; avatar?: AvatarConfig | null; mbti?: string | null }
       }[]>(
         'room_members',
-        `room_id=eq.${roomId}&left_at=is.null&select=user_id,seat,role,ready,online,profiles(nickname,avatar)&order=seat`,
+        `room_id=eq.${roomId}&left_at=is.null&select=user_id,seat,role,ready,online,profiles(nickname,avatar,mbti)&order=seat`,
       ),
     ])
     const room = rooms?.[0]
@@ -498,6 +508,7 @@ export class SupabaseRoomApi implements RoomApi {
     const players: Player[] = (members ?? []).map((member) => ({
       id: member.user_id,
       nickname: member.profiles?.nickname || `玩家${member.seat}`,
+      mbti: normalizeMbti(member.profiles?.mbti),
       // 用玩家在首页设置的形象；没设过（或老数据）才按座位号兜底生成
       avatar: member.profiles?.avatar ? normalizeAvatar(member.profiles.avatar) : avatarForSeat(member.seat),
       isHost: member.role === 'host' || member.user_id === room.host_id,
@@ -516,7 +527,7 @@ export class SupabaseRoomApi implements RoomApi {
       truth: room.settings?.truth ?? null,
       players: players.length
         ? players
-        : [{ id: session.userId, nickname: getSavedProfile().nickname, avatar: getSavedProfile().avatar, isHost: true, isReady: false, online: true }],
+        : [{ id: session.userId, nickname: getSavedProfile().nickname, mbti: normalizeMbti(getSavedProfile().mbti), avatar: getSavedProfile().avatar, isHost: true, isReady: false, online: true }],
     }
   }
 

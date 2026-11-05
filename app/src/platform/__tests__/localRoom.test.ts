@@ -29,6 +29,15 @@ beforeEach(() => {
 })
 
 describe('本机房间', () => {
+  it('保存的 MBTI 随成员资料进入房间，重新加入后更新', async () => {
+    useDevice('dev-host', '主持人')
+    await api.setIdentity({ mbti: 'INTJ' })
+    const created = await api.createRoom({ title: 'MBTI测试房', maxPlayers: 8 })
+    expect(created.players[0].mbti).toBe('INTJ')
+    await api.setIdentity({ mbti: 'ENFP' })
+    const joined = await api.joinRoom(created.code)
+    expect(joined.players[0].mbti).toBe('ENFP')
+  })
   it('创建房间：房主坐 1 号位并且默认已准备', async () => {
     useDevice('dev-host', '主持人')
     const room = await api.createRoom({ title: '测试房', maxPlayers: 8 })

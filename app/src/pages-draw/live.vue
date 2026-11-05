@@ -1,4 +1,4 @@
-﻿<script setup lang="ts">
+<script setup lang="ts">
 /**
  * 你画我猜 · 房间联机页。
  *
@@ -12,6 +12,7 @@ import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { onLoad } from '@dcloudio/uni-app'
 import DrawCanvas from '@/components/draw-canvas/draw-canvas.vue'
 import Avatar from '@/components/Avatar.vue'
+import PlayerIdentity from '@/components/PlayerIdentity.vue'
 import { DrawEngine } from '@/modules/draw/engine'
 import { ChunkPump } from '@/modules/draw/sync'
 import type { DrawChunk } from '@/modules/draw/types'
@@ -71,6 +72,7 @@ let ticking = false
 const myTurn = computed(() => Boolean(view.value && view.value.painterId === meId.value && view.value.phase === 'drawing'))
 
 /** 座位号：同名玩家靠它区分（B 的视图里 players 顺序就是座位顺序） */
+function mbtiOf(id: string | null | undefined) { return view.value?.players.find(p => p.id === id)?.mbti }
 function seatOf(id: string): number {
   const index = view.value?.players.findIndex((player) => player.id === id) ?? -1
   return index >= 0 ? index + 1 : 0
@@ -235,7 +237,7 @@ onMounted(async () => {
         variant: drawVariant.value,
         // 只抽 AI 认得出的词：其余词永远判不了猜中，等于白画
         listFilter: filterScorable,
-        players: room.players.map((player) => ({ id: player.id, name: player.nickname })),
+        players: room.players.map((player) => ({ id: player.id, name: player.nickname, mbti: player.mbti })),
         meId: meId.value,
         scoreConfig: DRAW_SCORE,
       })
@@ -408,7 +410,7 @@ async function endSession() {
 
     <template v-else>
       <view class="surface turn">
-        <text class="label">{{ myTurn ? '轮到你画' : `${painterName} 正在画` }}</text>
+        <text class="label">{{ myTurn ? '轮到你画' : '正在作画' }} · <PlayerIdentity :name="painterName" :mbti="mbtiOf(view?.painterId)" /></text>
         <text class="muted">{{ hintText }} · 剩余 {{ remain }} 秒</text>
         <text v-if="myTurn && myWord" class="word">你的题：{{ myWord.word }}</text>
       </view>
@@ -419,7 +421,7 @@ async function endSession() {
       </view>
 
       <view v-else-if="view.phase === 'drawing'" class="surface">
-        <text class="label">{{ painterName }} 正在画</text>
+        <text class="label"><PlayerIdentity :name="painterName" :mbti="mbtiOf(view?.painterId)" /> 正在画</text>
         <DrawCanvas ref="viewCanvasRef" :engine="viewerEngine" mode="watch" :variant="drawVariant" @error="error = $event" />
       </view>
 
@@ -430,7 +432,7 @@ async function endSession() {
           <view v-for="(row, index) in podium" :key="row.playerId" class="podium-item" :class="'place-' + (index + 1)">
             <text class="medal">{{ index === 0 ? '🥇' : index === 1 ? '🥈' : '🥉' }}</text>
             <Avatar :avatar="avatarOf(row.playerId)" size="large" />
-            <text class="pname" :class="toneOf(row.playerId)">{{ row.name }} #{{ seatOf(row.playerId) }}</text>
+            <text class="pname" :class="toneOf(row.playerId)"><PlayerIdentity :name="row.name" :mbti="mbtiOf(row.playerId)" /> #{{ seatOf(row.playerId) }}</text>
             <text class="pscore">{{ row.total }}</text>
           </view>
         </view>
@@ -438,7 +440,7 @@ async function endSession() {
           <view class="tr th"><text>排名</text><text>昵称</text><text>得分</text></view>
           <view v-for="row in restRows" :key="row.playerId" class="tr">
             <text>{{ row.rank }}</text>
-            <text :class="toneOf(row.playerId)">{{ row.name }} #{{ seatOf(row.playerId) }}</text>
+            <text :class="toneOf(row.playerId)"><PlayerIdentity :name="row.name" :mbti="mbtiOf(row.playerId)" /> #{{ seatOf(row.playerId) }}</text>
             <text>{{ row.total }}</text>
           </view>
         </view>
@@ -447,7 +449,7 @@ async function endSession() {
       <view v-if="view.panel.length" class="surface">
         <text class="label">本轮作品</text>
         <view v-for="entry in view.panel" :key="entry.playerId" class="panel-row">
-          <text class="name">{{ entry.name }} {{ entry.shortId }}</text>
+          <text class="name"><PlayerIdentity :name="entry.name" :mbti="mbtiOf(entry.playerId)" /> {{ entry.shortId }}</text>
           <image v-if="panelUrls[entry.imageRef]" class="shot" :src="panelUrls[entry.imageRef]" mode="widthFix" />
           <text class="muted">答案：{{ entry.answer }}<template v-if="entry.ai"> · AI {{ entry.ai.score }} 分</template></text>
           <view class="reactions">
@@ -460,7 +462,7 @@ async function endSession() {
       <view class="surface">
         <text class="label">猜一猜</text>
         <view v-for="message in view.messages.slice(-8)" :key="message.id" class="message" :class="{ correct: message.kind === 'correct' }">
-          <text class="who" :class="toneOf(message.playerId)">{{ labelOf(message.playerId, message.playerName) }}</text>
+          <text class="who" :class="toneOf(message.playerId)"><PlayerIdentity :name="labelOf(message.playerId, message.playerName)" :mbti="mbtiOf(message.playerId)" /></text>
           <text class="text">{{ message.text }}</text>
         </view>
         <view v-if="!myTurn" class="input-row">

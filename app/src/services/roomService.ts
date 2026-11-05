@@ -27,8 +27,8 @@ export function currentIdentity() {
 }
 
 /** 把首页设置的昵称/形象同步到后端（Supabase 会写 profiles，本机模式只落本地） */
-export function syncIdentity(nickname: string, avatar: ReturnType<typeof currentIdentity>['avatar']) {
-  return roomApi.setIdentity({ nickname, avatar })
+export function syncIdentity(nickname: string, avatar: ReturnType<typeof currentIdentity>['avatar'], mbti?: ReturnType<typeof currentIdentity>['mbti']) {
+  return roomApi.setIdentity({ nickname, avatar, mbti })
 }
 
 export function createRoom(input: CreateRoomInput): Promise<Room> {

@@ -36,7 +36,7 @@ function clock(start = 1_000_000) {
 }
 
 const ROSTER = [
-  { id: 'user-a', name: '甲' },
+  { id: 'user-a', name: '甲', mbti: 'ENFP' },
   { id: 'user-b', name: '乙' },
   { id: 'user-c', name: '丙' },
 ]

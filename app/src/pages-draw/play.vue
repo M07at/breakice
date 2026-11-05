@@ -9,7 +9,7 @@
         </text>
       </view>
       <text class="topic-word">{{ topicWord }}</text>
-      <text class="topic-progress">第 {{ view.roundIndex + 1 }} / {{ view.players.length }} 位</text>
+      <text class="topic-progress"><PlayerIdentity :name="painterName" :mbti="mbtiOf(view.painterId)" /> · 第 {{ view.roundIndex + 1 }} / {{ view.players.length }} 位</text>
     </view>
 
     <!--
@@ -51,7 +51,7 @@
           class="chat-item"
           :class="{ correct: m.kind === 'correct' }"
         >
-          <text class="chat-who">{{ m.playerName }}<text class="chat-id">{{ m.shortId }}</text></text>
+          <text class="chat-who"><PlayerIdentity :name="m.playerName" :mbti="mbtiOf(m.playerId)" /><text class="chat-id">{{ m.shortId }}</text></text>
           <text v-if="m.kind === 'correct'" class="chat-correct">{{ m.text }}</text>
           <text v-else class="chat-text">{{ m.text }}</text>
         </view>
@@ -76,7 +76,7 @@
         <view class="section-title">本局汇总</view>
         <view v-for="entry in view.panel" :key="entry.playerId" class="panel-item">
           <view class="panel-head">
-            <text class="panel-name">{{ entry.name }}<text class="panel-id">{{ entry.shortId }}</text></text>
+            <text class="panel-name"><PlayerIdentity :name="entry.name" :mbti="mbtiOf(entry.playerId)" /><text class="panel-id">{{ entry.shortId }}</text></text>
             <text class="panel-ai">{{ entry.ai && !entry.ai.degraded ? entry.ai.score : '—' }}</text>
           </view>
           <view class="panel-answer-row">
@@ -107,13 +107,13 @@
     <view v-if="view.phase === 'reveal'" class="modal-mask">
       <view class="modal-card">
         <view class="modal-head">
-          <text class="modal-title">{{ painterName }} 画完了</text>
+          <text class="modal-title"><PlayerIdentity :name="painterName" :mbti="mbtiOf(view?.painterId)" /> 画完了</text>
           <text class="modal-left">{{ remaining }}s</text>
         </view>
         <scroll-view scroll-y class="modal-body">
           <view v-for="entry in view.panel" :key="entry.playerId" class="panel-item">
             <view class="panel-head">
-              <text class="panel-name">{{ entry.name }}<text class="panel-id">{{ entry.shortId }}</text></text>
+              <text class="panel-name"><PlayerIdentity :name="entry.name" :mbti="mbtiOf(entry.playerId)" /><text class="panel-id">{{ entry.shortId }}</text></text>
               <text class="panel-ai">{{ entry.ai && !entry.ai.degraded ? entry.ai.score : '—' }}</text>
             </view>
             <view class="panel-answer-row">
@@ -156,6 +156,7 @@ import { computed, nextTick, ref, watch } from 'vue'
 import { onLoad, onUnload } from '@dcloudio/uni-app'
 import DrawCanvas from '@/components/draw-canvas/draw-canvas.vue'
 import Leaderboard from '@/components/leaderboard/leaderboard.vue'
+import PlayerIdentity from '@/components/PlayerIdentity.vue'
 import { DrawEngine } from '@/modules/draw/engine'
 import { DRAW_VARIANT_LABEL } from '@/modules/draw/words'
 import { currentDrawRoom, disposeDrawRoom, startLocalDrawRoom } from '@/modules/draw/room'
@@ -322,6 +323,7 @@ watch(
   },
 )
 
+function mbtiOf(id: string | null | undefined) { return view.value?.players.find(p => p.id === id)?.mbti }
 function nameOf(playerId: string): string {
   return view.value?.players.find((p) => p.id === playerId)?.name ?? playerId
 }

@@ -28,6 +28,7 @@ export const REVEAL_SECONDS = 8
 export interface DrawRoomPlayer {
   id: string
   name: string
+  mbti?: string | null
 }
 
 /**
@@ -147,7 +148,7 @@ export interface LocalDrawRoomOptions {
    * 联机用：直接给定玩家名单（房间真实成员 + 真实 id）。
    * 不传时按 playerCount 生成「我 / 玩家2 / 玩家3」，行为与单机一致。
    */
-  players?: { id: string; name: string }[]
+  players?: DrawRoomPlayer[]
   /** 联机用：我是名单里的哪一个（默认本机身份） */
   meId?: string
   /** 抽词过滤：例如只保留 AI 认得出的词，联机时由页面传入 */
@@ -253,7 +254,7 @@ export class LocalDrawRoomBackend implements DrawRoomBackend {
     // 联机时用房间真实名单；单机时保持原来的生成规则
     const roster = options.players && options.players.length >= 2 ? options.players : null
     this.players = roster
-      ? roster.map((player) => ({ id: player.id, name: player.name }))
+      ? roster.map((player) => ({ id: player.id, name: player.name, mbti: player.mbti }))
       : Array.from({ length: Math.max(2, options.playerCount) }, (_, i) =>
           i === 0 ? { id: LOCAL_USER_ID, name: '我' } : { id: `local-${i + 1}`, name: `玩家${i + 1}` },
         )

@@ -1,5 +1,8 @@
 import type { AvatarConfig, AvatarLayerKey } from '../types/room'
 
+import { normalizeMbti } from '../modules/shared/mbti'
+import type { Mbti } from '../modules/shared/mbti'
+
 export interface AvatarLayer {
   key: AvatarLayerKey
   label: string
@@ -33,6 +36,7 @@ export const NICKNAME_MAX = 12
 export interface UserProfile {
   nickname: string
   avatar: AvatarConfig
+  mbti?: Mbti | null
 }
 
 function layerOf(key: AvatarLayerKey): AvatarLayer {
@@ -89,7 +93,7 @@ export function getSavedProfile(): UserProfile {
   try {
     const saved = uni.getStorageSync(PROFILE_STORAGE_KEY) as Partial<UserProfile> | '' | undefined
     if (saved && typeof saved === 'object') {
-      return { nickname: normalizeNickname(saved.nickname), avatar: normalizeAvatar(saved.avatar) }
+      return { nickname: normalizeNickname(saved.nickname), avatar: normalizeAvatar(saved.avatar), mbti: normalizeMbti(saved.mbti) }
     }
     return { nickname: DEFAULT_NICKNAME, avatar: { ...defaultAvatar } }
   } catch {
@@ -103,6 +107,7 @@ export function saveProfile(profile: UserProfile): void {
     uni.setStorageSync(PROFILE_STORAGE_KEY, {
       nickname: normalizeNickname(profile.nickname),
       avatar: normalizeAvatar(profile.avatar),
+      mbti: normalizeMbti(profile.mbti),
     })
   } catch (error) {
     console.warn('保存形象失败', error)

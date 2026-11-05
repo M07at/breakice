@@ -951,12 +951,12 @@ type Admin = ReturnType<typeof createClient>
 async function roomMembers(admin: Admin, roomId: string) {
   const { data, error } = await admin
     .from('room_members')
-    .select('user_id, seat, ready, profiles(nickname)')
+    .select('user_id, seat, ready, profiles(nickname,mbti)')
     .eq('room_id', roomId)
     .is('left_at', null)
     .order('seat')
   if (error) throw new UcError('BAD_REQUEST', `读取房间成员失败：${error.message}`)
-  return (data ?? []) as { user_id: string; seat: number; ready: boolean; profiles?: { nickname?: string } }[]
+  return (data ?? []) as { user_id: string; seat: number; ready: boolean; profiles?: { nickname?: string; mbti?: string | null } }[]
 }
 
 const ARTWORK_STATUS: Record<string, 'pending' | 'success' | 'failed' | 'timeout'> = {
@@ -1010,7 +1010,7 @@ async function snapshotOf(input: {
   state: UcState
   viewerId: string
   hostId: string
-  members: { user_id: string; profiles?: { nickname?: string } }[]
+  members: { user_id: string; profiles?: { nickname?: string; mbti?: string | null } }[]
 }) {
   const artworks = input.state.config.variant === 'draw' ? await loadArtworks(input.admin, input.gameId) : []
   // 名单以引擎里的座位顺序为准，机器人没有 room_members 记录，名字从 bots 表补
@@ -1025,7 +1025,7 @@ async function snapshotOf(input: {
     gameNumber: input.gameNumber,
     playerId: input.viewerId,
     hostId: input.hostId,
-    players: input.state.players.map((p) => ({ id: p.id, name: names.get(p.id) ?? '玩家' })),
+    players: input.state.players.map((p) => ({ id: p.id, name: names.get(p.id) ?? '玩家', mbti: input.members.find(m => m.user_id === p.id)?.profiles?.mbti ?? null })),
     view: toPublicView(input.state),
     artworks,
     serverNow: Date.now(),

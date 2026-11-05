@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { Player } from '../types/room'
 import Avatar from './Avatar.vue'
+import PlayerIdentity from './PlayerIdentity.vue'
 
 defineProps<{
   players: Player[]
@@ -18,7 +19,7 @@ defineProps<{
       </view>
       <view class="player-copy">
         <view class="player-name-row">
-          <text class="player-name">{{ player.nickname }}</text>
+          <text class="player-name"><PlayerIdentity :name="player.nickname" :mbti="player.mbti" /></text>
           <text v-if="showHostBadge && player.isHost" class="host-badge">房主</text>
         </view>
         <text class="player-state">{{ player.isReady ? '已准备' : '等待准备' }}</text>

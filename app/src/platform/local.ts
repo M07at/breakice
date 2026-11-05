@@ -2,6 +2,7 @@
 import type { AvatarConfig, GameType, Player, Room, TruthTurn } from '../types/room'
 import { PlatformError } from './types'
 import type { CreateRoomInput, Identity, RoomApi, Unsubscribe } from './types'
+import { normalizeMbti } from '../modules/shared/mbti'
 
 /**
  * 本机房间：没有配置 Supabase 时的实现。
@@ -23,7 +24,7 @@ interface LocalRoomRecord {
   phase: Room['phase']
   gameType: GameType | null
   truth?: TruthTurn | null
-  members: { id: string; nickname: string; avatar: AvatarConfig; ready: boolean; online: boolean; seat: number }[]
+  members: { id: string; nickname: string; avatar: AvatarConfig; mbti?: Identity['mbti']; ready: boolean; online: boolean; seat: number }[]
 }
 
 const listeners = new Map<string, Set<(room: Room) => void>>()
@@ -77,6 +78,7 @@ function toRoom(record: LocalRoomRecord): Room {
     .map((member) => ({
       id: member.id,
       nickname: member.nickname,
+      mbti: normalizeMbti(member.mbti),
       avatar: member.avatar,
       isHost: member.id === record.hostId,
       isReady: member.ready,
@@ -120,17 +122,18 @@ export class LocalRoomApi implements RoomApi {
 
   identity(): Identity {
     const profile = getSavedProfile()
-    return { id: deviceId(), nickname: profile.nickname, avatar: profile.avatar }
+    return { id: deviceId(), nickname: profile.nickname, avatar: profile.avatar, mbti: normalizeMbti(profile.mbti) }
   }
 
-  async setIdentity(patch: Partial<Pick<Identity, 'nickname' | 'avatar'>>): Promise<Identity> {
+  async setIdentity(patch: Partial<Pick<Identity, 'nickname' | 'avatar' | 'mbti'>>): Promise<Identity> {
     const current = getSavedProfile()
     const next = {
       nickname: patch.nickname !== undefined ? normalizeNickname(patch.nickname) : current.nickname,
       avatar: patch.avatar !== undefined ? normalizeAvatar(patch.avatar) : current.avatar,
+      mbti: normalizeMbti(patch.mbti !== undefined ? patch.mbti : current.mbti),
     }
     saveProfile(next)
-    return { id: deviceId(), nickname: next.nickname, avatar: next.avatar }
+    return { id: deviceId(), ...next }
   }
 
   async createRoom(input: CreateRoomInput): Promise<Room> {
@@ -143,7 +146,7 @@ export class LocalRoomApi implements RoomApi {
       maxPlayers: input.maxPlayers,
       phase: 'lobby',
       gameType: null,
-      members: [{ id: me.id, nickname: me.nickname, avatar: me.avatar, ready: true, online: true, seat: 1 }],
+      members: [{ id: me.id, nickname: me.nickname, avatar: me.avatar, mbti: me.mbti, ready: true, online: true, seat: 1 }],
     }
     return save(record)
   }
@@ -158,6 +161,9 @@ export class LocalRoomApi implements RoomApi {
     const existing = record.members.find((member) => member.id === me.id)
     if (existing) {
       existing.online = true
+      existing.nickname = me.nickname
+      existing.avatar = me.avatar
+      existing.mbti = me.mbti
       return save(record)
     }
     if (record.members.length >= record.maxPlayers) throw new PlatformError('ROOM_FULL', '房间人数已满')
@@ -165,6 +171,7 @@ export class LocalRoomApi implements RoomApi {
     record.members.push({
       id: me.id,
       nickname: me.nickname,
+      mbti: me.mbti,
       avatar: me.avatar,
       ready: false,
       online: true,

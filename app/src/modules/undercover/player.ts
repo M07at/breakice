@@ -17,7 +17,7 @@ export interface UcPlayerSnapshot {
   gameNumber: number
   playerId: string
   hostId: string
-  players: { id: string; name: string }[]
+  players: { id: string; name: string; mbti?: string | null }[]
   view: UcPublicView
   bankNotice?: string
   artworks?: HybridArtwork[]

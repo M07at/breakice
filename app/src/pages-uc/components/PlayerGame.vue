@@ -1,7 +1,7 @@
 <template>
   <view class="uc-page">
     <view class="uc-header"><text class="uc-eyebrow">破冰局 / {{ snapshot?.view.variant === 'draw' ? '你画我猜谁是卧底' : '谁是卧底' }}</text><view class="uc-row"><text class="uc-title">{{ title }}</text><text v-if="snapshot?.view.phaseDeadline" class="player-clock">{{ remaining }}秒</text></view><text class="uc-subtitle">{{ port?.label ?? '个人游戏界面' }}</text></view>
-    <view v-if="snapshot" class="uc-note identity">你是 {{ seatOf(snapshot.playerId) }} 号 · {{ nameOf(snapshot.playerId) }} <text v-if="rights?.isHost">（主持人）</text></view>
+    <view v-if="snapshot" class="uc-note identity">你是 {{ seatOf(snapshot.playerId) }} 号 · <PlayerIdentity :name="nameOf(snapshot.playerId)" :mbti="mbtiOf(snapshot.playerId)" /> <text v-if="rights?.isHost">（主持人）</text></view>
     <view v-if="!connected" class="uc-note" role="status">{{ snapshot ? '连接暂时中断，显示的是上次进度；正在重试连接…' : '正在连接游戏…' }}</view>
     <view v-if="busy" class="uc-note" role="status">正在提交，请稍候…</view>
     <view v-if="notice" class="uc-note" role="status">{{ notice }}</view>
@@ -25,54 +25,54 @@
       <template v-if="snapshot.view.phase === 'describe'">
         <view class="uc-card">
           <text class="uc-badge">第 {{ snapshot.view.round }} 轮{{ snapshot.view.pkCandidates ? ' · 平票加赛' : '' }}</text>
-          <text class="person">{{ seatOf(snapshot.view.currentSpeakerId) }} 号 · {{ nameOf(snapshot.view.currentSpeakerId) }}</text>
+          <text class="person">{{ seatOf(snapshot.view.currentSpeakerId) }} 号 · <PlayerIdentity :name="nameOf(snapshot.view.currentSpeakerId)" :mbti="mbtiOf(snapshot.view.currentSpeakerId)" /></text>
           <text class="uc-label">{{ snapshot.view.variant === 'draw' ? rights.canFinish ? '轮到你作画了' : '正在作画，请等待回顾' : rights.canFinish ? '轮到你发言了' : '正在发言，请认真听' }}</text>
           <text class="uc-muted">{{ snapshot.view.variant === 'draw' ? '当前画手用图形表达自己的词。提交后自动轮到下一位，所有作品在回顾阶段展示。' : rights.canFinish ? '先介绍一下名字，再描述自己的词，不要直接念出词语。' : '在自己的手机上等待。倒计时结束自动轮到下一位。' }}</text>
           <button v-if="rights.canFinish && snapshot.view.variant === 'classic'" class="uc-button" :disabled="locked" @tap="send({ type: 'turnDone' })">我说完了 →</button>
           <view v-if="!rights.canFinish" class="uc-hint-block"><text class="uc-note">{{ rights.me?.alive ? '等待你的发言回合' : '你正在旁观' }}</text></view>
         </view>
         <view v-if="snapshot.view.variant === 'draw' && !rights.canFinish && snapshot.view.phase === 'describe'" class="uc-card">
-          <text class="uc-label">{{ nameOf(snapshot.view.currentSpeakerId) }} 正在画</text>
+          <text class="uc-label"><PlayerIdentity :name="nameOf(snapshot.view.currentSpeakerId)" :mbti="mbtiOf(snapshot.view.currentSpeakerId)" /> 正在画</text>
           <DrawCanvas ref="hybridCanvas" :engine="hybridViewer" mode="watch" variant="classic" @error="error = $event" />
         </view>
         <HybridDrawAdapter ref="hybridAdapter" v-if="snapshot.view.variant === 'draw' && rights.canFinish" :key="snapshot.gameId + snapshot.view.turnKey + snapshot.playerId" :game-id="snapshot.gameId" :turn-key="snapshot.view.turnKey" :player-id="snapshot.playerId" :seed-ops="roundOps" :editable="!locked" @submit="submitDrawing" />
         <view v-if="rights.me?.alive" class="uc-card"><text class="uc-label">我的词卡</text><text v-if="secret" class="secret-word small">{{ secret.isBlank ? '你是白板' : secret.word }}</text><button class="uc-button uc-secondary" :disabled="locked" @tap="secret ? hideSecret() : reveal()">{{ secret ? '遮住我的词语' : '私密查看我的词语' }}</button></view>
-        <view class="uc-card"><text class="uc-label">发言顺序</text><view v-for="(id, i) in snapshot.view.speakOrder" :key="id" class="player-line"><text>{{ seatOf(id) }} 号 · {{ nameOf(id) }}</text><text class="uc-muted">{{ i < speakerIndex ? '已发言' : id === snapshot.view.currentSpeakerId ? '正在发言' : '等待' }}</text></view></view>
+        <view class="uc-card"><text class="uc-label">发言顺序</text><view v-for="(id, i) in snapshot.view.speakOrder" :key="id" class="player-line"><text>{{ seatOf(id) }} 号 · <PlayerIdentity :name="nameOf(id)" :mbti="mbtiOf(id)" /></text><text class="uc-muted">{{ i < speakerIndex ? '已发言' : id === snapshot.view.currentSpeakerId ? '正在发言' : '等待' }}</text></view></view>
       </template>
 
       <view v-if="snapshot.view.variant === 'draw' && ['review', 'vote', 'reveal', 'ended'].includes(snapshot.view.phase)" class="uc-card">
         <text class="uc-label">{{ snapshot.view.phase === 'review' ? '作品回顾 · 倒计时后自动投票' : '本轮画作' }}</text>
         <text class="uc-muted">缺席或超时未交的画手没有作品。AI 评分失败或超时不会阻塞投票。</text>
-        <view v-for="(art, index) in galleryArtworks" :key="art.id" class="final-player"><text>第 {{ index + 1 }} 位 · {{ nameOf(art.playerId) }}</text><image v-if="artworkUrls[art.id]" class="gallery-image" :src="artworkUrls[art.id]" mode="widthFix" /><text v-else class="gallery-picture">{{ art.preview }}</text><text v-if="guessText(art)" class="uc-muted">{{ guessText(art) }}</text>
+        <view v-for="(art, index) in galleryArtworks" :key="art.id" class="final-player"><text>第 {{ index + 1 }} 位 · <PlayerIdentity :name="nameOf(art.playerId)" :mbti="mbtiOf(art.playerId)" /></text><image v-if="artworkUrls[art.id]" class="gallery-image" :src="artworkUrls[art.id]" mode="widthFix" /><text v-else class="gallery-picture">{{ art.preview }}</text><text v-if="guessText(art)" class="uc-muted">{{ guessText(art) }}</text>
           <text class="uc-muted">{{ art.status === 'pending' ? 'AI 评分中…' : art.status === 'success' ? 'AI 评分完成' : art.status === 'failed' ? '评分失败，已跳过' : '评分超时，已跳过' }}{{ art.score !== undefined ? ' · ' + art.score + '分' : '' }}</text></view>
         <view v-if="relayFinal && artworkUrls[relayFinal.id]" class="final-player">
-          <text>完整接力画（{{ nameOf(relayFinal.playerId) }}）</text>
+          <text>完整接力画（<PlayerIdentity :name="nameOf(relayFinal.playerId)" :mbti="mbtiOf(relayFinal.playerId)" />）</text>
           <image class="gallery-image" :src="artworkUrls[relayFinal.id]" mode="widthFix" />
         </view>
-        <view v-for="id in playersWithoutArtwork" :key="'na-' + id" class="final-player"><text>{{ nameOf(id) }} · 本轮没有作画</text><text class="uc-muted">只有轮到发言的人才会画</text></view>
+        <view v-for="id in playersWithoutArtwork" :key="'na-' + id" class="final-player"><text><PlayerIdentity :name="nameOf(id)" :mbti="mbtiOf(id)" /> · 本轮没有作画</text><text class="uc-muted">只有轮到发言的人才会画</text></view>
         <text v-if="!snapshot.artworks?.length && !playersWithoutArtwork.length" class="uc-muted">本轮暂无已提交画作，仍会按时进入投票。</text>
       </view>
       <view v-if="snapshot.view.phase === 'vote'" class="uc-card">
         <view class="uc-row"><text class="uc-label">投出你认为的卧底</text><text class="uc-badge">{{ votedCount }} / {{ voterCount }} 人已投</text></view>
         <template v-if="rights.canVote">
           <text class="uc-muted">{{ snapshot.view.pkCandidates ? '只能投平票加赛玩家。' : '请选择一位存活玩家。' }}不能自投，也可以弃权。各位玩家可在各自手机上投票。</text>
-          <view class="uc-grid vote-options"><button v-for="p in candidates" :key="p.id" class="uc-choice" :class="{ active: selected === p.id }" :disabled="locked" @tap="selected = p.id"><text class="uc-muted">{{ p.seat + 1 }} 号</text>{{ nameOf(p.id) }}</button><button class="uc-choice" :class="{ active: selected === null }" :disabled="locked" @tap="selected = null">这一票弃权</button></view>
+          <view class="uc-grid vote-options"><button v-for="p in candidates" :key="p.id" class="uc-choice" :class="{ active: selected === p.id }" :disabled="locked" @tap="selected = p.id"><text class="uc-muted">{{ p.seat + 1 }} 号</text><PlayerIdentity :name="nameOf(p.id)" :mbti="mbtiOf(p.id)" /></button><button class="uc-choice" :class="{ active: selected === null }" :disabled="locked" @tap="selected = null">这一票弃权</button></view>
           <button class="uc-button" :disabled="locked || confirming || selected === undefined" @tap="confirmVote">{{ selected === undefined ? '先选择，再确认' : selected === null ? '确认弃权' : `确认投给 ${nameOf(selected)}` }}</button>
         </template>
         <view v-else class="uc-note personal-wait">{{ rights.me?.hasVoted ? '你的票已提交。等待其他玩家投票。' : rights.me?.alive ? '你是本次加赛候选人，这次不参与投票。' : '你已出局，本轮旁观投票。' }}</view>
-        <view v-for="p in snapshot.view.players.filter(p => p.canVote)" :key="p.id" class="player-line"><text>{{ p.seat + 1 }} 号 · {{ nameOf(p.id) }}</text><text class="uc-muted">{{ p.hasVoted ? '已提交' : '等待投票' }}</text></view>
+        <view v-for="p in snapshot.view.players.filter(p => p.canVote)" :key="p.id" class="player-line"><text>{{ p.seat + 1 }} 号 · <PlayerIdentity :name="nameOf(p.id)" :mbti="mbtiOf(p.id)" /></text><text class="uc-muted">{{ p.hasVoted ? '已提交' : '等待投票' }}</text></view>
       </view>
 
       <view v-if="snapshot.view.phase === 'reveal' && snapshot.view.lastResult" class="uc-card">
         <text class="uc-badge">第 {{ snapshot.view.round }} 轮结果</text><text class="person">{{ roundResult }}</text>
         <text v-if="snapshot.view.lastResult.eliminatedId" class="uc-muted">身份：{{ roleOf(snapshot.view.lastResult.eliminatedId) }}。词语在终局揭晓。</text>
-        <view v-for="p in snapshot.view.players.filter(p => (snapshot!.view.lastResult!.tally[p.id] ?? 0) > 0)" :key="p.id" class="player-line"><text>{{ nameOf(p.id) }}</text><text>{{ snapshot.view.lastResult.tally[p.id] }} 票</text></view>
+        <view v-for="p in snapshot.view.players.filter(p => (snapshot!.view.lastResult!.tally[p.id] ?? 0) > 0)" :key="p.id" class="player-line"><text><PlayerIdentity :name="nameOf(p.id)" :mbti="mbtiOf(p.id)" /></text><text>{{ snapshot.view.lastResult.tally[p.id] }} 票</text></view>
         <text class="uc-note personal-wait">{{ snapshot.view.lastResult.tied && !snapshot.view.lastResult.pk ? '接下来平票玩家加赛。' : snapshot.view.round >= snapshot.view.maxRounds ? '轮数已到上限，接下来结算。' : '接下来存活玩家进入下一轮。' }}程序自动推进，大家留在自己的界面即可。</text>
       </view>
 
       <template v-if="snapshot.view.phase === 'ended'">
         <view class="uc-card"><text class="uc-badge">第 {{ snapshot.view.round }} 轮 · 本局结束</text><text class="person">{{ ending }}</text><text v-if="snapshot.view.endedReason === 'max_rounds'" class="uc-muted">已达到轮数上限。</text><text v-if="snapshot.view.pair" class="uc-note personal-wait">平民词：{{ snapshot.view.pair.civilian }} / 卧底词：{{ snapshot.view.pair.undercover }}</text></view>
-        <view class="uc-card"><text class="uc-label">揭晓所有人的词</text><view v-for="p in snapshot.view.players" :key="p.id" class="final-player"><view class="uc-row"><text>{{ p.seat + 1 }} 号 · {{ nameOf(p.id) }}</text><text class="uc-badge">{{ p.role ? ROLE_LABEL[p.role] : '' }}</text></view><text class="uc-muted">{{ p.word === null ? '没有词语' : p.word }} · {{ p.alive ? '存活到最后' : '已出局' }}</text></view></view>
+        <view class="uc-card"><text class="uc-label">揭晓所有人的词</text><view v-for="p in snapshot.view.players" :key="p.id" class="final-player"><view class="uc-row"><text>{{ p.seat + 1 }} 号 · <PlayerIdentity :name="nameOf(p.id)" :mbti="mbtiOf(p.id)" /></text><text class="uc-badge">{{ p.role ? ROLE_LABEL[p.role] : '' }}</text></view><text class="uc-muted">{{ p.word === null ? '没有词语' : p.word }} · {{ p.alive ? '存活到最后' : '已出局' }}</text></view></view>
         <button v-if="rights.isHost" class="uc-button" :disabled="locked" @tap="backToLobby">回到大厅 →</button><view v-else class="uc-note">等待主持人开始下一局，你会自动进入新局。</view>
       </template>
 
@@ -97,11 +97,14 @@ import type { DrawingSubmission, UcPlayerPort, UcPlayerSnapshot } from '@/module
 import { createPlayerPreviewPort, previewOrigin } from '@/modules/local/player-preview'
 import { onLivePoke, pokeRoom } from '@/services/liveRoom'
 import DrawCanvas from '@/components/draw-canvas/draw-canvas.vue'
+import PlayerIdentity from '@/components/PlayerIdentity.vue'
+import { useRoomStore } from '@/stores/room'
 import { DrawEngine } from '@/modules/draw/engine'
 import type { DrawChunk } from '@/modules/draw/types'
 import { resolveArtworkUrls } from '@/services/ucGame'
 
 const props = defineProps<{ query: Record<string,string|undefined>; variant: 'classic' | 'draw' }>()
+const roomStore = useRoomStore()
 const port = ref<UcPlayerPort | null>(null)
 const snapshot = ref<UcPlayerSnapshot | null>(null)
 const secret = ref<UcSecretView | null>(null)
@@ -178,6 +181,7 @@ const remaining = computed(() => Math.max(0, Math.ceil(((snapshot.value?.view.ph
 const speakerIndex = computed(() => snapshot.value?.view.speakOrder.indexOf(snapshot.value.view.currentSpeakerId ?? '') ?? -1)
 const candidates = computed(() => snapshot.value?.view.players.filter(p => p.alive && p.id !== snapshot.value!.playerId && (!snapshot.value!.view.pkCandidates || snapshot.value!.view.pkCandidates.includes(p.id))) ?? [])
 const title = computed(() => ({ word: '领好你的秘密词', describe: '认真听，慢慢猜', review: '一起看看画作', vote: '你觉得会是谁？', reveal: '这一轮，揭晓', ended: '秘密终于揭晓' })[snapshot.value?.view.phase ?? 'word'])
+const mbtiOf = (id: string | null) => snapshot.value?.players.find(p => p.id === id)?.mbti ?? roomStore.members.find(p => p.id === id)?.mbti
 const nameOf = (id: string | null) => snapshot.value?.players.find(p => p.id === id)?.name ?? ''
 const seatOf = (id: string | null) => (snapshot.value?.view.players.find(p => p.id === id)?.seat ?? 0) + 1
 const roleOf = (id: string) => { const role = snapshot.value?.view.players.find(p => p.id === id)?.role; return role ? ROLE_LABEL[role] : '' }

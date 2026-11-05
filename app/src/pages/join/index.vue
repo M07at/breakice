@@ -3,6 +3,7 @@ import { ref } from 'vue'
 import { onLoad } from '@dcloudio/uni-app'
 import { useRoomStore } from '../../stores/room'
 import Avatar from '../../components/Avatar.vue'
+import PlayerIdentity from '../../components/PlayerIdentity.vue'
 import { getSavedProfile } from '../../services/avatarService'
 import { toErrorMessage } from '../../platform/types'
 import { parseRoomCode } from '../../services/roomCode'
@@ -88,7 +89,7 @@ async function submit() {
       <view class="identity-row">
         <Avatar :avatar="profile.avatar" size="medium" />
         <view class="identity-copy">
-          <text class="identity-name">{{ profile.nickname }}</text>
+          <text class="identity-name"><PlayerIdentity :name="profile.nickname" :mbti="profile.mbti" /></text>
           <text class="identity-hint">形象和昵称在首页设置</text>
         </view>
       </view>
