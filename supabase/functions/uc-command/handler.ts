@@ -15,7 +15,7 @@ const SUPABASE_URL = Deno.env.get('SUPABASE_URL') ?? ''
 const SERVICE_ROLE = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
 
 /** 部署后可以用 { op: 'version' } 确认线上跑的是哪一版 */
-const HANDLER_VERSION = 'uc-2026-11-05-bots2'
+const HANDLER_VERSION = 'uc-2026-11-05-bots3'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -333,7 +333,10 @@ async function settleDeparted(
 ): Promise<{ state: UcState; events: UcEvent[] }> {
   const members = await roomMembers(admin, roomId)
   const present = new Set(members.map((m) => m.user_id))
-  const gone = state.players.filter((p) => p.alive && !present.has(p.id))
+  // 机器人只出现在对局名单里、不是房间成员，不能当成"已离开"摘掉，
+  // 否则机器人一被摘光，胜负条件立刻成立，整局会瞬间结算。
+  const bots = new Set((await loadBots(admin)).map((bot) => bot.user_id))
+  const gone = state.players.filter((p) => p.alive && !present.has(p.id) && !bots.has(p.id))
   if (gone.length === 0) return { state, events: [] }
 
   let next = state
@@ -685,6 +688,7 @@ Deno.serve(async (req: Request) => {
     return fail(error)
   }
 })
+
 
 
 
