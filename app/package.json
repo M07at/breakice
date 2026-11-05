@@ -25,6 +25,7 @@
     "check:qrcode": "node ../scripts/check-qrcode.mjs",
     "check:all": "node ../scripts/check-all.mjs",
     "check:security": "node ../scripts/check-security.mjs",
+    "check:bots": "node ../scripts/check-bots.mjs",
     "verify": "node ../scripts/verify.mjs",
     "doctor": "node ../scripts/doctor.mjs",
     "release:manifest": "node ../scripts/release-manifest.mjs"
