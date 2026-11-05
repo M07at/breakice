@@ -230,9 +230,10 @@ Deno.serve(async (req) => {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ sketch_data: base64 }),
-        signal: AbortSignal.timeout(timeoutMs),
+        // drawzy 首次调用要加载模型，固定给足 45 秒，不依赖 Secret
+        signal: AbortSignal.timeout(Math.max(timeoutMs, 45000)),
       })
-      if (!response.ok) throw new Error(`drawzy ${response.status}`)
+      if (!response.ok) throw new Error(`drawzy ${response.status} ${await response.text().catch(() => '')}`.slice(0, 200))
       const payload = await response.json() as {
         data?: { sketch_class_name?: string; top_five_sketch_classes?: string[] }
       }
