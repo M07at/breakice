@@ -878,7 +878,7 @@ const SUPABASE_URL = Deno.env.get('SUPABASE_URL') ?? ''
 const SERVICE_ROLE = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
 
 /** 部署后可以用 { op: 'version' } 确认线上跑的是哪一版 */
-const HANDLER_VERSION = 'uc-2026-11-05-rules3'
+const HANDLER_VERSION = 'uc-2026-11-06-bots5-mbti'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
