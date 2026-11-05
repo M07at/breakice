@@ -29,7 +29,7 @@
           <text class="uc-label">{{ snapshot.view.variant === 'draw' ? rights.canFinish ? '轮到你作画了' : '正在作画，请等待回顾' : rights.canFinish ? '轮到你发言了' : '正在发言，请认真听' }}</text>
           <text class="uc-muted">{{ snapshot.view.variant === 'draw' ? '当前画手用图形表达自己的词。提交后自动轮到下一位，所有作品在回顾阶段展示。' : rights.canFinish ? '先介绍一下名字，再描述自己的词，不要直接念出词语。' : '在自己的手机上等待。倒计时结束自动轮到下一位。' }}</text>
           <button v-if="rights.canFinish && snapshot.view.variant === 'classic'" class="uc-button" :disabled="locked" @tap="send({ type: 'turnDone' })">我说完了 →</button>
-          <text v-if="!rights.canFinish" class="uc-note personal-wait">{{ rights.me?.alive ? '等待你的发言回合' : '你正在旁观' }}</text>
+          <view v-if="!rights.canFinish" class="uc-hint-block"><text class="uc-note">{{ rights.me?.alive ? '等待你的发言回合' : '你正在旁观' }}</text></view>
         </view>
         <view v-if="snapshot.view.variant === 'draw' && !rights.canFinish && snapshot.view.phase === 'describe'" class="uc-card">
           <text class="uc-label">{{ nameOf(snapshot.view.currentSpeakerId) }} 正在画</text>
@@ -67,7 +67,7 @@
       <template v-if="snapshot.view.phase === 'ended'">
         <view class="uc-card"><text class="uc-badge">第 {{ snapshot.view.round }} 轮 · 本局结束</text><text class="person">{{ ending }}</text><text v-if="snapshot.view.endedReason === 'max_rounds'" class="uc-muted">已达到轮数上限。</text><text v-if="snapshot.view.pair" class="uc-note personal-wait">平民词：{{ snapshot.view.pair.civilian }} / 卧底词：{{ snapshot.view.pair.undercover }}</text></view>
         <view class="uc-card"><text class="uc-label">揭晓所有人的词</text><view v-for="p in snapshot.view.players" :key="p.id" class="final-player"><view class="uc-row"><text>{{ p.seat + 1 }} 号 · {{ nameOf(p.id) }}</text><text class="uc-badge">{{ p.role ? ROLE_LABEL[p.role] : '' }}</text></view><text class="uc-muted">{{ p.word === null ? '没有词语' : p.word }} · {{ p.alive ? '存活到最后' : '已出局' }}</text></view></view>
-        <button v-if="rights.isHost" class="uc-button" :disabled="locked" @tap="replay">原班人马，再来一局 →</button><view v-else class="uc-note">等待主持人开始下一局，你会自动进入新局。</view>
+        <button v-if="rights.isHost" class="uc-button" :disabled="locked" @tap="backToLobby">回到大厅 →</button><view v-else class="uc-note">等待主持人开始下一局，你会自动进入新局。</view>
       </template>
 
       <button v-if="rights.canEnd" class="uc-link uc-warning" :disabled="locked || confirming" @tap="confirmEnd">主持人提前结束</button>
@@ -247,6 +247,11 @@ function confirmEnd() {
   confirming.value = true
   uni.showModal({ title: '提前结束本局？', content: '所有玩家会同步看到结果和词语。', success: r => { if (r.confirm) void send({ type: 'endGame' }) }, complete: () => { confirming.value = false } })
 }
+/** 一局结束回大厅：房间已由服务端置回 lobby 并清空准备状态 */
+function backToLobby() {
+  uni.navigateBack({ delta: 1, fail: () => uni.reLaunch({ url: '/pages/room/index' }) })
+}
+
 async function replay() {
   if (!rights.value?.isHost || locked.value || !snapshot.value) return
   await execute({ gameId: snapshot.value.gameId, replayId: `${requestPrefix}-replay-${++sequence}` })
@@ -306,6 +311,8 @@ let lastHybridTurn = ''
 .player-clock { font-size: 40rpx; font-weight: 700; white-space: nowrap; }
 .final-player { padding: 20rpx 0; border-bottom: 2rpx solid #edf0e7; }
 </style>
+
+
 
 
 
