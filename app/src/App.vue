@@ -11,10 +11,10 @@ onLaunch(() => {
 </script>
 
 <style>
+@import './styles/background.css';
 page {
   /* 全局背景：只用这张图，不叠黑底 */
   background-color: #f6f8fb;
-  background-image: url('/static/background.jpg');
   background-size: cover;
   background-position: center;
   background-attachment: fixed;
