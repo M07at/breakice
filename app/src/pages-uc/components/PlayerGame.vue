@@ -43,8 +43,9 @@
       <view v-if="snapshot.view.variant === 'draw' && ['review', 'vote', 'reveal', 'ended'].includes(snapshot.view.phase)" class="uc-card">
         <text class="uc-label">{{ snapshot.view.phase === 'review' ? '作品回顾 · 倒计时后自动投票' : '本轮画作' }}</text>
         <text class="uc-muted">缺席或超时未交的画手没有作品。AI 评分失败或超时不会阻塞投票。</text>
-        <view v-for="art in (snapshot.artworks ?? []).filter(a => snapshot!.view.phase === 'ended' || a.turnKey === snapshot!.view.turnKey)" :key="art.id" class="final-player"><text>{{ nameOf(art.playerId) }}</text><image v-if="artworkUrls[art.id]" class="gallery-image" :src="artworkUrls[art.id]" mode="widthFix" /><text v-else class="gallery-picture">{{ art.preview }}</text><text class="uc-muted">{{ art.status === 'pending' ? 'AI 评分中…' : art.status === 'success' ? 'AI 评分完成' : art.status === 'failed' ? '评分失败，已跳过' : '评分超时，已跳过' }}{{ art.score !== undefined ? ' · ' + art.score + '分' : '' }}</text></view>
-        <text v-if="!snapshot.artworks?.length" class="uc-muted">本轮暂无已提交画作，仍会按时进入投票。</text>
+        <view v-for="art in (snapshot.artworks ?? [])" :key="art.id" class="final-player"><text>{{ nameOf(art.playerId) }}</text><image v-if="artworkUrls[art.id]" class="gallery-image" :src="artworkUrls[art.id]" mode="widthFix" /><text v-else class="gallery-picture">{{ art.preview }}</text><text class="uc-muted">{{ art.status === 'pending' ? 'AI 评分中…' : art.status === 'success' ? 'AI 评分完成' : art.status === 'failed' ? '评分失败，已跳过' : '评分超时，已跳过' }}{{ art.score !== undefined ? ' · ' + art.score + '分' : '' }}</text></view>
+        <view v-for="id in playersWithoutArtwork" :key="'na-' + id" class="final-player"><text>{{ nameOf(id) }} · 本轮没有作画</text><text class="uc-muted">只有轮到发言的人才会画</text></view>
+        <text v-if="!snapshot.artworks?.length && !playersWithoutArtwork.length" class="uc-muted">本轮暂无已提交画作，仍会按时进入投票。</text>
       </view>
       <view v-if="snapshot.view.phase === 'vote'" class="uc-card">
         <view class="uc-row"><text class="uc-label">投出你认为的卧底</text><text class="uc-badge">{{ votedCount }} / {{ voterCount }} 人已投</text></view>
@@ -123,6 +124,12 @@ const aliveCount = computed(() => snapshot.value?.view.players.filter(p => p.ali
 const confirmedCount = computed(() => snapshot.value?.view.players.filter(p => p.alive && p.wordConfirmed).length ?? 0)
 const voterCount = computed(() => snapshot.value?.view.players.filter(p => p.canVote).length ?? 0)
 const votedCount = computed(() => snapshot.value?.view.players.filter(p => p.canVote && p.hasVoted).length ?? 0)
+/** 这一局里从未作画的人（机器人、没轮到过的、已出局的） */
+const playersWithoutArtwork = computed(() => {
+  const drawn = new Set((snapshot.value?.artworks ?? []).map((a) => a.playerId))
+  return (snapshot.value?.view.players ?? []).map((p) => p.id).filter((id) => !drawn.has(id))
+})
+
 const remaining = computed(() => Math.max(0, Math.ceil(((snapshot.value?.view.phaseDeadline ?? 0) - clock.value - serverOffset) / 1000)))
 const speakerIndex = computed(() => snapshot.value?.view.speakOrder.indexOf(snapshot.value.view.currentSpeakerId ?? '') ?? -1)
 const candidates = computed(() => snapshot.value?.view.players.filter(p => p.alive && p.id !== snapshot.value!.playerId && (!snapshot.value!.view.pkCandidates || snapshot.value!.view.pkCandidates.includes(p.id))) ?? [])
