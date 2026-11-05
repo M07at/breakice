@@ -1,4 +1,4 @@
-﻿// 破冰局 · uc-command：服务端谁是卧底引擎
+// 破冰局 · uc-command：服务端谁是卧底引擎
 //
 // 这个文件会被 scripts/build-uc-command.mjs 拼在上面的引擎代码之后，
 // 所以这里**不要写 import**，直接用内联进来的 createGame / applyAction / tick / toPublicView / UcError。
@@ -15,7 +15,7 @@ const SUPABASE_URL = Deno.env.get('SUPABASE_URL') ?? ''
 const SERVICE_ROLE = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
 
 /** 部署后可以用 { op: 'version' } 确认线上跑的是哪一版 */
-const HANDLER_VERSION = 'uc-2026-11-05-bots3'
+const HANDLER_VERSION = 'uc-2026-11-05-bots4'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -188,8 +188,11 @@ function nextBotAction(state: UcState, botIds: Set<string>): { actor: string; ac
       (p) => p.alive && botIds.has(p.id) && !(p.id in state.votes) && eligibleVoterIds(state).includes(p.id),
     )
     if (!bot) return null
-    const targets = eligibleVoterIds(state).filter((id) => id !== bot.id)
-    const target = targets.length > 0 ? targets[Math.floor(Math.random() * targets.length)] : null
+    // 加时赛只能投给加赛候选人，投别人会被引擎判 INVALID_TARGET
+    const pool = state.pkCandidates && state.pkCandidates.length > 0 ? state.pkCandidates : eligibleVoterIds(state)
+    const targets = pool.filter((id) => id !== bot.id)
+    // 普通轮没人可投就弃权；加时赛必须投给自己以外的候选人，没有就退而投候选人之一
+    const target = targets.length > 0 ? targets[Math.floor(Math.random() * targets.length)] : (pool.length > 0 ? pool[0] : null)
     return { actor: bot.id, action: { type: 'vote', by: bot.id, targetId: target } as UcAction }
   }
   return null
@@ -214,7 +217,14 @@ async function driveBots(admin: Admin, gameId: string, maxSteps = 24): Promise<v
     // 阶段该不该结束交给引擎（全员行动完）和客户端的 tick 决定，
     // 否则机器人会在同一次请求里把整局一路推到结算。
     const now = Date.now()
-    const applied = applyAction(game.state, pick.action, { now, isHost: false })
+    // 机器人动作失败只跳过它自己，绝不能让整个 tick 请求 400
+    let applied
+    try {
+      applied = applyAction(game.state, pick.action, { now, isHost: false })
+    } catch (botError) {
+      console.warn('[uc-command] 机器人动作被拒，已跳过', pick.action.type, String(botError))
+      return
+    }
     const next = applied.state
     const ended = next.phase === 'ended'
     const { error } = await admin.rpc('uc_commit_action', {
@@ -688,6 +698,7 @@ Deno.serve(async (req: Request) => {
     return fail(error)
   }
 })
+
 
 
 

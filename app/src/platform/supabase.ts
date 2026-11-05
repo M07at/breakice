@@ -323,9 +323,11 @@ export class SupabaseRoomApi implements RoomApi {
       }
       return result as T
     } catch (issue) {
-      // 把服务端返回的原因打出来，排查时不用再翻 Network 面板
+      // 把服务端返回的原因打出来，排查时不用再翻 Network 面板。
+      // tick 是每秒一次的轮询，网络抖动很正常，用它打红字只会淹没真正的问题。
       const op = body && typeof body === 'object' ? (body as { op?: string }).op : undefined
-      console.error(`[uc-command] ${path}#${op ?? '?'} 失败`, issue instanceof Error ? issue.message : issue)
+      const log = op === 'tick' ? console.warn : console.error
+      log(`[uc-command] ${path}#${op ?? '?'} 失败`, issue instanceof Error ? issue.message : issue)
       throw issue
     }
   }
