@@ -47,7 +47,7 @@ try {
   }
   const [host, guest] = sessions
   const version = await uc(host.access_token, { op: 'version' })
-  assert.equal(version.version, 'uc-2026-11-06-bots5-mbti')
+  assert.equal(version.version, 'uc-2026-11-06-drawing-lifecycle')
   passed(`Live function version: ${version.version}`)
 
   const profile = async (session) => (await must(

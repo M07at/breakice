@@ -15,7 +15,7 @@ const SUPABASE_URL = Deno.env.get('SUPABASE_URL') ?? ''
 const SERVICE_ROLE = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
 
 /** 部署后可以用 { op: 'version' } 确认线上跑的是哪一版 */
-const HANDLER_VERSION = 'uc-2026-11-06-bots5-mbti'
+const HANDLER_VERSION = 'uc-2026-11-06-drawing-lifecycle'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -134,7 +134,7 @@ async function loadArtworks(admin: Admin, gameId: string) {
       turnKey: art.turn_key,
       preview: art.storage_path,
       status,
-      score: typeof ai?.total === 'number' ? ai.total : undefined,
+      score: ai?.status === 'success' && typeof ai.total === 'number' ? ai.total : undefined,
       comment: typeof ai?.comment === 'string' ? ai.comment : undefined,
     }
   })
@@ -477,7 +477,7 @@ async function handleAct(admin: Admin, uid: string, body: Record<string, any>): 
     }
   }
 
-  if (meta.expectedVersion !== undefined && Number(meta.expectedVersion) !== state.version) {
+  if (action.type !== 'aiScored' && meta.expectedVersion !== undefined && Number(meta.expectedVersion) !== state.version) {
     const independent = action.type === 'acknowledgeWord' || action.type === 'vote' || action.type === 'drawingSubmitted'
     // 交画只要求还在作画阶段：轮次/发言者的时间戳很容易在提交瞬间变化，
     // 用 turnKey 严格比对会把正常的提交判成过期（人机回合切换快时尤其明显）。
@@ -502,7 +502,13 @@ async function handleAct(admin: Admin, uid: string, body: Record<string, any>): 
 
   const full = { ...(action as object), by: uid } as UcAction
   // AI 评分只能代表自己交的那幅画，不让客户端给别人加分
-  if (full.type === 'aiScored') (full as { playerId: string }).playerId = uid
+  if (full.type === 'aiScored') {
+    full.playerId = uid
+    const { data: artwork } = await admin.from('artworks').select('id').eq('game_id', game.id).eq('user_id', uid).eq('turn_key', `${full.turnKey}#${uid}`).maybeSingle()
+    const { data: verified } = artwork ? await admin.from('ai_scores').select('total,status').eq('artwork_id', artwork.id).maybeSingle() : { data: null }
+    if (verified?.status !== 'success' || typeof verified.total !== 'number') throw new UcError('BAD_REQUEST', '没有已验证的 AI 分数')
+    full.score = verified.total
+  }
   const applied = applyAction(baseState, full, { now, isHost: hostId === uid })
   const settled = tick(applied.state, now)
   const next = settled.state
@@ -591,10 +597,6 @@ async function handleTick(admin: Admin, uid: string, body: Record<string, any>):
       p_version: settled.state.version,
     })
     await writeScores(admin, game.id, [...departed.events, ...settled.events], `${game.id}:v${settled.state.version}`)
-    if (ended) {
-      await admin.from('games').update({ status: 'ended', ended_at: new Date().toISOString() }).eq('id', game.id)
-      await admin.from('rooms').update({ status: 'lobby' }).eq('id', game.room_id)
-    }
   }
 
   await driveBots(admin, game.id)

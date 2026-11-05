@@ -79,6 +79,7 @@ export async function clearRemoteDrawRoom(roomId: string): Promise<void> {
     await (roomApi as SupabaseRoomApi).rpcCall<void>('clear_draw_session', { p_room_id: roomId })
   } catch (error) {
     console.warn('清理你画我猜会话失败', error)
+    throw error
   }
 }
 /** 主持人把这一轮的题面发给作画者（只有本人能读回） */

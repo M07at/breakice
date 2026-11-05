@@ -211,10 +211,11 @@ let liveUnsubscribe: (() => void) | null = null
         ...room.value,
         phase: 'lobby',
         gameType: null,
-        players: room.value.players.map((player) => ({ ...player, isReady: player.isHost })),
+        players: room.value.players.map((player) => ({ ...player, isReady: false })),
       }
     } catch (issue) {
       error.value = toErrorMessage(issue)
+      throw issue
     } finally {
       busy.value = false
     }
@@ -263,6 +264,7 @@ let liveUnsubscribe: (() => void) | null = null
     connecting,
     error,
     platformLabel,
+    refreshNow,
     create,
     join,
     restore,

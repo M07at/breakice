@@ -129,17 +129,28 @@ function createPort(gameId: string, variant: Variant): UcPlayerPort {
       return snapshot
     },
     submitDrawing: async (id, drawing, meta) => {
-      const submitted = await invoke<UcPlayerSnapshot>({
+      let submitted = await invoke<UcPlayerSnapshot>({
         op: 'act',
         game_id: id,
         action: { type: 'drawingSubmitted', turnKey: meta.expectedTurnKey, drawingRef: drawing.preview },
         meta,
       })
+      // 提前交画和到时交画走同一套发言结束规则，不再等剩余倒计时。
+      if (submitted.view.phase === 'describe' && submitted.view.currentSpeakerId === submitted.playerId) {
+        try {
+          submitted = await invoke<UcPlayerSnapshot>({ op: 'act', game_id: id, action: { type: 'turnDone' }, meta: {
+            requestId: `${meta.requestId}-done`, expectedVersion: submitted.view.version,
+            expectedPhase: submitted.view.phase, expectedRound: submitted.view.round, expectedTurnKey: submitted.view.turnKey,
+          } })
+        } catch { submitted = await invoke<UcPlayerSnapshot>({ op: 'tick', game_id: id }) }
+      }
       pokeRoom('game')
       // 画作已入库，再要一次 AI 评分；评分失败/超时不影响回合推进
       if (!drawing.artworkId) return submitted
+      const artworkId = drawing.artworkId
+      void (async () => {
       try {
-        const ai = await requireApi().scoreArtwork(drawing.artworkId)
+        const ai = await requireApi().scoreArtwork(artworkId)
         if (ai?.status === 'success' && typeof ai.total === 'number') {
           const view = submitted.view
           const scored = await invoke<UcPlayerSnapshot>({
@@ -166,6 +177,7 @@ function createPort(gameId: string, variant: Variant): UcPlayerPort {
       } catch (error) {
         console.warn('[uc] AI 评分异常', error)
       }
+      })()
       return submitted
     },
     replay: (requestId) => {
@@ -219,7 +231,8 @@ export async function adoptUndercoverRound(roomId: string, variant: Variant): Pr
 }
 
 /** 主持人提前结束本局：让服务端把 games.status 收尾，否则下一局会被 GAME_ACTIVE 挡住 */
-export async function endUndercoverRound(): Promise<void> {
+export async function endUndercoverRound(roomId = activeRoomId): Promise<void> {
+  if (!activeGameId && roomId) await adoptUndercoverRound(roomId, 'classic')
   if (!activeGameId) return
   await invoke({
     op: 'act',

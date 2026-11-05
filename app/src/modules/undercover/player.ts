@@ -3,7 +3,7 @@ import type { UcClientAction, UcCommandMeta } from './backend'
 import type { UcPublicView, UcSecretView } from './view'
 
 export type MockScoreMode = 'success' | 'failed' | 'timeout'
-export interface HybridArtwork { id: string; playerId: string; turnKey: string; preview: string; status: 'pending' | MockScoreMode; score?: number }
+export interface HybridArtwork { id: string; playerId: string; turnKey: string; preview: string; status: 'pending' | MockScoreMode; score?: number; comment?: string }
 export interface DrawingSubmission {
   /** 模拟适配器放图形符号；真实画布放 Storage 路径 {game_id}/{turn_key}/{user_id}.png */
   preview: string

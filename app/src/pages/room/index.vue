@@ -10,6 +10,7 @@ import { adoptUndercoverRound, endUndercoverRound, PLAYER_PAGE, startUndercoverR
 import { fetchRoomLeaderboard } from '../../services/scoreBoard'
 import { toErrorMessage } from '../../platform/types'
 import { testBotCount } from '../../modules/undercover/rules'
+import { clearRemoteDrawRoom } from '../../services/drawRemoteApi'
 import type { LeaderboardRow } from '../../modules/score'
 import type { GameType } from '../../types/room'
 
@@ -69,7 +70,7 @@ const MIN_PLAYERS: Record<GameType, number> = {
   'truth-or-dare': 2,
   undercover: 4,
   hybrid: 4,
-  drawing: 2,
+  drawing: 1,
 }
 
 function openPage(url: string) {
@@ -124,6 +125,7 @@ async function startLocalDraw() {
     return
   }
   try {
+    if (room.value) await clearRemoteDrawRoom(room.value.id)
     await roomStore.begin('drawing')
     await nextTick()
     openPage(`${gameUrl('drawing')}&variant=${mode}`)
@@ -255,12 +257,14 @@ async function finishRound() {
   // 谁是卧底的局在 games 表里，得先让服务端把它收尾，否则下一局会被 GAME_ACTIVE 挡住
   if (isUndercover(room.value?.gameType ?? null)) {
     try {
-      await endUndercoverRound()
+      await endUndercoverRound(room.value?.id)
     } catch (issue) {
       console.warn('结束服务端局次失败', issue)
+      notice.value = toErrorMessage(issue)
+      return
     }
   }
-  await roomStore.finishGame()
+  try { await roomStore.finishGame() } catch (issue) { notice.value = toErrorMessage(issue); return }
   await loadLeaderboard()
   notice.value = '本局已结束，房间回到大厅'
 }

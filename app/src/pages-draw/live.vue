@@ -8,7 +8,7 @@
  *
  * 只有本页用于房间模式；B 原来的 setup/play 单机流程不受影响。
  */
-import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { onLoad } from '@dcloudio/uni-app'
 import DrawCanvas from '@/components/draw-canvas/draw-canvas.vue'
 import Avatar from '@/components/Avatar.vue'
@@ -25,6 +25,7 @@ import type { LocalDrawRoomBackend } from '@/modules/draw/room'
 import { roomApi } from '@/platform'
 import { SupabaseRoomApi } from '@/platform/supabase'
 import { fetchRoom } from '@/services/roomService'
+import { useRoomStore } from '@/stores/room'
 import { createDrawPublisher } from '@/services/drawRemote'
 import type { DrawRemoteApi, Publisher } from '@/services/drawRemote'
 import { createRemoteDrawRoom, } from '@/services/drawRemote'
@@ -46,6 +47,11 @@ interface CanvasApi {
 const DRAW_SCORE = { aiWeight: 1, painterCap: 2000, perGuesser: 100, guesserBase: 200, guesserPerSecond: 0 }
 
 const roomId = ref('')
+const roomStore = useRoomStore()
+let finishing = false
+let finishRequested = false
+let returning = false
+let returnTimer: ReturnType<typeof setTimeout> | null = null
 /** 玩法：普通 / Emoji / 自定义，由主持人在房间页选择 */
 const drawVariant = ref<'classic' | 'emoji' | 'custom'>('classic')
 const customText = ref('')
@@ -132,9 +138,9 @@ const autoSubmit = () => {
 
 const remain = computed(() => {
   const snapshot = view.value
-  if (!snapshot || snapshot.phase !== 'drawing') return 0
+  if (!snapshot || snapshot.phase === 'ended') return 0
   // endsAt 是服务端时间：先用偏差换成本机时间，再减，倒计时才会真的走
-  return Math.max(0, Math.round((snapshot.endsAt - (clockTick.value + serverOffset.value)) / 1000))
+  return Math.max(0, Math.ceil((snapshot.endsAt - (clockTick.value + serverOffset.value)) / 1000))
 })
 
 /** 联机用的单人画布引擎：只画自己的这一张 */
@@ -160,6 +166,7 @@ onLoad((options) => {
 
 /** 收到新视图时统一处理：校正时钟、刷新画廊图片、同步私有题面 */
 function adoptView(next: DrawRoomView) {
+  const previous = view.value
   serverOffset.value = next.serverTime - Date.now()
   clockTick.value = Date.now()
   
@@ -168,8 +175,18 @@ function adoptView(next: DrawRoomView) {
   if (lastRoundKey !== next.roundKey) {
     lastRoundKey = next.roundKey
     remoteWord.value = ''
+    autoSubmitArmed = true
+    viewerEngine.reset()
   }
   view.value = next
+  if (!previous || previous.phase !== next.phase || previous.roundKey !== next.roundKey) {
+    void nextTick(() => uni.pageScrollTo({ scrollTop: 0, duration: 0 }))
+  }
+  error.value = ''
+  if (next.phase === 'ended') {
+    if (isHost.value && !finishRequested) void finishDrawingSession()
+    else if (!isHost.value) scheduleReturn()
+  }
   // 玩法以主持人发布出来的视图为准：其他人是自动进房的，URL 里没有 variant
   const published = (next as { variant?: string }).variant
   if (published === 'emoji' || published === 'custom' || published === 'classic') {
@@ -302,6 +319,7 @@ onMounted(async () => {
 })
 
 onUnmounted(() => {
+  if (returnTimer) clearTimeout(returnTimer)
   offView?.()
   remoteDispose?.()
   publisher?.stop()
@@ -330,8 +348,38 @@ async function syncPanelUrls() {
 }
 
 function backToLobby() {
-  uni.navigateBack({ delta: 1, fail: () => uni.reLaunch({ url: '/pages/room/index' }) })
+  if (returning) return
+  returning = true
+  uni.reLaunch({ url: '/pages/room/index' })
 }
+function scheduleReturn() {
+  publisher?.stop()
+  remoteDispose?.()
+  if (tickTimer) clearInterval(tickTimer)
+  if (!returnTimer) returnTimer = setTimeout(backToLobby, 5000)
+}
+async function finishDrawingSession(early = false) {
+  if (finishing || !view.value || !isHost.value) return
+  finishing = true
+  finishRequested = true
+  try {
+    if (early && localBackend) view.value = await localBackend.end()
+    await publisher?.flush()
+    await (roomApi as SupabaseRoomApi).rpcCall('finish_draw_session', { p_room_id: roomId.value, p_game_key: view.value.gameId })
+    scheduleReturn()
+    await roomStore.refreshNow()
+  } catch (issue) {
+    error.value = issue instanceof Error ? issue.message : String(issue)
+  } finally { finishing = false }
+}
+watch(() => roomStore.room?.phase, async (phase, previous) => {
+  if (phase !== 'lobby' || previous !== 'playing' || !view.value) return
+  try {
+    const latest = await api?.readView(roomId.value)
+    adoptView({ ...(latest?.view ?? view.value), phase: 'ended', endsAt: 0 })
+  } catch { view.value = { ...view.value, phase: 'ended', endsAt: 0 } }
+  scheduleReturn()
+})
 
 async function submitDrawing() {
   if (busy.value || !canvasRef.value || !view.value) return
@@ -391,9 +439,8 @@ async function react(targetPlayerId: string, kind: 'flower' | 'dislike') {
 }
 
 async function endSession() {
-  publisher?.stop()
-  await clearRemoteDrawRoom(roomId.value)
-  uni.navigateBack({ delta: 1 })
+  finishRequested = false
+  await finishDrawingSession(true)
 }
 </script>
 
@@ -408,13 +455,6 @@ async function endSession() {
       <button v-if="isHost" class="ghost" @click="endSession">结束</button>
     </view>
 
-    <view class="alert debug">
-      角色={{ isHost ? '主持人' : '观战' }}｜我={{ meId.slice(0, 6) }}｜阶段={{ view ? view.phase : '无视图' }}｜画者={{
-        view ? view.painterId.slice(0, 6) : '-'
-      }}｜轮次={{ view ? view.roundKey : '-' }}｜玩法={{ drawVariant }}｜题面={{ myWord ? myWord.word : '空' }}｜通道={{
-        liveConnected() ? '连' : '断'
-      }}
-    </view>
 
     <view v-if="wordError" class="alert">{{ wordError }}</view>
     <view v-if="error" class="alert">{{ error }}</view>
@@ -422,6 +462,10 @@ async function endSession() {
     <view v-if="!view" class="surface empty">等待主持人开局…</view>
 
     <template v-else>
+      <view v-if="!ended" class="drawing-countdown" :class="{ urgent: remain <= 5 }" role="timer">
+        <text>{{ view.scoring ? 'AI 正在评分' : view.phase === 'reveal' ? '查看结果，随后换人' : '作画剩余' }}</text>
+        <text v-if="!view.scoring" class="countdown-number">{{ remain }}<text class="countdown-unit"> 秒</text></text>
+      </view>
       <view class="surface turn">
         <text class="label">{{ myTurn ? '轮到你画' : '正在作画' }} · <PlayerIdentity :name="painterName" :mbti="mbtiOf(view?.painterId)" /></text>
         <text class="muted">{{ view.scoring ? 'AI 正在识别画作，请稍候…' : `${hintText} · 剩余 ${remain} 秒` }}</text>
@@ -440,6 +484,7 @@ async function endSession() {
 
             <view v-if="ended" class="surface">
         <text class="label">最终排名</text>
+        <text class="muted">本局已结束，5 秒后回到房间；下一局需要重新准备。</text>
         <button v-if="isHost" class="primary" @click="backToLobby">回到大厅 →</button>
         <view class="podium">
           <view v-for="(row, index) in podium" :key="row.playerId" class="podium-item" :class="'place-' + (index + 1)">
@@ -493,6 +538,10 @@ async function endSession() {
 .page {
   padding: 24rpx;
 }
+.drawing-countdown { position: sticky; top: 0; z-index: 20; display: flex; align-items: center; justify-content: space-between; padding: 22rpx 28rpx; margin-bottom: 20rpx; border: 3rpx solid #4f8ef7; border-radius: 20rpx; background: #edf4ff; color: #2455a5; font-size: 28rpx; font-weight: 700; }
+.countdown-number { font-size: 76rpx; line-height: 1; font-weight: 900; font-variant-numeric: tabular-nums; }
+.countdown-unit { font-size: 28rpx; }
+.drawing-countdown.urgent { background: #fff0ec; border-color: #d75535; color: #b53d24; }
 .head {
   margin-bottom: 20rpx;
 }

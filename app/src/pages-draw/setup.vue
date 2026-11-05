@@ -22,7 +22,7 @@
         <text class="count">{{ count }} 人</text>
       </view>
       <view v-else class="row">
-        <button size="mini" :disabled="count <= 2" @tap="count--">−</button>
+        <button size="mini" :disabled="count <= 1" @tap="count--">−</button>
         <text class="count">{{ count }} 人</text>
         <button size="mini" :disabled="count >= 12" @tap="count++">+</button>
       </view>
@@ -53,6 +53,7 @@ import { startLocalDrawRoom } from '@/modules/draw/room'
 import type { DrawVariant } from '@/modules/draw/types'
 import { DEFAULT_DRAW_SECONDS, DRAW_DURATION_OPTIONS, normalizeDrawSeconds } from '@/modules/draw/settings'
 import { useRoomStore } from '@/stores/room'
+import { clearRemoteDrawRoom } from '@/services/drawRemoteApi'
 
 const variants: DrawVariant[] = ['classic', 'emoji', 'custom']
 const variant = ref<DrawVariant>('classic')
@@ -74,7 +75,7 @@ const roomId = ref('')
 // 从房间进入时用房间人数预填，房间是这一局的单位
 onLoad((options) => {
   const raw = Number(options?.count)
-  if (Number.isFinite(raw)) count.value = Math.min(12, Math.max(2, Math.round(raw)))
+  if (Number.isFinite(raw)) count.value = Math.min(12, Math.max(1, Math.round(raw)))
   locked.value = options?.lock === '1'
   // 从房间进来时会带 room=<id>，联机版靠它发布/订阅对局
   roomId.value = String(options?.room ?? '')
@@ -93,6 +94,7 @@ async function start() {
     const seconds = variant.value === 'custom' ? drawSeconds.value : DEFAULT_DRAW_SECONDS
     if (roomId.value) {
       if (roomStore.room?.id !== roomId.value || !roomStore.isHost) throw new Error('请由主持人从房间大厅进入')
+      await clearRemoteDrawRoom(roomId.value)
       await roomStore.begin('drawing')
       uni.redirectTo({ url: `/pages-draw/live?room=${encodeURIComponent(roomId.value)}&variant=${variant.value}&drawSeconds=${seconds}&customText=${encodeURIComponent(customText.value.trim())}` })
       return

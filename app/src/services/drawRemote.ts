@@ -62,13 +62,15 @@ export function createDrawPublisher(options: PublisherOptions): Publisher {
   let publishTimer: ReturnType<typeof setInterval> | null = null
   let pollTimer: ReturnType<typeof setInterval> | null = null
   let offView: (() => void) | null = null
+  let publishWork: Promise<void> | null = null
 
-  async function publishOnce(): Promise<void> {
+  async function performPublish(): Promise<void> {
     if (!dirty || publishing) return
     publishing = true
     dirty = false
     try {
       const view = await options.backend.view()
+      if (stopped) return
       // 主持人自己作画时本机视图含答案；公开频道不能把它发给猜题者。
       await options.api.publishView(options.roomId, { ...view, word: null, palette: [] })
     } catch (error) {
@@ -78,6 +80,11 @@ export function createDrawPublisher(options: PublisherOptions): Publisher {
     } finally {
       publishing = false
     }
+  }
+  function publishOnce(): Promise<void> {
+    if (publishWork) return publishWork
+    publishWork = performPublish().finally(() => { publishWork = null })
+    return publishWork
   }
 
   async function drainQueue(): Promise<void> {

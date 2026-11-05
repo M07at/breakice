@@ -137,6 +137,7 @@ export interface DrawRoomBackend {
   sendReaction(targetPlayerId: string, kind: DrawReaction): Promise<DrawRoomView>
   /** 页面卸载时释放监听和定时器 */
   dispose(): void
+  end?(): Promise<DrawRoomView>
 }
 
 /** 对别人的画表示态度：送花 = 好看，点差评 = 画得离谱 */
@@ -259,10 +260,10 @@ export class LocalDrawRoomBackend implements DrawRoomBackend {
     this.listFilter = options.listFilter ?? null
     this.gameId = `local-draw-${this.now().toString(36)}`
     // 联机时用房间真实名单；单机时保持原来的生成规则
-    const roster = options.players && options.players.length >= 2 ? options.players : null
+    const roster = options.players && options.players.length >= 1 ? options.players : null
     this.players = roster
       ? roster.map((player) => ({ id: player.id, name: player.name, mbti: player.mbti }))
-      : Array.from({ length: Math.max(2, options.playerCount) }, (_, i) =>
+      : Array.from({ length: Math.max(1, options.playerCount) }, (_, i) =>
           i === 0 ? { id: LOCAL_USER_ID, name: '我' } : { id: `local-${i + 1}`, name: `玩家${i + 1}` },
         )
 
@@ -388,6 +389,7 @@ export class LocalDrawRoomBackend implements DrawRoomBackend {
           degraded: true,
         }
       }
+      if (this.phase === 'ended') return
       this.drawings[actor] = { playerId: actor, imageRef, ai }
       this.answers[actor] = word
       this.board.settleRound({
@@ -482,6 +484,14 @@ export class LocalDrawRoomBackend implements DrawRoomBackend {
 
   private painterId(): string {
     return this.players[this.roundIndex]?.id ?? this.players[0].id
+  }
+
+  async end(): Promise<DrawRoomView> {
+    this.phase = 'ended'
+    this.endsAt = 0
+    this.revealEndsAt = 0
+    await this.emit()
+    return this.view()
   }
 
   private roundKey(): string {

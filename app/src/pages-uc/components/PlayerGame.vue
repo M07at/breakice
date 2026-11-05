@@ -2,6 +2,9 @@
   <view class="uc-page">
     <view class="uc-header"><text class="uc-eyebrow">破冰局 / {{ snapshot?.view.variant === 'draw' ? '你画我猜谁是卧底' : '谁是卧底' }}</text><view class="uc-row"><text class="uc-title">{{ title }}</text><text v-if="snapshot?.view.phaseDeadline" class="player-clock">{{ remaining }}秒</text></view><text class="uc-subtitle">{{ port?.label ?? '个人游戏界面' }}</text></view>
     <view v-if="snapshot" class="uc-note identity">你是 {{ seatOf(snapshot.playerId) }} 号 · <PlayerIdentity :name="nameOf(snapshot.playerId)" :mbti="mbtiOf(snapshot.playerId)" /> <text v-if="rights?.isHost">（主持人）</text></view>
+    <view v-if="snapshot && snapshot.view.phaseDeadline" class="phase-countdown" :class="{ urgent: remaining <= 5 }" role="timer">
+      <text>{{ timerLabel }}</text><text class="countdown-number">{{ remaining }}<text class="countdown-unit"> 秒</text></text>
+    </view>
     <view v-if="!connected" class="uc-note" role="status">{{ snapshot ? '连接暂时中断，显示的是上次进度；正在重试连接…' : '正在连接游戏…' }}</view>
     <view v-if="busy" class="uc-note" role="status">正在提交，请稍候…</view>
     <view v-if="notice" class="uc-note" role="status">{{ notice }}</view>
@@ -35,7 +38,7 @@
           <text class="uc-label"><PlayerIdentity :name="nameOf(snapshot.view.currentSpeakerId)" :mbti="mbtiOf(snapshot.view.currentSpeakerId)" /> 正在画</text>
           <DrawCanvas ref="hybridCanvas" :engine="hybridViewer" mode="watch" variant="classic" @error="error = $event" />
         </view>
-        <HybridDrawAdapter ref="hybridAdapter" v-if="snapshot.view.variant === 'draw' && rights.canFinish" :key="snapshot.gameId + snapshot.view.turnKey + snapshot.playerId" :game-id="snapshot.gameId" :turn-key="snapshot.view.turnKey" :player-id="snapshot.playerId" :seed-ops="roundOps" :editable="!locked" @submit="submitDrawing" />
+        <HybridDrawAdapter ref="hybridAdapter" v-if="snapshot.view.variant === 'draw' && rights.canFinish" :key="snapshot.gameId + snapshot.view.turnKey + snapshot.playerId" :game-id="snapshot.gameId" :turn-key="snapshot.view.turnKey" :player-id="snapshot.playerId" :editable="!locked" @submit="submitDrawing" />
         <view v-if="rights.me?.alive" class="uc-card"><text class="uc-label">我的词卡</text><text v-if="secret" class="secret-word small">{{ secret.isBlank ? '你是白板' : secret.word }}</text><button class="uc-button uc-secondary" :disabled="locked" @tap="secret ? hideSecret() : reveal()">{{ secret ? '遮住我的词语' : '私密查看我的词语' }}</button></view>
         <view class="uc-card"><text class="uc-label">发言顺序</text><view v-for="(id, i) in snapshot.view.speakOrder" :key="id" class="player-line"><text>{{ seatOf(id) }} 号 · <PlayerIdentity :name="nameOf(id)" :mbti="mbtiOf(id)" /></text><text class="uc-muted">{{ i < speakerIndex ? '已发言' : id === snapshot.view.currentSpeakerId ? '正在发言' : '等待' }}</text></view></view>
       </template>
@@ -43,12 +46,8 @@
       <view v-if="snapshot.view.variant === 'draw' && ['review', 'vote', 'reveal', 'ended'].includes(snapshot.view.phase)" class="uc-card">
         <text class="uc-label">{{ snapshot.view.phase === 'review' ? '作品回顾 · 倒计时后自动投票' : '本轮画作' }}</text>
         <text class="uc-muted">缺席或超时未交的画手没有作品。AI 评分失败或超时不会阻塞投票。</text>
-        <view v-for="(art, index) in galleryArtworks" :key="art.id" class="final-player"><text>第 {{ index + 1 }} 位 · <PlayerIdentity :name="nameOf(art.playerId)" :mbti="mbtiOf(art.playerId)" /></text><image v-if="artworkUrls[art.id]" class="gallery-image" :src="artworkUrls[art.id]" mode="widthFix" /><text v-else class="gallery-picture">{{ art.preview }}</text><text v-if="guessText(art)" class="uc-muted">{{ guessText(art) }}</text>
+        <view v-for="(art, index) in galleryArtworks" :key="art.id" class="final-player"><text>第 {{ index + 1 }} 位 · <PlayerIdentity :name="nameOf(art.playerId)" :mbti="mbtiOf(art.playerId)" /></text><image v-if="artworkUrls[art.id]" class="gallery-image" :src="artworkUrls[art.id]" mode="widthFix" /><view v-else class="gallery-placeholder">画作加载中…</view><text v-if="guessText(art)" class="uc-muted">{{ guessText(art) }}</text>
           <text class="uc-muted">{{ art.status === 'pending' ? 'AI 评分中…' : art.status === 'success' ? 'AI 评分完成' : art.status === 'failed' ? '评分失败，已跳过' : '评分超时，已跳过' }}{{ art.score !== undefined ? ' · ' + art.score + '分' : '' }}</text></view>
-        <view v-if="relayFinal && artworkUrls[relayFinal.id]" class="final-player">
-          <text>完整接力画（<PlayerIdentity :name="nameOf(relayFinal.playerId)" :mbti="mbtiOf(relayFinal.playerId)" />）</text>
-          <image class="gallery-image" :src="artworkUrls[relayFinal.id]" mode="widthFix" />
-        </view>
         <view v-for="id in playersWithoutArtwork" :key="'na-' + id" class="final-player"><text><PlayerIdentity :name="nameOf(id)" :mbti="mbtiOf(id)" /> · 本轮没有作画</text><text class="uc-muted">只有轮到发言的人才会画</text></view>
         <text v-if="!snapshot.artworks?.length && !playersWithoutArtwork.length" class="uc-muted">本轮暂无已提交画作，仍会按时进入投票。</text>
       </view>
@@ -73,7 +72,7 @@
       <template v-if="snapshot.view.phase === 'ended'">
         <view class="uc-card"><text class="uc-badge">第 {{ snapshot.view.round }} 轮 · 本局结束</text><text class="person">{{ ending }}</text><text v-if="snapshot.view.endedReason === 'max_rounds'" class="uc-muted">已达到轮数上限。</text><text v-if="snapshot.view.pair" class="uc-note personal-wait">平民词：{{ snapshot.view.pair.civilian }} / 卧底词：{{ snapshot.view.pair.undercover }}</text></view>
         <view class="uc-card"><text class="uc-label">揭晓所有人的词</text><view v-for="p in snapshot.view.players" :key="p.id" class="final-player"><view class="uc-row"><text>{{ p.seat + 1 }} 号 · <PlayerIdentity :name="nameOf(p.id)" :mbti="mbtiOf(p.id)" /></text><text class="uc-badge">{{ p.role ? ROLE_LABEL[p.role] : '' }}</text></view><text class="uc-muted">{{ p.word === null ? '没有词语' : p.word }} · {{ p.alive ? '存活到最后' : '已出局' }}</text></view></view>
-        <button v-if="rights.isHost" class="uc-button" :disabled="locked" @tap="backToLobby">回到大厅 →</button><view v-else class="uc-note">等待主持人开始下一局，你会自动进入新局。</view>
+        <button class="uc-button" :disabled="busy" @tap="backToLobby">回到房间 →</button><view class="uc-note">本局已结束，5 秒后回到房间。下一局需要重新准备。</view>
       </template>
 
       <button v-if="rights.canEnd" class="uc-link uc-warning" :disabled="locked || confirming" @tap="confirmEnd">主持人提前结束</button>
@@ -88,7 +87,7 @@
 
 <script setup lang="ts">
 import HybridDrawAdapter from './HybridDrawAdapter.vue'
-import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { onHide, onLoad, onShow } from '@dcloudio/uni-app'
 import { isUcError, ROLE_LABEL } from '@/modules/undercover'
 import type { UcClientAction, UcCommandMeta, UcSecretView } from '@/modules/undercover'
@@ -152,17 +151,12 @@ const galleryArtworks = computed(() => {
   })
 })
 
-/** 完整接力画：本轮最后一位作画者的成品 */
-const relayFinal = computed(() => {
-  const list = galleryArtworks.value
-  return list.length > 0 ? list[list.length - 1] : null
-})
-
 /**
  * 画作上的 AI 猜测信息。服务端接上画图识别后，artworks 行会带 aiGuess / aiSeconds；
  * 现在没有就返回空串，不占位置。
  */
-function guessText(art: Record<string, unknown>) {
+function guessText(art: { comment?: string; aiGuess?: string; aiSeconds?: number }) {
+  if (art.comment) return art.comment
   const guess = art.aiGuess as string | undefined
   const seconds = art.aiSeconds as number | undefined
   if (!guess && seconds === undefined) return ''
@@ -178,6 +172,7 @@ const playersWithoutArtwork = computed(() => {
 })
 
 const remaining = computed(() => Math.max(0, Math.ceil(((snapshot.value?.view.phaseDeadline ?? 0) - clock.value - serverOffset) / 1000)))
+const timerLabel = computed(() => ({ describe: props.variant === 'draw' ? '本次作画剩余' : '本次发言剩余', review: '查看画作，随后投票', vote: '投票剩余', reveal: '下一轮开始前' })[snapshot.value?.view.phase as 'describe' | 'review' | 'vote' | 'reveal'] ?? '剩余时间')
 const speakerIndex = computed(() => snapshot.value?.view.speakOrder.indexOf(snapshot.value.view.currentSpeakerId ?? '') ?? -1)
 const candidates = computed(() => snapshot.value?.view.players.filter(p => p.alive && p.id !== snapshot.value!.playerId && (!snapshot.value!.view.pkCandidates || snapshot.value!.view.pkCandidates.includes(p.id))) ?? [])
 const title = computed(() => ({ word: '领好你的秘密词', describe: '认真听，慢慢猜', review: '一起看看画作', vote: '你觉得会是谁？', reveal: '这一轮，揭晓', ended: '秘密终于揭晓' })[snapshot.value?.view.phase ?? 'word'])
@@ -202,6 +197,11 @@ function receive(next: UcPlayerSnapshot) {
   if (!previous || previous.gameId !== next.gameId || previous.view.phase !== next.view.phase) { hideSecret(); selected.value = undefined }
   if (previous && previous.gameId !== next.gameId) { retry.value = null; error.value = ''; notice.value = '主持人已开始新局，你仍使用自己的身份参加。' }
   snapshot.value = next
+  if (next.view.phase === 'ended' && previous?.view.phase !== 'ended') {
+    active = false
+    endedTimer = setTimeout(backToLobby, 5000)
+  }
+  if (!previous || previous.gameId !== next.gameId || previous.view.phase !== next.view.phase) void nextTick(() => uni.pageScrollTo({ scrollTop: 0, duration: 0 }))
   serverOffset = next.serverNow - Date.now()
   clock.value = Date.now()
   connected.value = true
@@ -211,7 +211,6 @@ function receive(next: UcPlayerSnapshot) {
     lastHybridTurn = next.view.turnKey
     hybridViewer.reset()
     hybridCanvas.value?.paint()
-    roundOps.value = []
     // 请画手把当前画布整份补发一次，避免重置前的笔画丢失
     pokeRoom('hybrid-sync')
   }
@@ -301,7 +300,8 @@ function confirmEnd() {
 }
 /** 一局结束回大厅：房间已由服务端置回 lobby 并清空准备状态 */
 function backToLobby() {
-  uni.navigateBack({ delta: 1, fail: () => uni.reLaunch({ url: '/pages/room/index' }) })
+  if (endedTimer) clearTimeout(endedTimer)
+  uni.reLaunch({ url: '/pages/room/index' })
 }
 
 async function replay() {
@@ -331,7 +331,6 @@ onMounted(async () => {
       if (event === 'hybrid-snapshot') {
         const ops = (payload as { ops?: import('@/modules/draw/types').DrawOp[] }).ops
         if (Array.isArray(ops)) {
-          roundOps.value = ops
           hybridViewer.loadSnapshot(ops)
           hybridCanvas.value?.paint()
         }
@@ -360,15 +359,16 @@ const hybridViewer = new DrawEngine({ by: 'hybrid-viewer' })
 /** 融合玩法画布：倒计时结束时自动提交，不再让玩家点按钮 */
 const hybridAdapter = ref<{ submitNow: () => void } | null>(null)
 let hybridSubmitted = false
-setInterval(() => checkAutoSubmit(), 1000)
+const autoSubmitTimer = setInterval(() => checkAutoSubmit(), 1000)
 
 // 观战端每 4 秒要一次全量快照：丢片、清空、重连都能在 4 秒内自愈
-setInterval(() => {
+const hybridSyncTimer = setInterval(() => {
   const view = snapshot.value?.view
   if (!view || view.variant !== 'draw' || view.phase !== 'describe') return
   if (rights.value?.canFinish) return
   pokeRoom('hybrid-sync')
 }, 4000)
+onUnmounted(() => { clearInterval(autoSubmitTimer); clearInterval(hybridSyncTimer) })
 
 function checkAutoSubmit() {
   const value = remaining.value
@@ -388,8 +388,6 @@ function checkAutoSubmit() {
 }
 watch(() => snapshot.value?.view.turnKey, () => { hybridSubmitted = false })
 const hybridCanvas = ref<{ paint(): void } | null>(null)
-/** 本轮已经画好的笔画：轮到下一人时作为接力起点 */
-const roundOps = ref<import('@/modules/draw/types').DrawOp[]>([])
 let lastHybridTurn = ''
 </script>
 
@@ -407,6 +405,11 @@ let lastHybridTurn = ''
 .player-line { display: flex; align-items: center; justify-content: space-between; gap: 16rpx; padding: 20rpx 0; border-bottom: 2rpx solid #edf0e7; }
 .vote-options { margin: 24rpx 0; }
 .player-clock { font-size: 40rpx; font-weight: 700; white-space: nowrap; }
+.phase-countdown { position: sticky; top: 0; z-index: 20; display: flex; align-items: center; justify-content: space-between; padding: 22rpx 28rpx; margin-bottom: 24rpx; border: 3rpx solid #4f8ef7; border-radius: 20rpx; background: #edf4ff; color: #2455a5; font-size: 28rpx; font-weight: 700; }
+.countdown-number { font-size: 76rpx; line-height: 1; font-weight: 900; font-variant-numeric: tabular-nums; }
+.countdown-unit { font-size: 28rpx; }
+.phase-countdown.urgent { background: #fff0ec; border-color: #d75535; color: #b53d24; }
+.gallery-placeholder { display: flex; align-items: center; justify-content: center; min-height: 300rpx; margin: 12rpx 0; border-radius: 12rpx; background: #f1f4f8; color: #65738a; font-size: 26rpx; }
 .final-player { padding: 20rpx 0; border-bottom: 2rpx solid #edf0e7; }
 </style>
 
