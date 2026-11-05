@@ -2,7 +2,7 @@
 import { onLaunch } from '@dcloudio/uni-app'
 
 /** 构建标识：改这里 + 重新构建，控制台就能确认跑的是不是最新包 */
-const BUILD_ID = 'v17-1105'
+const BUILD_ID = 'v18-1106-entry-errors'
 
 onLaunch(() => {
   // 每次启动都打一条，方便从控制台截图判断版本

@@ -63,7 +63,12 @@ async function submit() {
     uni.reLaunch({ url: '/pages/room/index' })
   } catch (issue) {
     uni.hideLoading()
-    uni.showToast({ title: roomStore.error || toErrorMessage(issue), icon: 'none' })
+    uni.showModal({
+      title: '加入房间失败',
+      content: roomStore.error || toErrorMessage(issue),
+      showCancel: false,
+      confirmText: '知道了',
+    })
   }
 }
 </script>
