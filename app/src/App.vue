@@ -34,4 +34,9 @@ scroll-view {
 button::after {
   border: 0;
 }
+/* 透明化页面容器：否则各页自己的浅色底会把背景图整个盖住 */
+view.page,
+view[class*="page"] {
+  background: transparent !important;
+}
 </style>
