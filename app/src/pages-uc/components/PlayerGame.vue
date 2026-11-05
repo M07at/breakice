@@ -43,7 +43,7 @@
       <view v-if="snapshot.view.variant === 'draw' && ['review', 'vote', 'reveal', 'ended'].includes(snapshot.view.phase)" class="uc-card">
         <text class="uc-label">{{ snapshot.view.phase === 'review' ? '作品回顾 · 倒计时后自动投票' : '本轮画作' }}</text>
         <text class="uc-muted">缺席或超时未交的画手没有作品。AI 评分失败或超时不会阻塞投票。</text>
-        <view v-for="art in (snapshot.artworks ?? [])" :key="art.id" class="final-player"><text>{{ nameOf(art.playerId) }}</text><image v-if="artworkUrls[art.id]" class="gallery-image" :src="artworkUrls[art.id]" mode="widthFix" /><text v-else class="gallery-picture">{{ art.preview }}</text><text class="uc-muted">{{ art.status === 'pending' ? 'AI 评分中…' : art.status === 'success' ? 'AI 评分完成' : art.status === 'failed' ? '评分失败，已跳过' : '评分超时，已跳过' }}{{ art.score !== undefined ? ' · ' + art.score + '分' : '' }}</text></view>
+        <view v-for="art in galleryArtworks" :key="art.id" class="final-player"><text>{{ nameOf(art.playerId) }}</text><image v-if="artworkUrls[art.id]" class="gallery-image" :src="artworkUrls[art.id]" mode="widthFix" /><text v-else class="gallery-picture">{{ art.preview }}</text><text class="uc-muted">{{ art.status === 'pending' ? 'AI 评分中…' : art.status === 'success' ? 'AI 评分完成' : art.status === 'failed' ? '评分失败，已跳过' : '评分超时，已跳过' }}{{ art.score !== undefined ? ' · ' + art.score + '分' : '' }}</text></view>
         <view v-for="id in playersWithoutArtwork" :key="'na-' + id" class="final-player"><text>{{ nameOf(id) }} · 本轮没有作画</text><text class="uc-muted">只有轮到发言的人才会画</text></view>
         <text v-if="!snapshot.artworks?.length && !playersWithoutArtwork.length" class="uc-muted">本轮暂无已提交画作，仍会按时进入投票。</text>
       </view>
@@ -125,8 +125,20 @@ const confirmedCount = computed(() => snapshot.value?.view.players.filter(p => p
 const voterCount = computed(() => snapshot.value?.view.players.filter(p => p.canVote).length ?? 0)
 const votedCount = computed(() => snapshot.value?.view.players.filter(p => p.canVote && p.hasVoted).length ?? 0)
 /** 这一局里从未作画的人（机器人、没轮到过的、已出局的） */
+/**
+ * 画作展示范围：
+ * - 投票/回顾：本轮所有人的作品（每轮每位玩家在自己的回合里各画一幅）
+ * - 结束：整局所有轮次
+ */
+const galleryArtworks = computed(() => {
+  const all = snapshot.value?.artworks ?? []
+  if (snapshot.value?.view.phase === 'ended') return all
+  const round = String(snapshot.value?.view.round ?? '')
+  return all.filter((art) => art.turnKey.split('-')[0] === round)
+})
+
 const playersWithoutArtwork = computed(() => {
-  const drawn = new Set((snapshot.value?.artworks ?? []).map((a) => a.playerId))
+  const drawn = new Set(galleryArtworks.value.map((a) => a.playerId))
   return (snapshot.value?.view.players ?? []).map((p) => p.id).filter((id) => !drawn.has(id))
 })
 
