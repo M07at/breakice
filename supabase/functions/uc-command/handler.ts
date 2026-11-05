@@ -1,4 +1,4 @@
-// 破冰局 · uc-command：服务端谁是卧底引擎
+﻿// 破冰局 · uc-command：服务端谁是卧底引擎
 //
 // 这个文件会被 scripts/build-uc-command.mjs 拼在上面的引擎代码之后，
 // 所以这里**不要写 import**，直接用内联进来的 createGame / applyAction / tick / toPublicView / UcError。
@@ -15,7 +15,7 @@ const SUPABASE_URL = Deno.env.get('SUPABASE_URL') ?? ''
 const SERVICE_ROLE = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
 
 /** 部署后可以用 { op: 'version' } 确认线上跑的是哪一版 */
-const HANDLER_VERSION = 'uc-2026-11-05-bots4'
+const HANDLER_VERSION = 'uc-2026-11-05-rules'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -698,6 +698,7 @@ Deno.serve(async (req: Request) => {
     return fail(error)
   }
 })
+
 
 
 

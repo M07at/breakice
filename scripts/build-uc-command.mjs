@@ -1,4 +1,4 @@
-#!/usr/bin/env node
+﻿#!/usr/bin/env node
 /**
  * 把 C 的谁是卧底引擎打包成**一个自包含的 Edge Function 文件**。
  *
@@ -28,7 +28,7 @@ const outDir = resolve(root, 'supabase/functions/uc-command')
 function inlineModule(file) {
   const source = readFileSync(file, 'utf8')
   return source
-    .replace(/^import\b[\s\S]*?from\s+['"][^'"]+['"];?\s*$/gm, '')
+    .replace(/^\s*import\b[\s\S]*?from\s+['"][^'"]+['"];?\s*$/gm, '')
     .replace(/^export\s+(type|interface|class|function|const|let)\s/gm, '$1 ')
     .replace(/^export\s*\{[\s\S]*?\}\s*$/gm, '')
     .trim()
@@ -100,3 +100,4 @@ mkdirSync(outDir, { recursive: true })
 writeFileSync(resolve(outDir, 'index.ts'), bundle)
 console.log(`已生成 supabase/functions/uc-command/index.ts：${(bundle.length / 1024).toFixed(1)} KB，${bundle.split('\n').length} 行`)
 console.log(`内联词对 ${seedPairs().length} 条`)
+
