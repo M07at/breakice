@@ -149,12 +149,7 @@ onLoad((options) => {
 function adoptView(next: DrawRoomView) {
   serverOffset.value = next.serverTime - Date.now()
   clockTick.value = Date.now()
-  // 一局结束：颁奖台停留 8 秒后自动回大厅
-  if (next.phase === 'ended' && !endedTimer) {
-    endedTimer = setTimeout(() => {
-      uni.navigateBack({ delta: 1, fail: () => uni.reLaunch({ url: '/pages/room/index' }) })
-    }, 8000)
-  }
+  
 
   // 换了一轮就清掉上一轮读到的题面
   if (lastRoundKey !== next.roundKey) {
@@ -307,6 +302,10 @@ async function syncPanelUrls() {
   panelUrls.value = next
 }
 
+function backToLobby() {
+  uni.navigateBack({ delta: 1, fail: () => uni.reLaunch({ url: '/pages/room/index' }) })
+}
+
 async function submitDrawing() {
   if (busy.value || !canvasRef.value || !view.value) return
   busy.value = true
@@ -414,6 +413,7 @@ async function endSession() {
 
             <view v-if="ended" class="surface">
         <text class="label">最终排名</text>
+        <button v-if="isHost" class="primary" @click="backToLobby">回到大厅 →</button>
         <view class="podium">
           <view v-for="(row, index) in podium" :key="row.playerId" class="podium-item" :class="'place-' + (index + 1)">
             <text class="medal">{{ index === 0 ? '🥇' : index === 1 ? '🥈' : '🥉' }}</text>
@@ -666,6 +666,7 @@ async function endSession() {
   color: var(--muted);
   font-size: 22rpx;
 }</style>
+
 
 
 
