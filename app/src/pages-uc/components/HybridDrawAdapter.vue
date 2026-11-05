@@ -1,4 +1,4 @@
-﻿<script setup lang="ts">
+<script setup lang="ts">
 /**
  * 融合玩法里的「作画回合」：用 B 的真实画布替换 C 的模拟图形。
  *
@@ -87,6 +87,8 @@ async function submit() {
 function clearCanvas() {
   if (!canvasRef.value) return
   canvasRef.value?.reset()
+  // 通知观战端一起清空：增量分片里没有「清除」这种操作
+  pokeRoom('hybrid-clear')
 }
 </script>
 

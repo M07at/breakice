@@ -267,6 +267,11 @@ onMounted(async () => {
     await load()
     offLive = onLivePoke((event, payload) => {
       // 融合玩法：画手的笔画实时重放到观战画布
+      if (event === 'hybrid-clear') {
+        hybridViewer.reset()
+        hybridCanvas.value?.paint()
+        return
+      }
       if (event === 'hybrid-snapshot') {
         const ops = (payload as { ops?: import('@/modules/draw/types').DrawOp[] }).ops
         if (Array.isArray(ops)) {
@@ -299,6 +304,14 @@ const hybridViewer = new DrawEngine({ by: 'hybrid-viewer' })
 const hybridAdapter = ref<{ submitNow: () => void } | null>(null)
 let hybridSubmitted = false
 setInterval(() => checkAutoSubmit(), 1000)
+
+// 观战端每 4 秒要一次全量快照：丢片、清空、重连都能在 4 秒内自愈
+setInterval(() => {
+  const view = snapshot.value?.view
+  if (!view || view.variant !== 'draw' || view.phase !== 'describe') return
+  if (rights.value?.canFinish) return
+  pokeRoom('hybrid-sync')
+}, 4000)
 
 function checkAutoSubmit() {
   const value = remaining.value
