@@ -1,4 +1,4 @@
-﻿<script setup lang="ts">
+<script setup lang="ts">
 import { computed, nextTick, ref, watch } from 'vue'
 import { onLoad, onShareAppMessage, onShow } from '@dcloudio/uni-app'
 import { useRoomStore } from '../../stores/room'
@@ -117,7 +117,9 @@ async function hostStart(gameType: GameType) {
   })
   notice.value = ''
 
-  if (roomStore.memberCount < minPlayers) {
+  // 谁是卧底 / 融合玩法人数不够时可以用机器人补位（最多补 2 个，方便两个人测试）
+  const canFillBots = isUndercover(gameType)
+  if (roomStore.memberCount < minPlayers && !canFillBots) {
     uni.showToast({ title: `${GAME_LABEL[gameType]}至少要 ${minPlayers} 人`, icon: 'none' })
     return
   }
@@ -137,10 +139,12 @@ async function hostStart(gameType: GameType) {
       return
     }
     const variant = variantOf(gameType)
+    const bots = Math.max(0, Math.min(2, 4 - roomStore.memberCount))
     try {
+      if (bots > 0) uni.showToast({ title: `已补 ${bots} 个机器人`, icon: 'none' })
       uni.showLoading({ title: '正在开局…', mask: true })
       try {
-        await startUndercoverRound(room.value.id, variant)
+        await startUndercoverRound(room.value.id, variant, bots)
       } finally {
         uni.hideLoading()
       }
@@ -567,6 +571,7 @@ onShareAppMessage(() => ({
 }
 .build-tag { display: block; margin-top: 4rpx; color: var(--muted); font-size: 19rpx; }
 </style>
+
 
 
 
