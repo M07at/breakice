@@ -338,7 +338,14 @@ function checkAutoSubmit() {
   if (!view || view.variant !== 'draw' || !rights.value?.canFinish) return
   if (value > 0 || hybridSubmitted) return
   hybridSubmitted = true
-  hybridAdapter.value?.submitNow()
+  try {
+    hybridAdapter.value?.submitNow()
+    console.log('[hybrid] 倒计时结束，已触发自动提交', view.turnKey)
+  } catch (issue) {
+    hybridSubmitted = false
+    error.value = '自动提交失败：' + (issue instanceof Error ? issue.message : String(issue))
+    console.error('[hybrid] 自动提交失败', issue)
+  }
 }
 watch(() => snapshot.value?.view.turnKey, () => { hybridSubmitted = false })
 const hybridCanvas = ref<{ paint(): void } | null>(null)

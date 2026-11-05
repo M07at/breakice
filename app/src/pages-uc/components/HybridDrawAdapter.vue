@@ -101,11 +101,6 @@ function clearCanvas() {
 
     <DrawCanvas ref="canvasRef" :engine="engine" mode="draw" variant="classic" @error="errorText = $event" />
 
-    <view class="draw-actions">
-      <button class="uc-link" :disabled="!editable || submitting" @tap="clearCanvas">清空</button>
-      
-    </view>
-
     <text v-if="errorText" class="uc-note">{{ errorText }}</text>
   </view>
 </template>
