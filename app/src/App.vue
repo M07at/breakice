@@ -12,10 +12,21 @@ onLaunch(() => {
 
 <style>
 page {
-  background: #f6f8fb;
+  /* 全局背景：图片 + 半透明黑底，所有页面统一 */
+  background-color: #0b1020;
+  background-image: url('/static/background.jpg');
+  background-size: cover;
+  background-position: center;
+  background-attachment: fixed;
   color: #172033;
   font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif;
   font-size: 28rpx;
+}
+
+/* 半透明黑底：叠在背景图上，让内容区是深色玻璃质感，卡片仍然透出白 */
+view.page {
+  min-height: 100vh;
+  background: rgba(8, 12, 24, 0.55) !important;
 }
 
 view,
