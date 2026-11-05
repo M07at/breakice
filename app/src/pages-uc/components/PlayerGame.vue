@@ -1,4 +1,4 @@
-﻿<template>
+<template>
   <view class="uc-page">
     <view class="uc-header"><text class="uc-eyebrow">破冰局 / {{ snapshot?.view.variant === 'draw' ? '你画我猜谁是卧底' : '谁是卧底' }}</text><view class="uc-row"><text class="uc-title">{{ title }}</text><text v-if="snapshot?.view.phaseDeadline" class="player-clock">{{ remaining }}秒</text></view><text class="uc-subtitle">{{ port?.label ?? '个人游戏界面' }}</text></view>
     <view v-if="snapshot" class="uc-note identity">你是 {{ seatOf(snapshot.playerId) }} 号 · {{ nameOf(snapshot.playerId) }} <text v-if="rights?.isHost">（主持人）</text></view>
@@ -156,6 +156,8 @@ function receive(next: UcPlayerSnapshot) {
     lastHybridTurn = next.view.turnKey
     hybridViewer.reset()
     hybridCanvas.value?.paint()
+    // 请画手把当前画布整份补发一次，避免重置前的笔画丢失
+    pokeRoom('hybrid-sync')
   }
   void syncArtworkUrls(next)
 
@@ -265,6 +267,14 @@ onMounted(async () => {
     await load()
     offLive = onLivePoke((event, payload) => {
       // 融合玩法：画手的笔画实时重放到观战画布
+      if (event === 'hybrid-snapshot') {
+        const ops = (payload as { ops?: import('@/modules/draw/types').DrawOp[] }).ops
+        if (Array.isArray(ops)) {
+          hybridViewer.loadSnapshot(ops)
+          hybridCanvas.value?.paint()
+        }
+        return
+      }
       if (event === 'hybrid-stroke') {
         const chunk = (payload as { chunk?: DrawChunk }).chunk
         if (chunk && hybridViewer.applyChunk(chunk) > 0) hybridCanvas.value?.paint()
@@ -288,13 +298,16 @@ const hybridViewer = new DrawEngine({ by: 'hybrid-viewer' })
 /** 融合玩法画布：倒计时结束时自动提交，不再让玩家点按钮 */
 const hybridAdapter = ref<{ submitNow: () => void } | null>(null)
 let hybridSubmitted = false
-watch(remaining, (value) => {
+setInterval(() => checkAutoSubmit(), 1000)
+
+function checkAutoSubmit() {
+  const value = remaining.value
   const view = snapshot.value?.view
   if (!view || view.variant !== 'draw' || !rights.value?.canFinish) return
   if (value > 0 || hybridSubmitted) return
   hybridSubmitted = true
   hybridAdapter.value?.submitNow()
-})
+}
 watch(() => snapshot.value?.view.turnKey, () => { hybridSubmitted = false })
 const hybridCanvas = ref<{ paint(): void } | null>(null)
 let lastHybridTurn = ''

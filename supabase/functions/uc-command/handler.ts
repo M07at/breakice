@@ -15,7 +15,7 @@ const SUPABASE_URL = Deno.env.get('SUPABASE_URL') ?? ''
 const SERVICE_ROLE = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
 
 /** 部署后可以用 { op: 'version' } 确认线上跑的是哪一版 */
-const HANDLER_VERSION = 'uc-2026-11-05-rules'
+const HANDLER_VERSION = 'uc-2026-11-05-rules2'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -480,7 +480,7 @@ async function handleAct(admin: Admin, uid: string, body: Record<string, any>): 
   }
 
   if (meta.expectedVersion !== undefined && Number(meta.expectedVersion) !== state.version) {
-    const independent = action.type === 'acknowledgeWord' || action.type === 'vote'
+    const independent = action.type === 'acknowledgeWord' || action.type === 'vote' || action.type === 'drawingSubmitted'
     const sameStage =
       meta.expectedPhase === state.phase &&
       Number(meta.expectedRound) === state.round &&
@@ -698,6 +698,7 @@ Deno.serve(async (req: Request) => {
     return fail(error)
   }
 })
+
 
 
 

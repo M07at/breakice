@@ -13,7 +13,7 @@ import type { HybridArtwork } from '@/modules/undercover/player'
 import type { DrawingSubmission } from '@/modules/undercover/player'
 import { prepareHybridArtwork } from '@/services/ucGame'
 import { ChunkPump } from '@/modules/draw/sync'
-import { pokeRoom } from '@/services/liveRoom'
+import { onLivePoke, pokeRoom } from '@/services/liveRoom'
 import type { DrawChunk } from '@/modules/draw/types'
 
 const props = defineProps<{
@@ -33,6 +33,7 @@ interface CanvasApi {
 
 const canvasRef = ref<CanvasApi | null>(null)
 let painterPump: ChunkPump | null = null
+let offSync: (() => void) | null = null
 const submitting = ref(false)
 const errorText = ref('')
 const scoreMode = ref<HybridArtwork['status']>('success')
@@ -50,7 +51,14 @@ painterPump = new ChunkPump(
 )
 painterPump.start()
 
+// 观战端重置画布后会请求一次全量笔画，这里把当前画布整份回过去
+offSync = onLivePoke((event) => {
+  if (event !== 'hybrid-sync') return
+  pokeRoom('hybrid-snapshot', { ops: engine.snapshot() })
+})
+
 onUnmounted(() => {
+  offSync?.()
   painterPump?.stop()
   painterPump = null
 })
@@ -77,6 +85,7 @@ async function submit() {
 }
 
 function clearCanvas() {
+  if (!canvasRef.value) return
   canvasRef.value?.reset()
 }
 </script>
@@ -85,7 +94,7 @@ function clearCanvas() {
   <view class="uc-card">
     <view class="draw-head">
       <text class="uc-label">你的作画回合</text>
-      <text class="uc-muted">{{ turnKey }} 号作品 · 画完点提交</text>
+      <text class="uc-muted">{{ turnKey }} 号作品 · 倒计时结束自动提交</text>
     </view>
 
     <DrawCanvas ref="canvasRef" :engine="engine" mode="draw" variant="classic" @error="errorText = $event" />
@@ -118,6 +127,7 @@ function clearCanvas() {
   flex: 1;
 }
 </style>
+
 
 
 
