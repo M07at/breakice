@@ -62,6 +62,7 @@ def predict(body: Sketch, authorization: str = Header(default='')):
         return {'status': 'success', 'data': {
             'sketch_class_name': labels[int(top[0])],
             'top_five_sketch_classes': [labels[int(index)] for index in top],
+            'class_probabilities': {label: float(probabilities[index]) for index, label in enumerate(labels)},
         }}
     except (ValueError, OSError) as error:
         raise HTTPException(422, str(error)) from error

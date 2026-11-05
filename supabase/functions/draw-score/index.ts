@@ -220,6 +220,23 @@ function validDrawingRef(roomId: string, roundKey: string, painterId: string, im
 }
 
 
+
+/** 以目标类别的模型概率计分；下载耗时和无关的前五候选不再带来保底高分。 */
+function evaluateRecognition(word: string, raw: unknown): Record<string, unknown> {
+  const expected = expectedClassFor(word) ?? DRAWZY_CLASSES.find(value => value === word.trim().toLowerCase())
+  if (!expected) return { status: 'unsupported', error: 'UNSUPPORTED_WORD', comment: '本题超出 AI 识别范围，本轮不计 AI 分。' }
+  const data = (raw as { data?: { sketch_class_name?: string; class_probabilities?: Record<string, number>; top_five_sketch_classes?: string[] } })?.data
+  const confidence = data?.class_probabilities?.[expected]
+  if (typeof confidence !== 'number' || !Number.isFinite(confidence) || confidence < 0 || confidence > 1 || !data?.sketch_class_name) {
+    return { status: 'failed', error: 'BAD_PROVIDER_RESULT' }
+  }
+  const score = Math.round(confidence * 100)
+  return { status: 'success', score, total: score, confidence, guess: data.sketch_class_name,
+    candidates: data.top_five_sketch_classes ?? [], provider: 'drawzy', scoringVersion: 'confidence-v2',
+    comment: `AI 识别：${data.sketch_class_name} · 题目匹配度 ${score}%` }
+}
+
+
 // 普通你画我猜：主持人触发，题面取私有通道，图像从私有 Storage 读取。
 const corsHeaders = { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': 'authorization, apikey, content-type, x-client-info' }
 function reply(body: unknown, status = 200) {
@@ -254,7 +271,7 @@ Deno.serve(async (req: Request) => {
     const { data: cached, error: cacheError } = await admin.from('draw_ai_scores').select('*').match(key).maybeSingle()
     if (cacheError) return reply({ error: 'SCORING_STORAGE_UNAVAILABLE' }, 503)
     if (cached && cached.image_ref !== imageRef) return reply({ error: 'DRAWING_ALREADY_SUBMITTED' }, 409)
-    if (cached?.result && ['success', 'unsupported'].includes(cached.status)) return reply(cached.result)
+    if (cached?.result && ['success', 'unsupported'].includes(cached.status) && (cached.result.scoringVersion === 'confidence-v2' || cached.status === 'unsupported')) return reply(cached.result)
     if (cached?.status === 'pending' && Date.now() - Date.parse(cached.updated_at) < 65000) return reply({ status: 'pending' })
 
     const claim = { ...key, image_ref: imageRef, status: 'pending', result: null, updated_at: new Date().toISOString() }
@@ -290,14 +307,7 @@ Deno.serve(async (req: Request) => {
       const response = await fetch(`${base}/predict/sketch`, { method: 'POST', headers, body: JSON.stringify({ sketch_data: btoa(binary) }), signal: AbortSignal.timeout(45000) })
       if (!response.ok) throw new Error(`DRAWZY_HTTP_${response.status}`)
       const raw = await response.json()
-      const guess = String(raw.data?.sketch_class_name ?? raw.data?.predicted_class_label ?? '')
-      const top = raw.data?.top_five_sketch_classes ?? raw.data?.top5_indices
-      if (!guess || !Array.isArray(top) || top.some(value => typeof value !== 'string')) throw new Error('BAD_PROVIDER_RESULT')
-      const seconds = Math.max(0, (started - Number(view.startedAt)) / 1000)
-      const correct = top.some(value => value.toLowerCase() === expected.toLowerCase())
-      const score = scoreFromGuess({ correct, seconds })
-      const comment = `AI 首选：${guess} · ${correct ? '前5项包含答案' : '前5项未包含答案'} · 用时 ${seconds.toFixed(1)} 秒`
-      return await finish({ status: 'success', score, total: score, guess, candidates: top, correct, seconds, comment, provider: 'drawzy', latencyMs: Date.now() - started })
+      return await finish({ ...evaluateRecognition(word, raw), latencyMs: Date.now() - started })
     } catch (error) {
       const timeout = /timeout|abort/i.test(String(error))
       console.error('[draw-score] provider failed', String(error))

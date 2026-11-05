@@ -32,7 +32,7 @@ Deno.serve(async (req: Request) => {
     const { data: cached, error: cacheError } = await admin.from('draw_ai_scores').select('*').match(key).maybeSingle()
     if (cacheError) return reply({ error: 'SCORING_STORAGE_UNAVAILABLE' }, 503)
     if (cached && cached.image_ref !== imageRef) return reply({ error: 'DRAWING_ALREADY_SUBMITTED' }, 409)
-    if (cached?.result && ['success', 'unsupported'].includes(cached.status)) return reply(cached.result)
+    if (cached?.result && ['success', 'unsupported'].includes(cached.status) && (cached.result.scoringVersion === 'confidence-v2' || cached.status === 'unsupported')) return reply(cached.result)
     if (cached?.status === 'pending' && Date.now() - Date.parse(cached.updated_at) < 65000) return reply({ status: 'pending' })
 
     const claim = { ...key, image_ref: imageRef, status: 'pending', result: null, updated_at: new Date().toISOString() }
@@ -68,14 +68,7 @@ Deno.serve(async (req: Request) => {
       const response = await fetch(`${base}/predict/sketch`, { method: 'POST', headers, body: JSON.stringify({ sketch_data: btoa(binary) }), signal: AbortSignal.timeout(45000) })
       if (!response.ok) throw new Error(`DRAWZY_HTTP_${response.status}`)
       const raw = await response.json()
-      const guess = String(raw.data?.sketch_class_name ?? raw.data?.predicted_class_label ?? '')
-      const top = raw.data?.top_five_sketch_classes ?? raw.data?.top5_indices
-      if (!guess || !Array.isArray(top) || top.some(value => typeof value !== 'string')) throw new Error('BAD_PROVIDER_RESULT')
-      const seconds = Math.max(0, (started - Number(view.startedAt)) / 1000)
-      const correct = top.some(value => value.toLowerCase() === expected.toLowerCase())
-      const score = scoreFromGuess({ correct, seconds })
-      const comment = `AI 首选：${guess} · ${correct ? '前5项包含答案' : '前5项未包含答案'} · 用时 ${seconds.toFixed(1)} 秒`
-      return await finish({ status: 'success', score, total: score, guess, candidates: top, correct, seconds, comment, provider: 'drawzy', latencyMs: Date.now() - started })
+      return await finish({ ...evaluateRecognition(word, raw), latencyMs: Date.now() - started })
     } catch (error) {
       const timeout = /timeout|abort/i.test(String(error))
       console.error('[draw-score] provider failed', String(error))

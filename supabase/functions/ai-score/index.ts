@@ -6,6 +6,7 @@
 // 幂等：ai_scores.artwork_id 唯一；同一幅画重复调用只会产生一条记录。
 // 函数密钥：AI_BASE_URL / AI_API_KEY / AI_MODEL / AI_TIMEOUT_MS / ARTWORK_BUCKET
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2"
+import { evaluateRecognition } from '../_shared/recognition.ts'
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -159,7 +160,7 @@ Deno.serve(async (req) => {
     .eq("artwork_id", artworkId)
     .maybeSingle()
 
-  if (existing?.status === "success") return json(existing)
+  if (existing?.status === "success" && (Deno.env.get('AI_MODE') !== 'guess' || String(existing.model ?? '').includes('confidence-v2'))) return json(existing)
   if (existing?.status === "pending") {
     const ageMs = Date.now() - new Date(existing.created_at as string).getTime()
     if (ageMs < DEFAULT_TIMEOUT_MS * 2) return json(existing)
@@ -184,7 +185,7 @@ Deno.serve(async (req) => {
   const bucket = Deno.env.get("ARTWORK_BUCKET") ?? DEFAULT_BUCKET
 
   const finish = async (patch: Record<string, unknown>, artworkStatus: "scored" | "failed") => {
-    await admin.from("ai_scores").update(patch).eq("artwork_id", artworkId)
+    await admin.from("ai_scores").update(patch.status === 'success' ? patch : { ...patch, total: null, ai_guess: null, ai_seconds: null }).eq("artwork_id", artworkId)
     await admin.from("artworks").update({ status: artworkStatus }).eq("id", artworkId)
   }
 
@@ -238,17 +239,16 @@ Deno.serve(async (req) => {
       const payload = await response.json() as {
         data?: { sketch_class_name?: string; top_five_sketch_classes?: string[] }
       }
-      const predicted = String(payload.data?.sketch_class_name ?? "")
-      const top5 = (payload.data?.top_five_sketch_classes ?? []).map((item) => String(item).toLowerCase())
-      const seconds = Math.round((guessStarted - startedGuessAt) / 100) / 10
-      const correct = Boolean(expected) && top5.includes(expected.toLowerCase())
-      const score = scoreFromGuess({ correct, seconds })
-      const comment = describeGuess({ correct, guess: predicted, seconds })
+      const result = evaluateRecognition(secret?.word ?? '', payload)
+      if (result.status !== 'success') {
+        await finish({ status: 'failed', error: result.error, comment: result.comment ?? 'AI 暂不可用' }, 'failed')
+        return json(result)
+      }
       await finish(
-        { status: "success", total: score, comment, provider: "drawzy", model: "quickdraw-cnn", ai_guess: predicted, ai_seconds: seconds },
+        { status: "success", total: result.score, comment: result.comment, provider: "drawzy", model: "quickdraw-confidence-v2", ai_guess: result.guess, ai_seconds: null },
         "scored",
       )
-      return json({ status: "success", score, total: score, comment, guess: predicted, seconds })
+      return json(result)
     } catch (error) {
       await finish({ status: "failed", error: `DRAWZY_FAILED: ${String(error)}` }, "failed")
       return json({ status: "failed", error: "DRAWZY_FAILED" })
