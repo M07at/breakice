@@ -8,7 +8,7 @@ mkdirSync(reports, { recursive: true })
 for (const name of ['tests.xml', 'release-manifest.json']) { const file = resolve(reports, name); if (existsSync(file)) unlinkSync(file) }
 const result = { startedAt: new Date().toISOString(), node: process.version, status: 'running', stages: [] }
 writeFileSync(resolve(reports, 'verify.json'), JSON.stringify(result, null, 2))
-const stages = ['doctor', 'type-check', 'test:ci', 'test:quality', 'build:mp-weixin', 'build:h5', 'check:size', 'check:secrets', 'release:manifest']
+const stages = ['doctor', 'check:bundle', 'type-check', 'test:ci', 'test:quality', 'build:mp-weixin', 'build:h5', 'check:size', 'check:secrets', 'release:manifest']
 for (const stage of stages) {
   console.log(`\n[C checks] ${stage}`)
   const started = Date.now()

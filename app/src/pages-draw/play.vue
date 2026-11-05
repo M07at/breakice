@@ -436,7 +436,7 @@ function back() {
   margin-bottom: 14rpx;
   padding: 20rpx 26rpx 24rpx;
   border-radius: 20rpx;
-  background: #fff;
+  background: var(--surface, #ffffff);
   box-shadow: 0 6rpx 18rpx rgba(31, 35, 48, 0.06);
   text-align: center;
 }
@@ -479,7 +479,7 @@ function back() {
   display: block;
   height: 34rpx;
   line-height: 34rpx;
-  color: #8a8f9c;
+  color: var(--muted, #6c7588);
   font-size: 24rpx;
 }
 
@@ -496,7 +496,7 @@ function back() {
   padding: 18rpx 44rpx;
   border: 2rpx solid #ffe08a;
   border-radius: 18rpx;
-  background: #fff7d6;
+  background: var(--surface, #ffffff)7d6;
   box-shadow: 0 6rpx 16rpx rgba(255, 200, 60, 0.18);
 }
 .hint-box-text {
@@ -518,7 +518,7 @@ function back() {
   padding: 8rpx 16rpx;
 }
 .chat-who {
-  color: #8a8f9c;
+  color: var(--muted, #6c7588);
   font-size: 22rpx;
 }
 .chat-id {
@@ -585,7 +585,7 @@ function back() {
   width: 100%;
   height: 75vw;
   border-radius: 16rpx;
-  background: #fff;
+  background: var(--surface, #ffffff);
   box-shadow: 0 6rpx 18rpx rgba(31, 35, 48, 0.06);
 }
 .board-freeze-img {
@@ -614,7 +614,7 @@ function back() {
   max-height: 82vh;
   padding: 24rpx;
   border-radius: 20rpx;
-  background: #fff;
+  background: var(--surface, #ffffff);
   box-sizing: border-box;
 }
 .modal-head {
@@ -629,7 +629,7 @@ function back() {
   color: #1f2330;
 }
 .modal-left {
-  color: #8a8f9c;
+  color: var(--muted, #6c7588);
   font-size: 24rpx;
 }
 .modal-body {

@@ -26,6 +26,7 @@
     "check:all": "node ../scripts/check-all.mjs",
     "check:security": "node ../scripts/check-security.mjs",
     "check:bots": "node ../scripts/check-bots.mjs",
+    "check:bundle": "node ../scripts/check-bundle-fresh.mjs",
     "verify": "node ../scripts/verify.mjs",
     "doctor": "node ../scripts/doctor.mjs",
     "release:manifest": "node ../scripts/release-manifest.mjs"

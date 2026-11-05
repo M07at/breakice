@@ -499,7 +499,7 @@ async function endSession() {
   margin-bottom: 20rpx;
   padding: 24rpx;
   border-radius: var(--radius-md);
-  background: #fff;
+  background: var(--surface, #ffffff);
 }
 .label {
   display: block;
@@ -517,7 +517,7 @@ async function endSession() {
 .primary {
   margin-top: 16rpx;
   border-radius: 14rpx;
-  color: #fff;
+  color: var(--surface, #ffffff);
   background: var(--brand);
   font-size: 28rpx;
 }
@@ -624,7 +624,7 @@ async function endSession() {
 .podium-item.place-1 {
   order: 2;
   padding-top: 24rpx;
-  background: linear-gradient(180deg, #fff7e0, #ffe9b8);
+  background: linear-gradient(180deg, var(--surface, #ffffff)7e0, #ffe9b8);
 }
 .podium-item.place-2 {
   order: 1;

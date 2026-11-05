@@ -111,7 +111,7 @@ async function start() {
 .choice-desc {
   display: block;
   margin-top: 6rpx;
-  color: #8a8f9c;
+  color: var(--muted, #6c7588);
   font-size: 22rpx;
 }
 .count {
