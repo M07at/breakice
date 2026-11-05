@@ -31,6 +31,7 @@ async function submit() {
     uni.reLaunch({ url: '/pages/room/index' })
   } catch (issue) {
     uni.hideLoading()
+    uni.hideToast()
     uni.showModal({
       title: '创建房间失败',
       content: roomStore.error || toErrorMessage(issue),

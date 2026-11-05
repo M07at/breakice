@@ -69,18 +69,29 @@ function writeSession(session: Session | null): void {
   }
 }
 
+/** 手机首次登录包含微信与 Supabase 换票，不能套用游戏轮询的短超时。 */
+function requestPolicy(path: string): { timeout: number; label: string } {
+  if (path === '/functions/v1/wechat-auth') return { timeout: 45000, label: '微信登录' }
+  if (path.startsWith('/auth/v1/')) return { timeout: 45000, label: '登录服务' }
+  if (/\/rpc\/set_my_profile(?:_v2)?$/.test(path)) return { timeout: 30000, label: '资料同步' }
+  if (path.endsWith('/rpc/create_room')) return { timeout: 30000, label: '创建房间' }
+  if (path.endsWith('/rpc/join_room')) return { timeout: 30000, label: '加入房间' }
+  return { timeout: 10000, label: '服务器连接' }
+}
+
 function uniRequest<T>(options: {
   path: string
   method?: 'GET' | 'POST' | 'DELETE'
   body?: unknown
   token?: string
 }): Promise<T> {
+  const policy = requestPolicy(options.path)
   return new Promise((resolve, reject) => {
     uni.request({
       url: `${baseUrl()}${options.path}`,
       method: options.method ?? 'GET',
       data: options.body as Record<string, unknown> | undefined,
-      timeout: 10000,
+      timeout: policy.timeout,
       header: {
         apikey: env.supabaseAnonKey,
         Authorization: `Bearer ${options.token ?? env.supabaseAnonKey}`,
@@ -99,8 +110,11 @@ function uniRequest<T>(options: {
         // 原始 errMsg 里有 "url not in domain list" 这类关键信息，必须透出来。
         const raw = String((error as { errMsg?: string } | undefined)?.errMsg ?? '')
         const blocked = /domain|url not in|invalid url/i.test(raw)
+        const timedOut = /time\s*out|timeout/i.test(raw)
         const message = blocked
           ? '请求被微信拦下了：这个域名不在小程序的「request 合法域名」里（真机才校验，开发者工具勾了"不校验"所以没事）'
+          : timedOut
+          ? `${policy.label}请求超时（${policy.timeout / 1000} 秒），尚未收到服务器响应。请切换 Wi-Fi 或移动网络后重试。`
           : `连不上服务器，请检查网络${raw ? `（${raw.slice(0, 80)}）` : ''}`
         reject(new PlatformError(blocked ? 'NOT_CONFIGURED' : 'NETWORK', message))
       },
