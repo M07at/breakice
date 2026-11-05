@@ -393,7 +393,7 @@ async function endSession() {
     <view class="alert debug">
       角色={{ isHost ? '主持人' : '观战' }}｜我={{ meId.slice(0, 6) }}｜阶段={{ view ? view.phase : '无视图' }}｜画者={{
         view ? view.painterId.slice(0, 6) : '-'
-      }}｜轮次={{ view ? view.roundKey : '-' }}｜题面={{ myWord ? myWord.word : '空' }}｜通道={{
+      }}｜轮次={{ view ? view.roundKey : '-' }}｜玩法={{ drawVariant }}｜题面={{ myWord ? myWord.word : '空' }}｜通道={{
         liveConnected() ? '连' : '断'
       }}
     </view>
