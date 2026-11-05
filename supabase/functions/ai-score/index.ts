@@ -52,6 +52,50 @@ function promptFor(word: string | null) {
   ].join("\n")
 }
 
+
+// ---------------------------------------------------------------------------
+// 中文词 → drawzy 的英文类别（与 app/src/modules/draw/classMap.ts 保持一致）
+// 这里是服务端的精简副本：Edge Function 不能 import 前端模块。
+// ---------------------------------------------------------------------------
+const WORD_TO_CLASS: Record<string, string> = {
+  苹果: "apple", 香蕉: "banana", 自行车: "bicycle", 单车: "bicycle", 书: "book", 书本: "book",
+  水桶: "bucket", 公交车: "bus", 巴士: "bus", 相机: "camera", 照相机: "camera", 汽车: "car",
+  小汽车: "car", 猫: "cat", 小猫: "cat", 椅子: "chair", 云: "cloud", 白云: "cloud", 杯子: "cup",
+  钻石: "diamond", 狗: "dog", 小狗: "dog", 门: "door", 眼睛: "eye", 鱼: "fish", 花: "flower",
+  脚: "foot", 叉子: "fork", 吉他: "guitar", 锤子: "hammer", 帽子: "hat", 房子: "house", 钥匙: "key",
+  刀: "knife", 梯子: "ladder", 叶子: "leaf", 月亮: "moon", 山: "mountain", 蘑菇: "mushroom",
+  裤子: "pants", 铅笔: "pencil", 猪: "pig", 披萨: "pizza", 剪刀: "scissors", 衬衫: "shirt",
+  鞋: "shoe", 鞋子: "shoe", 勺子: "spoon", 星星: "star", 太阳: "sun", 树: "tree", 雨伞: "umbrella",
+  轮子: "wheel",
+  对牛弹琴: "cow", 守株待兔: "rabbit", 井底之蛙: "frog", 狐假虎威: "tiger", 亡羊补牢: "sheep",
+  画蛇添足: "snake", 杯弓蛇影: "snake", 草木皆兵: "tree",
+}
+
+function expectedClassFor(word: string): string {
+  const text = word.trim()
+  if (!text) return ""
+  if (WORD_TO_CLASS[text]) return WORD_TO_CLASS[text]
+  const keys = Object.keys(WORD_TO_CLASS).filter((key) => text.includes(key) || key.includes(text))
+  keys.sort((a, b) => b.length - a.length)
+  return keys.length > 0 ? WORD_TO_CLASS[keys[0]] : ""
+}
+
+/** 猜中 80+（越快越高），没猜中 80-（越慢越低），与 app 侧的 aiScore.ts 同口径 */
+function scoreFromGuess(input: { correct: boolean; seconds: number }): number {
+  const seconds = Math.min(60, Math.max(0, Number.isFinite(input.seconds) ? input.seconds : 60))
+  const ratio = 1 - seconds / 60
+  const raw = input.correct ? 80 + 20 * ratio : 80 * ratio
+  return Math.min(100, Math.max(0, Math.round(raw)))
+}
+
+function describeGuess(input: { correct: boolean; guess: string; seconds: number }): string {
+  const parts: string[] = []
+  if (input.guess) parts.push(`AI 猜：${input.guess}`)
+  parts.push(`用时 ${input.seconds.toFixed(1)} 秒`)
+  parts.push(input.correct ? "猜中了" : "没猜中")
+  return parts.join(" · ")
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders })
   if (req.method !== "POST") return json({ error: "METHOD_NOT_ALLOWED" }, 405)
@@ -143,7 +187,8 @@ Deno.serve(async (req) => {
     await admin.from("artworks").update({ status: artworkStatus }).eq("id", artworkId)
   }
 
-  if (!apiKey) {
+  const mode = Deno.env.get("AI_MODE") ?? "chat"
+  if (mode !== "guess" && !apiKey) {
     await finish({ status: "failed", error: "AI_NOT_CONFIGURED" }, "failed")
     return json({ status: "failed", error: "AI_NOT_CONFIGURED" })
   }
@@ -156,6 +201,7 @@ Deno.serve(async (req) => {
     .eq("user_id", artwork.user_id)
     .maybeSingle()
 
+  const startedGuessAt = Date.now()
   let dataUrl = ""
   try {
     const { data: signed, error: signedError } = await admin.storage
@@ -172,6 +218,39 @@ Deno.serve(async (req) => {
   } catch (error) {
     await finish({ status: "failed", error: `IMAGE_UNAVAILABLE: ${String(error)}` }, "failed")
     return json({ status: "failed", error: "IMAGE_UNAVAILABLE" })
+  }
+
+  // ---- guess 模式：调 drawzy 的 /predict/sketch，用「猜中与否 + 用时」算分 ----
+  if (mode === "guess") {
+    const expected = expectedClassFor((secret?.word as string | undefined) ?? "")
+    const base64 = dataUrl.split(",")[1] ?? ""
+    const guessStarted = Date.now()
+    try {
+      const response = await fetch(`${baseUrl}/predict/sketch`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ sketch_data: base64 }),
+        signal: AbortSignal.timeout(timeoutMs),
+      })
+      if (!response.ok) throw new Error(`drawzy ${response.status}`)
+      const payload = await response.json() as {
+        data?: { sketch_class_name?: string; top_five_sketch_classes?: string[] }
+      }
+      const predicted = String(payload.data?.sketch_class_name ?? "")
+      const top5 = (payload.data?.top_five_sketch_classes ?? []).map((item) => String(item).toLowerCase())
+      const seconds = Math.round((guessStarted - startedGuessAt) / 100) / 10
+      const correct = Boolean(expected) && top5.includes(expected.toLowerCase())
+      const score = scoreFromGuess({ correct, seconds })
+      const comment = describeGuess({ correct, guess: predicted, seconds })
+      await finish(
+        { status: "success", score, comment, provider: "drawzy", model: "quickdraw-cnn", ai_guess: predicted, ai_seconds: seconds },
+        "scored",
+      )
+      return json({ status: "success", score, comment, guess: predicted, seconds })
+    } catch (error) {
+      await finish({ status: "failed", error: `DRAWZY_FAILED: ${String(error)}` }, "failed")
+      return json({ status: "failed", error: "DRAWZY_FAILED" })
+    }
   }
 
   const startedAt = Date.now()

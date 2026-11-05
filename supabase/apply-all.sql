@@ -2492,3 +2492,10 @@ $$;
 
 revoke all on function public.submit_artwork(uuid, text, text) from public;
 grant execute on function public.submit_artwork(uuid, text, text) to authenticated;
+
+-- =======================================================================
+-- 0022_ai_scores_guess.sql
+-- =======================================================================
+-- ai_scores 增加 AI 猜测结果与用时，画廊要展示
+alter table public.ai_scores add column if not exists ai_guess text;
+alter table public.ai_scores add column if not exists ai_seconds numeric;
