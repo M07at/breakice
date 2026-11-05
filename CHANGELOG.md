@@ -45,3 +45,26 @@
 - C3: independent game routes, Chinese/English defaults and shared persistent development question bank.
 - C4: environment doctor, reproducible checks/reports, release hashes and Gitee activation recipe. Hosted CI activation remains pending.
 
+
+---
+
+## 2026-11-05 · 收尾（AI 评分闭环）
+
+- **AI 评分接入 drawzy**（本地 FastAPI + cloudflared 隧道）：
+  `ai-score` 的 `AI_MODE=guess` 分支调 `/predict/sketch`，用「AI 猜中与否 + 用时」算分：
+  猜中 `80 + 20×(1−t/60)`，没猜中 `80×(1−t/60)`，t 夹在 0–60 秒。
+  结果写 `ai_scores`（`total` / `ai_guess` / `ai_seconds`），画廊显示「AI 猜：xxx · 用时 x.x 秒」。
+- **词库清洗**：映射表按 drawzy 真实的 45 类（`airplane`…`bucket`）重写，
+  删除此前猜错的 cat/dog/tree 等；新增 `DRAW_WORD_POOL` 与 `filterScorable`，
+  你画我猜抽词只从能评分的词里挑。
+- **打包产物检查**：`npm run verify` 新增 `check:bundle`，引擎/词库/handler 比产物新就报红。
+- 测试 249 个全过，产物 0.96 MB。
+
+## 已知未完成
+
+| 项 | 说明 |
+| --- | --- |
+| 4 人真机全流程 | 规则与接力只在 2 真人 + 2 人机下验证 |
+| B 的布局层统一 | 颜色已 token 化，圆角/间距未调 |
+| ICP 备案 | 正式发布前必须 |
+| drawzy 隧道地址 | 每次重启会变，需同步 `AI_BASE_URL` 并重新部署 `ai-score` |

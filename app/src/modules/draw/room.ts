@@ -248,6 +248,7 @@ export class LocalDrawRoomBackend implements DrawRoomBackend {
     this.now = options.now ?? (() => Date.now())
     this.listItems =
       options.listItems ?? (() => bankRepo().listItems('sys_draw') as Promise<BankItem<'draw'>[]>)
+    this.listFilter = options.listFilter ?? null
     this.gameId = `local-draw-${this.now().toString(36)}`
     // 联机时用房间真实名单；单机时保持原来的生成规则
     const roster = options.players && options.players.length >= 2 ? options.players : null
@@ -486,7 +487,10 @@ export class LocalDrawRoomBackend implements DrawRoomBackend {
       this.palette = []
     } else {
       const items = await this.listItems()
-      const picked = pickDrawWord(items, this.variant, usedWordIds, rng)
+      // 只抽能参与 AI 评分的词（其余词永远判不了「猜中」，等于白画）
+      const allowed = this.listFilter ? new Set(this.listFilter(items.map((item) => item.content.word))) : null
+      const pool = allowed ? items.filter((item) => allowed.has(item.content.word)) : items
+      const picked = pickDrawWord(pool.length > 0 ? pool : items, this.variant, usedWordIds, rng)
       if (!picked) throw new Error('系统词库里没有可用的词')
       if (picked.item) usedWordIds.add(picked.item.id)
       this.word = picked.word
