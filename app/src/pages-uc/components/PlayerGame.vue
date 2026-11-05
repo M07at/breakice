@@ -134,7 +134,7 @@ const galleryArtworks = computed(() => {
   const all = snapshot.value?.artworks ?? []
   if (snapshot.value?.view.phase === 'ended') return all
   const round = String(snapshot.value?.view.round ?? '')
-  return all.filter((art) => art.turnKey.split(/[-#]/)[0] === round)
+  return all.filter((art) => art.turnKey.split('-')[0] === round || art.turnKey.split('#')[0] === round)
 })
 
 const playersWithoutArtwork = computed(() => {

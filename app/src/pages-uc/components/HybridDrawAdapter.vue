@@ -78,7 +78,7 @@ async function submit() {
     const filePath = await canvasRef.value.exportPng()
     if (!filePath) throw new Error('画布还没画东西')
 
-    const { storagePath, artworkId } = await prepareHybridArtwork(props.gameId, artworkKey, filePath)
+    const { storagePath, artworkId } = await prepareHybridArtwork(props.gameId, props.turnKey, filePath)
     emit('submit', { preview: storagePath, scoreMode: scoreMode.value === 'pending' ? 'success' : scoreMode.value, artworkId })
   } catch (error) {
     errorText.value = error instanceof Error ? error.message : '提交失败，请重试'
