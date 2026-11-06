@@ -66,7 +66,6 @@ const games = [
     <view class="head">
       <text class="eyebrow">HOW TO PLAY</text>
       <text class="title">使用说明</text>
-      <view class="close" @tap="back"><text class="close-mark">×</text></view>
     </view>
 
     <scroll-view scroll-y class="scroll">
@@ -93,6 +92,10 @@ const games = [
         <text class="rule">· 人不够时房主可以补充人机，人机只做最少的事，不会替你投票。</text>
       </view>
     </scroll-view>
+
+    <view class="foot">
+      <button class="back-btn" @tap="back">返回</button>
+    </view>
   </view>
 </template>
 
@@ -125,24 +128,25 @@ const games = [
   font-weight: 800;
 }
 
-.close {
-  position: absolute;
-  right: 28rpx;
-  bottom: 14rpx;
-  width: 56rpx;
-  height: 56rpx;
-  border-radius: 50%;
-  background: #fff;
-  border: 1rpx solid var(--line, #e7eaf0);
-  display: flex;
-  align-items: center;
-  justify-content: center;
+.foot {
+  flex-shrink: 0;
+  padding: 16rpx 32rpx 28rpx;
+  padding-bottom: calc(28rpx + env(safe-area-inset-bottom));
 }
 
-.close-mark {
-  color: var(--muted, #6c7588);
-  font-size: 34rpx;
-  line-height: 1;
+.back-btn {
+  width: 100%;
+  height: 88rpx;
+  border-radius: var(--radius-md, 20rpx);
+  background: var(--brand, #4f8ef7);
+  color: #fff;
+  font-size: 30rpx;
+  font-weight: 600;
+  line-height: 88rpx;
+}
+
+.back-btn::after {
+  border: none;
 }
 
 .scroll {
