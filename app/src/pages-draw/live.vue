@@ -9,7 +9,6 @@
  * 只有本页用于房间模式；B 原来的 setup/play 单机流程不受影响。
  */
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
-import { suppressAutoEnter } from '@/services/autoEnter'
 import { onLoad } from '@dcloudio/uni-app'
 import DrawCanvas from '@/components/draw-canvas/draw-canvas.vue'
 import DebugStrip from '@/components/DebugStrip.vue'
@@ -439,7 +438,8 @@ async function react(targetPlayerId: string, kind: 'flower' | 'dislike') {
 
 /** 退出回大厅：房间仍是 playing，随时可以点「回到游戏」继续 */
 function exitToLobby() {
-  suppressAutoEnter()
+  // 主动退出：标记一下，回大厅后不要自动拉回游戏
+  uni.setStorageSync('break-ice-suppress-auto-enter', 1)
   uni.navigateBack({ delta: 1, fail: () => uni.reLaunch({ url: '/pages/room/index' }) })
 }
 

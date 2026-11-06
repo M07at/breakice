@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import { computed, nextTick, ref, watch } from 'vue'
-import { allowAutoEnter, autoEnterAllowed } from '@/services/autoEnter'
 import { onLoad, onShareAppMessage, onShow } from '@dcloudio/uni-app'
 import { useRoomStore } from '../../stores/room'
 import PlayerList from '../../components/PlayerList.vue'
@@ -203,7 +202,8 @@ async function hostStart(gameType: GameType) {
 
 /** 回到正在进行的一局；谁是卧底要先把房间里的那局接管过来 */
 async function enterCurrentGame() {
-  allowAutoEnter()
+  // 玩家主动点了「回到游戏」→ 解除抑制
+  uni.removeStorageSync('break-ice-suppress-auto-enter')
   const gameType = room.value?.gameType
   const roomId = room.value?.id
 
@@ -249,7 +249,7 @@ watch(
     }
     if (phase !== 'playing' || roomStore.isHost || autoEntered.value) return
     // 玩家主动退出过就不自动拉回，等他点「回到游戏」
-    if (!autoEnterAllowed()) return
+    if (uni.getStorageSync('break-ice-suppress-auto-enter')) return
     if (previous !== 'lobby' && previous !== undefined) return
     autoEntered.value = true
     void enterCurrentGame()
