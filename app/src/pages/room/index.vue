@@ -194,9 +194,13 @@ async function hostStart(gameType: GameType) {
 }
 
 /** 回到正在进行的一局；谁是卧底要先把房间里的那局接管过来 */
-async function enterCurrentGame() {
-  // 玩家主动点了「回到游戏」→ 解除抑制
+/** 玩家主动点「回到游戏」：先解除抑制，再进游戏 */
+function resumeGame() {
   uni.removeStorageSync('break-ice-suppress-auto-enter')
+  void enterCurrentGame()
+}
+
+async function enterCurrentGame() {
   const gameType = room.value?.gameType
   const roomId = room.value?.id
 
@@ -327,7 +331,7 @@ onShareAppMessage(() => ({
     <view v-if="roomStore.playing" class="surface playing-surface">
       <view class="section-title"><text>本局进行中</text><text class="live-label">{{ GAME_LABEL[room.gameType ?? 'truth-or-dare'] }}</text></view>
       <text class="muted">这一局以房间为单位进行，结束后回到大厅再开下一局。</text>
-      <button class="btn btn-primary play-btn" @click="enterCurrentGame">回到游戏</button>
+      <button class="btn btn-primary play-btn" @click="resumeGame">回到游戏</button>
       <button v-if="roomStore.isHost" class="btn btn-ghost finish-btn" :loading="roomStore.busy" @click="finishRound">结束本局</button>
     </view>
 

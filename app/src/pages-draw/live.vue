@@ -47,6 +47,8 @@ interface CanvasApi {
 const DRAW_SCORE = { aiWeight: 1, painterCap: 2000, perGuesser: 100, guesserBase: 200, guesserPerSecond: 0 }
 
 const roomId = ref('')
+/** 结束后先把最终视图发出去，再停发布器 */
+let endedPublished = false
 const roomStore = useRoomStore()
 let finishing = false
 let finishRequested = false
@@ -184,9 +186,13 @@ function adoptView(next: DrawRoomView) {
   }
   error.value = ''
   if (next.phase === 'ended') {
-    // 结算页常驻：不自动收尾、不自动返回，等玩家点「退出，回到大厅」，
-    // 房主结束本局由大厅的「结束本局」触发。
-    if (publisher) publisher.stop()
+    // 结算页常驻：不自动收尾、不自动返回。
+    // 注意：这里**不能**马上停发布器——最后这一版 ended 视图要先发出去，
+    // 否则观战端会永远停在 reveal，看不到结算页。
+    if (publisher && !endedPublished) {
+      endedPublished = true
+      setTimeout(() => publisher?.stop(), 3000)
+    }
   }
   // 玩法以主持人发布出来的视图为准：其他人是自动进房的，URL 里没有 variant
   const published = (next as { variant?: string }).variant
