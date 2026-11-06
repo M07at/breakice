@@ -27,6 +27,7 @@ import { SupabaseRoomApi } from '@/platform/supabase'
 import { fetchRoom } from '@/services/roomService'
 import { useRoomStore } from '@/stores/room'
 import { createDrawPublisher } from '@/services/drawRemote'
+import { bankRepo } from '@/modules/local/session'
 import type { DrawRemoteApi, Publisher } from '@/services/drawRemote'
 import { createRemoteDrawRoom, } from '@/services/drawRemote'
 import { createSupabaseDrawApi, clearRemoteDrawRoom, publishDrawWord, readMyDrawWord } from '@/services/drawRemoteApi'
@@ -270,6 +271,16 @@ onMounted(async () => {
         players: room.players.map((player) => ({ id: player.id, name: player.nickname, mbti: player.mbti })),
         meId: meId.value,
         scoreConfig: DRAW_SCORE,
+        // 主持人在题库页选过自定义题库就用它，否则仍用系统题库
+        listItems: async () => {
+          const bankId = String(uni.getStorageSync('break-ice-draw-bank') || '')
+          const repo = bankRepo()
+          const items = (bankId
+            ? await repo.listItems(bankId)
+            : await repo.listItems('sys_draw')) as import('@/modules/bank/types').BankItem<'draw'>[]
+          const usable = items.filter((item) => item.content && 'word' in item.content && item.content.word)
+          return usable.slice(0, 200)
+        },
         scorer: createDrawRoomScorer({
           roomId: roomId.value,
           api: roomApi as SupabaseRoomApi,

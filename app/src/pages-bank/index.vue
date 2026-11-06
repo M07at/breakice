@@ -13,6 +13,11 @@
         <text class="badge" :class="r.bank.visibility">{{ r.bank.visibility === 'system' ? '系统' : '我的' }}</text>
       </view>
       <text class="hint">{{ r.count }} 条{{ r.bank.description ? ` · ${r.bank.description}` : '' }}</text>
+      <button
+        v-if="type === 'draw'"
+        class="use-btn"
+        @tap.stop="useForDraw(r.bank.id, r.bank.name)"
+      >用这本题库玩你画我猜</button>
     </view>
 
     <button class="primary" @tap="create">新建{{ GAME_TYPE_LABEL[type] }}题库</button>
@@ -40,6 +45,12 @@ async function load() {
 function setType(t: GameType) {
   type.value = t
   load()
+}
+
+/** 记住这本题库，你画我猜开局时优先用它（存在本机，主持人开房即生效） */
+function useForDraw(bankId: string, name: string) {
+  uni.setStorageSync('break-ice-draw-bank', bankId)
+  uni.showToast({ title: `已选用：${name}`, icon: 'none' })
 }
 
 function open(id: string) {
@@ -72,5 +83,15 @@ function create() {
 
 .tabs {
   margin-bottom: 24rpx;
+}
+.use-btn {
+  margin-top: 16rpx;
+  padding: 14rpx 0;
+  border: 1rpx solid var(--brand, #4f8ef7);
+  border-radius: var(--radius-md, 20rpx);
+  background: var(--brand-soft, #e9f1ff);
+  color: var(--brand-deep, #2f6bd6);
+  font-size: 22rpx;
+  line-height: 1.4;
 }
 </style>
