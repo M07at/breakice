@@ -5,4 +5,4 @@
  * 不用每次都开控制台。**正式发布前把它改成 false**（或在页面里删掉 <DebugStrip/>），
  * 所有使用它的页面会同时隐藏。
  */
-export const DEBUG_STRIP = true
+export const DEBUG_STRIP = false
