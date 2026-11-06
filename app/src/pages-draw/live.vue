@@ -481,13 +481,13 @@ async function endSession() {
       </view>
 
       <view v-if="myTurn && view.phase === 'drawing'" class="surface">
-        <DrawCanvas ref="canvasRef" :engine="painterEngine" :mode="view.scoring ? 'watch' : 'draw'" :variant="drawVariant" @error="error = $event" />
+        <DrawCanvas ref="canvasRef" :key="'painter-' + drawVariant" :engine="painterEngine" :mode="view.scoring ? 'watch' : 'draw'" :variant="drawVariant" @error="error = $event" />
         <button class="primary" :disabled="busy || view.scoring" @click="submitDrawing">{{ view.scoring ? 'AI 评分中…' : busy ? '上传中…' : '交画' }}</button>
       </view>
 
       <view v-else-if="view.phase === 'drawing'" class="surface">
         <text class="label"><PlayerIdentity :name="painterName" :mbti="mbtiOf(view?.painterId)" /> 正在画</text>
-        <DrawCanvas ref="viewCanvasRef" :engine="viewerEngine" mode="watch" :variant="drawVariant" :palette="view ? view.palette : undefined" @error="error = $event" />
+        <DrawCanvas ref="viewCanvasRef" :key="'viewer-' + drawVariant" :engine="viewerEngine" mode="watch" :variant="drawVariant" :palette="view ? view.palette : undefined" @error="error = $event" />
       </view>
 
             <view v-if="ended" class="surface">
