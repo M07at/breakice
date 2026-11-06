@@ -57,6 +57,10 @@ function onNicknameBlur() {
   flushSave()
 }
 
+function openHelp() {
+  uni.navigateTo({ url: '/pages/help/index' })
+}
+
 function goCreate() {
   flushSave()
   uni.navigateTo({ url: '/pages/create/index' })
@@ -72,6 +76,9 @@ onUnmounted(flushSave)
 
 <template>
   <view class="home-page" :style="{ paddingTop: topInset + 'px' }">
+    <view class="help-btn" :style="{ top: topInset + 'px' }" @tap="openHelp">
+      <text class="help-mark">?</text>
+    </view>
     <view class="avatar-area">
       <AvatarBuilder v-model="profile.avatar" />
       <view class="nickname-row">
@@ -101,6 +108,30 @@ onUnmounted(flushSave)
 </template>
 
 <style scoped>
+.help-btn {
+  position: absolute;
+  top: 0;
+  right: 28rpx;
+  z-index: 10;
+  width: 56rpx;
+  height: 56rpx;
+  margin-top: 6rpx;
+  border-radius: 50%;
+  background: #fff;
+  border: 1rpx solid var(--line, #e7eaf0);
+  box-shadow: 0 6rpx 16rpx rgba(30, 41, 59, 0.08);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.help-mark {
+  color: var(--brand, #4f8ef7);
+  font-size: 30rpx;
+  font-weight: 700;
+  line-height: 1;
+}
+
 .home-page {
   display: flex;
   flex-direction: column;

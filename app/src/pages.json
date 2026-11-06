@@ -8,6 +8,13 @@
       }
     },
     {
+      "path": "pages/help/index",
+      "style": {
+        "navigationBarTitleText": "使用说明",
+        "navigationStyle": "custom"
+      }
+    },
+    {
       "path": "pages/create/index",
       "style": {
         "navigationBarTitleText": "创建房间",
