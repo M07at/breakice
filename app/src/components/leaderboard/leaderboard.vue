@@ -13,7 +13,7 @@
     >
       <text class="rank" :class="rankClass(row.rank)">{{ rankLabel(row.rank) }}</text>
       <view class="who">
-        <text class="name">{{ row.name }}</text>
+        <text class="name"><PlayerIdentity :name="row.name" :mbti="row.mbti ?? roomStore.members.find(p => p.id === row.playerId)?.mbti" /></text>
         <text v-if="row.degradedRounds > 0" class="tag">含 {{ row.degradedRounds }} 轮无 AI 评分</text>
       </view>
       <text v-if="row.delta" class="delta">+{{ row.delta }}</text>
@@ -32,6 +32,8 @@
  * 显示用的行来自 props，但只有版本号不比本地旧时才采用。
  */
 import { computed, ref, watch } from 'vue'
+import PlayerIdentity from '../PlayerIdentity.vue'
+import { useRoomStore } from '../../stores/room'
 import type { LeaderboardRow } from '@/modules/score'
 
 const props = withDefaults(
@@ -47,6 +49,7 @@ const props = withDefaults(
   { version: 0, me: '', limit: 0 },
 )
 
+const roomStore = useRoomStore()
 const shown = ref<LeaderboardRow[]>(props.rows)
 const shownVersion = ref(props.version)
 

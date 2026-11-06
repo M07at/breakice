@@ -2,6 +2,7 @@
 import { ref } from 'vue'
 import { useRoomStore } from '../../stores/room'
 import Avatar from '../../components/Avatar.vue'
+import PlayerIdentity from '../../components/PlayerIdentity.vue'
 import { getSavedProfile } from '../../services/avatarService'
 import { toErrorMessage } from '../../platform/types'
 
@@ -30,7 +31,13 @@ async function submit() {
     uni.reLaunch({ url: '/pages/room/index' })
   } catch (issue) {
     uni.hideLoading()
-    uni.showToast({ title: roomStore.error || toErrorMessage(issue), icon: 'none' })
+    uni.hideToast()
+    uni.showModal({
+      title: '创建房间失败',
+      content: roomStore.error || toErrorMessage(issue),
+      showCancel: false,
+      confirmText: '知道了',
+    })
   }
 }
 </script>
@@ -47,7 +54,7 @@ async function submit() {
       <view class="identity-row">
         <Avatar :avatar="profile.avatar" size="medium" />
         <view class="identity-copy">
-          <text class="identity-name">{{ profile.nickname }}</text>
+          <text class="identity-name"><PlayerIdentity :name="profile.nickname" :mbti="profile.mbti" /></text>
           <text class="identity-hint">形象和昵称在首页设置</text>
         </view>
       </view>

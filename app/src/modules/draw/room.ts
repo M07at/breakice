@@ -19,15 +19,17 @@ import { DrawEngine } from './engine'
 import { ChunkPump, LoopbackTransport } from './sync'
 import { customWord, pickDrawWord, pickEmojiPalette } from './words'
 import type { AiScoreResult, DrawVariant, DrawWord } from './types'
+import { DEFAULT_DRAW_SECONDS, normalizeDrawSeconds } from './settings'
 
 /** 每人作画时长 */
-export const DRAW_SECONDS = 90
+export const DRAW_SECONDS = DEFAULT_DRAW_SECONDS
 /** 每张画揭晓（能看到答案、送花、点差评）持续多久；这段时间不开始下一位 */
 export const REVEAL_SECONDS = 8
 
 export interface DrawRoomPlayer {
   id: string
   name: string
+  mbti?: string | null
 }
 
 /**
@@ -75,6 +77,7 @@ export interface DrawRoomView {
   roomId: string
   gameId: string
   variant: DrawVariant
+  drawSeconds?: number
   phase: DrawRoomPhase
   players: DrawRoomPlayer[]
   /** 这一轮该谁画 */
@@ -102,6 +105,8 @@ export interface DrawRoomView {
   ranking: LeaderboardRow[]
   /** 我这一轮交过了没有 */
   submittedByMe: boolean
+  /** 正在等待已提交画作的评分，主持人暂停换轮。 */
+  scoring?: boolean
   /** 所有该猜的人都猜对了 —— 页面收到就该立刻交画，不用等倒计时 */
   allGuessed: boolean
   /** 聊天和抢答记录（我猜对了会多一条 correct） */
@@ -132,6 +137,7 @@ export interface DrawRoomBackend {
   sendReaction(targetPlayerId: string, kind: DrawReaction): Promise<DrawRoomView>
   /** 页面卸载时释放监听和定时器 */
   dispose(): void
+  end?(): Promise<DrawRoomView>
 }
 
 /** 对别人的画表示态度：送花 = 好看，点差评 = 画得离谱 */
@@ -141,13 +147,14 @@ export interface LocalDrawRoomOptions {
   playerCount: number
   variant: DrawVariant
   customText?: string
+  drawSeconds?: number
   scorer?: AiScorer
   now?: () => number
   /**
    * 联机用：直接给定玩家名单（房间真实成员 + 真实 id）。
    * 不传时按 playerCount 生成「我 / 玩家2 / 玩家3」，行为与单机一致。
    */
-  players?: { id: string; name: string }[]
+  players?: DrawRoomPlayer[]
   /** 联机用：我是名单里的哪一个（默认本机身份） */
   meId?: string
   /** 抽词过滤：例如只保留 AI 认得出的词，联机时由页面传入 */
@@ -202,6 +209,7 @@ export class LocalDrawRoomBackend implements DrawRoomBackend {
   private readonly gameId: string
   private readonly variant: DrawVariant
   private readonly customText: string
+  private readonly drawSeconds: number
   private readonly scorer: AiScorer
   private readonly now: () => number
   private readonly listItems: () => Promise<BankItem<'draw'>[]>
@@ -244,6 +252,7 @@ export class LocalDrawRoomBackend implements DrawRoomBackend {
     this.meId = options.meId ?? LOCAL_USER_ID
     this.variant = options.variant
     this.customText = options.customText ?? ''
+    this.drawSeconds = normalizeDrawSeconds(options.drawSeconds)
     this.scorer = options.scorer ?? new MockAiScorer()
     this.now = options.now ?? (() => Date.now())
     this.listItems =
@@ -251,10 +260,10 @@ export class LocalDrawRoomBackend implements DrawRoomBackend {
     this.listFilter = options.listFilter ?? null
     this.gameId = `local-draw-${this.now().toString(36)}`
     // 联机时用房间真实名单；单机时保持原来的生成规则
-    const roster = options.players && options.players.length >= 2 ? options.players : null
+    const roster = options.players && options.players.length >= 1 ? options.players : null
     this.players = roster
-      ? roster.map((player) => ({ id: player.id, name: player.name }))
-      : Array.from({ length: Math.max(2, options.playerCount) }, (_, i) =>
+      ? roster.map((player) => ({ id: player.id, name: player.name, mbti: player.mbti }))
+      : Array.from({ length: Math.max(1, options.playerCount) }, (_, i) =>
           i === 0 ? { id: LOCAL_USER_ID, name: '我' } : { id: `local-${i + 1}`, name: `玩家${i + 1}` },
         )
 
@@ -288,6 +297,7 @@ export class LocalDrawRoomBackend implements DrawRoomBackend {
       variant: this.variant,
       playerCount: this.players.length,
       customText: this.customText,
+      drawSeconds: this.drawSeconds,
     }
   }
 
@@ -300,6 +310,7 @@ export class LocalDrawRoomBackend implements DrawRoomBackend {
       gameId: this.gameId,
       variant: this.variant,
       phase: this.phase,
+      drawSeconds: this.drawSeconds,
       players: this.players,
       painterId: this.painterId(),
       roundIndex: this.roundIndex,
@@ -320,6 +331,7 @@ export class LocalDrawRoomBackend implements DrawRoomBackend {
         : Object.values(this.drawings).filter((d) => d.playerId === this.meId),
       ranking: ended ? this.board.rows() : [],
       submittedByMe: Boolean(this.drawings[this.meId]) && this.painterId() === this.meId,
+      scoring: this.phase === 'drawing' && Boolean(this.pendingSubmit),
       allGuessed: this.isAllGuessed(),
       messages: this.messages,
       panel: ended ? this.buildPanel() : revealing ? this.buildPanel(this.painterId()) : [],
@@ -377,6 +389,7 @@ export class LocalDrawRoomBackend implements DrawRoomBackend {
           degraded: true,
         }
       }
+      if (this.phase === 'ended') return
       this.drawings[actor] = { playerId: actor, imageRef, ai }
       this.answers[actor] = word
       this.board.settleRound({
@@ -390,8 +403,12 @@ export class LocalDrawRoomBackend implements DrawRoomBackend {
       // 画完先揭晓这一张（8 秒），期间不开始下一位
       this.enterReveal()
     })()
-    await this.pendingSubmit
-    this.pendingSubmit = null
+    await this.emit()
+    try {
+      await this.pendingSubmit
+    } finally {
+      this.pendingSubmit = null
+    }
     return this.view()
   }
 
@@ -400,6 +417,8 @@ export class LocalDrawRoomBackend implements DrawRoomBackend {
    * 揭晓阶段 → 换下一位，或者全部结束。
    */
   async tick(): Promise<DrawRoomView> {
+    // 真实模型可能耗时数秒，不能在旧画评分期间切换题面或把分记到下一位。
+    if (this.pendingSubmit) return this.view()
     if (this.phase === 'drawing' && this.now() >= this.endsAt) {
       this.enterReveal()
     } else if (this.phase === 'reveal' && this.now() >= this.revealEndsAt) {
@@ -421,11 +440,11 @@ export class LocalDrawRoomBackend implements DrawRoomBackend {
     const actor = actorId ?? this.meId
     const player = this.players.find((p) => p.id === actor) ?? this.players[0]
     const answer = this.word?.word ?? ''
-    const canGuess = this.phase === 'drawing' && this.painterId() !== actor && Boolean(answer)
+    const canGuess = this.phase === 'drawing' && !this.pendingSubmit && this.now() < this.endsAt && this.painterId() !== actor && Boolean(answer)
     const isCorrect = canGuess && raw.toLowerCase() === answer.toLowerCase()
 
     if (isCorrect && !this.guesses.some((g) => g.playerId === actor)) {
-      const seconds = Math.max(0, Math.round((this.now() - (this.endsAt - DRAW_SECONDS * 1000)) / 1000))
+      const seconds = Math.max(0, Math.round((this.now() - this.startedAt) / 1000))
       this.guesses.push({ playerId: actor, seconds })
     }
 
@@ -467,6 +486,14 @@ export class LocalDrawRoomBackend implements DrawRoomBackend {
     return this.players[this.roundIndex]?.id ?? this.players[0].id
   }
 
+  async end(): Promise<DrawRoomView> {
+    this.phase = 'ended'
+    this.endsAt = 0
+    this.revealEndsAt = 0
+    await this.emit()
+    return this.view()
+  }
+
   private roundKey(): string {
     return `r${this.roundIndex + 1}`
   }
@@ -505,7 +532,7 @@ export class LocalDrawRoomBackend implements DrawRoomBackend {
     this.answers[this.painterId()] = this.word?.word ?? ''
     const startedAt = this.now()
     this.startedAt = startedAt
-    this.endsAt = startedAt + DRAW_SECONDS * 1000
+    this.endsAt = startedAt + this.drawSeconds * 1000
     this.phase = 'drawing'
     this.emit()
   }

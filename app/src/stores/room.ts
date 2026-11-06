@@ -87,9 +87,10 @@ let liveUnsubscribe: (() => void) | null = null
   async function syncIdentityQuietly() {
     try {
       const profile = roomService.currentIdentity()
-      await roomService.syncIdentity(profile.nickname, profile.avatar)
+      await roomService.syncIdentity(profile.nickname, profile.avatar, profile.mbti)
     } catch (issue) {
       console.warn('同步昵称失败，继续进房', issue)
+      uni.showToast({ title: '资料同步失败，房间可能显示旧昵称或 MBTI', icon: 'none' })
     }
   }
 
@@ -210,10 +211,11 @@ let liveUnsubscribe: (() => void) | null = null
         ...room.value,
         phase: 'lobby',
         gameType: null,
-        players: room.value.players.map((player) => ({ ...player, isReady: player.isHost })),
+        players: room.value.players.map((player) => ({ ...player, isReady: false })),
       }
     } catch (issue) {
       error.value = toErrorMessage(issue)
+      throw issue
     } finally {
       busy.value = false
     }
@@ -262,6 +264,7 @@ let liveUnsubscribe: (() => void) | null = null
     connecting,
     error,
     platformLabel,
+    refreshNow,
     create,
     join,
     restore,

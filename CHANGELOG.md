@@ -1,5 +1,8 @@
 ﻿# Changes
 
+The current feature comparison is [feature/integration clone → current master](./CHANGELOG-FEATURE-INTEGRATION-TO-MASTER.md).
+It compares baseline `e64a6da` with the v23 DeepSeek implementation. Entries below retain their historical context.
+
 ## Unreleased
 - Integration: **服务端谁是卧底引擎**（`functions/uc-command`）。C 的纯规则引擎被内联成单文件函数，
   提供 start / act / tick / current / word 五个操作；开局校验房主与全员准备，动作身份只认 token，

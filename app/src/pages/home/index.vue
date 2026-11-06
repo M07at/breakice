@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { onUnmounted, ref, watch } from 'vue'
 import AvatarBuilder from '../../components/AvatarBuilder.vue'
+import { MBTI_TYPES } from '../../modules/shared/mbti'
 import {
-  DEFAULT_NICKNAME,
   NICKNAME_MAX,
   clearLegacyAvatar,
   getSavedProfile,
@@ -25,6 +25,12 @@ function statusBarHeight(): number {
 clearLegacyAvatar()
 const topInset = ref(statusBarHeight())
 const profile = ref<UserProfile>(getSavedProfile())
+const mbtiOptions = ['暂不填写', ...MBTI_TYPES]
+const mbtiIndex = () => profile.value.mbti ? MBTI_TYPES.indexOf(profile.value.mbti) + 1 : 0
+function onMbtiChange(event: { detail: { value: string | number } }) {
+  profile.value.mbti = MBTI_TYPES[Number(event.detail.value) - 1] ?? null
+  flushSave()
+}
 
 /** 没有保存按钮：形象和昵称一改就自动落盘，写入做了合并防抖 */
 let saveTimer: ReturnType<typeof setTimeout> | undefined
@@ -69,16 +75,21 @@ onUnmounted(flushSave)
     <view class="avatar-area">
       <AvatarBuilder v-model="profile.avatar" />
       <view class="nickname-row">
+        <text class="profile-label">请你填你的游戏名字</text>
         <input
           v-model="profile.nickname"
           class="nickname-input"
           type="text"
           :maxlength="NICKNAME_MAX"
-          :placeholder="DEFAULT_NICKNAME"
+          placeholder="请输入游戏名字"
           placeholder-class="nickname-placeholder"
           @blur="onNicknameBlur"
           @confirm="onNicknameBlur"
         />
+        <text class="profile-label mbti-label">你的 MBTI（选填）</text>
+        <picker :range="mbtiOptions" :value="mbtiIndex()" @change="onMbtiChange">
+          <view class="mbti-selector">{{ profile.mbti || '暂不填写' }} <text>⌄</text></view>
+        </picker>
       </view>
     </view>
 
@@ -112,12 +123,15 @@ onUnmounted(flushSave)
 .nickname-row {
   display: flex;
   justify-content: center;
-  width: 100%;
+  flex-direction: column;
+  width: 440rpx;
+  max-width: 85%;
   margin-top: 6rpx;
 }
 
 .nickname-input {
-  width: 400rpx;
+  box-sizing: border-box;
+  width: 100%;
   height: 78rpx;
   padding: 0 28rpx;
   border: 1rpx solid #e3e7f0;
@@ -128,6 +142,10 @@ onUnmounted(flushSave)
   font-weight: 700;
   text-align: center;
 }
+
+.profile-label { margin-bottom: 10rpx; color: #303c50; font-size: 24rpx; font-weight: 700; }
+.mbti-label { margin-top: 20rpx; }
+.mbti-selector { display: flex; align-items: center; justify-content: space-between; height: 72rpx; padding: 0 26rpx; border: 1rpx solid #e3e7f0; border-radius: 18rpx; background: #fff; color: #303c50; font-size: 26rpx; }
 
 .nickname-placeholder {
   color: #b4bac8;

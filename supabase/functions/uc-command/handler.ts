@@ -15,7 +15,7 @@ const SUPABASE_URL = Deno.env.get('SUPABASE_URL') ?? ''
 const SERVICE_ROLE = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
 
 /** 部署后可以用 { op: 'version' } 确认线上跑的是哪一版 */
-const HANDLER_VERSION = 'uc-2026-11-05-rules3'
+const HANDLER_VERSION = 'uc-2026-11-06-drawing-lifecycle'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -88,12 +88,12 @@ type Admin = ReturnType<typeof createClient>
 async function roomMembers(admin: Admin, roomId: string) {
   const { data, error } = await admin
     .from('room_members')
-    .select('user_id, seat, ready, profiles(nickname)')
+    .select('user_id, seat, ready, profiles(nickname,mbti)')
     .eq('room_id', roomId)
     .is('left_at', null)
     .order('seat')
   if (error) throw new UcError('BAD_REQUEST', `读取房间成员失败：${error.message}`)
-  return (data ?? []) as { user_id: string; seat: number; ready: boolean; profiles?: { nickname?: string } }[]
+  return (data ?? []) as { user_id: string; seat: number; ready: boolean; profiles?: { nickname?: string; mbti?: string | null } }[]
 }
 
 const ARTWORK_STATUS: Record<string, 'pending' | 'success' | 'failed' | 'timeout'> = {
@@ -134,7 +134,7 @@ async function loadArtworks(admin: Admin, gameId: string) {
       turnKey: art.turn_key,
       preview: art.storage_path,
       status,
-      score: typeof ai?.total === 'number' ? ai.total : undefined,
+      score: ai?.status === 'success' && typeof ai.total === 'number' ? ai.total : undefined,
       comment: typeof ai?.comment === 'string' ? ai.comment : undefined,
     }
   })
@@ -147,7 +147,7 @@ async function snapshotOf(input: {
   state: UcState
   viewerId: string
   hostId: string
-  members: { user_id: string; profiles?: { nickname?: string } }[]
+  members: { user_id: string; profiles?: { nickname?: string; mbti?: string | null } }[]
 }) {
   const artworks = input.state.config.variant === 'draw' ? await loadArtworks(input.admin, input.gameId) : []
   // 名单以引擎里的座位顺序为准，机器人没有 room_members 记录，名字从 bots 表补
@@ -162,7 +162,7 @@ async function snapshotOf(input: {
     gameNumber: input.gameNumber,
     playerId: input.viewerId,
     hostId: input.hostId,
-    players: input.state.players.map((p) => ({ id: p.id, name: names.get(p.id) ?? '玩家' })),
+    players: input.state.players.map((p) => ({ id: p.id, name: names.get(p.id) ?? '玩家', mbti: input.members.find(m => m.user_id === p.id)?.profiles?.mbti ?? null })),
     view: toPublicView(input.state),
     artworks,
     serverNow: Date.now(),
@@ -385,12 +385,10 @@ async function handleStart(admin: Admin, uid: string, body: Record<string, any>)
   if (members.some((m) => !m.ready)) throw new UcError('BAD_CONFIG', '还有玩家没有准备')
 
   // 人不够时用机器人补位（测试用）：
-  //   客户端显式给 bots 就按它补；没给就算 4 人还差几个（最多 2 个）。
+  //   客户端显式给 bots 就按它补；没给就算 4 人还差几个（最多 5 个）。
   // 机器人是真实的 auth 账号，引擎不需要任何改动。
   const rosterIds = members.map((m) => m.user_id)
-  const requested = Math.round(Number(body.bots ?? 0))
-  const shortfall = Math.max(0, Math.min(2, 4 - rosterIds.length))
-  const botCount = Math.max(0, Math.min(2, Number.isFinite(requested) && requested > 0 ? requested : shortfall))
+  const botCount = testBotCount(rosterIds.length, body.bots)
   if (botCount > 0) {
     const bots = await ensureBots(admin, botCount)
     rosterIds.push(...bots.map((bot) => bot.user_id))
@@ -479,7 +477,7 @@ async function handleAct(admin: Admin, uid: string, body: Record<string, any>): 
     }
   }
 
-  if (meta.expectedVersion !== undefined && Number(meta.expectedVersion) !== state.version) {
+  if (action.type !== 'aiScored' && meta.expectedVersion !== undefined && Number(meta.expectedVersion) !== state.version) {
     const independent = action.type === 'acknowledgeWord' || action.type === 'vote' || action.type === 'drawingSubmitted'
     // 交画只要求还在作画阶段：轮次/发言者的时间戳很容易在提交瞬间变化，
     // 用 turnKey 严格比对会把正常的提交判成过期（人机回合切换快时尤其明显）。
@@ -504,7 +502,13 @@ async function handleAct(admin: Admin, uid: string, body: Record<string, any>): 
 
   const full = { ...(action as object), by: uid } as UcAction
   // AI 评分只能代表自己交的那幅画，不让客户端给别人加分
-  if (full.type === 'aiScored') (full as { playerId: string }).playerId = uid
+  if (full.type === 'aiScored') {
+    full.playerId = uid
+    const { data: artwork } = await admin.from('artworks').select('id').eq('game_id', game.id).eq('user_id', uid).eq('turn_key', `${full.turnKey}#${uid}`).maybeSingle()
+    const { data: verified } = artwork ? await admin.from('ai_scores').select('total,status').eq('artwork_id', artwork.id).maybeSingle() : { data: null }
+    if (verified?.status !== 'success' || typeof verified.total !== 'number') throw new UcError('BAD_REQUEST', '没有已验证的 AI 分数')
+    full.score = verified.total
+  }
   const applied = applyAction(baseState, full, { now, isHost: hostId === uid })
   const settled = tick(applied.state, now)
   const next = settled.state
@@ -593,10 +597,6 @@ async function handleTick(admin: Admin, uid: string, body: Record<string, any>):
       p_version: settled.state.version,
     })
     await writeScores(admin, game.id, [...departed.events, ...settled.events], `${game.id}:v${settled.state.version}`)
-    if (ended) {
-      await admin.from('games').update({ status: 'ended', ended_at: new Date().toISOString() }).eq('id', game.id)
-      await admin.from('rooms').update({ status: 'lobby' }).eq('id', game.room_id)
-    }
   }
 
   await driveBots(admin, game.id)

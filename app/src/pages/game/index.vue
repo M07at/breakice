@@ -1,4 +1,4 @@
-﻿<script setup lang="ts">
+<script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
 import { onShareAppMessage } from '@dcloudio/uni-app'
 import { useRoomStore } from '../../stores/room'
@@ -6,6 +6,7 @@ import { getPromptPoolSize, pickPrompt, pickRandomPlayer, refreshPromptPools } f
 import { setTruth } from '../../services/roomService'
 import type { Player, TruthOrDarePrompt, TruthTurn } from '../../types/room'
 import Avatar from '../../components/Avatar.vue'
+import PlayerIdentity from '../../components/PlayerIdentity.vue'
 
 const roomStore = useRoomStore()
 const room = computed(() => roomStore.room)
@@ -153,7 +154,7 @@ onShareAppMessage(() => ({
       <view class="turn-label"><text>本轮由谁来挑战</text><text class="turn-status">{{ spinning ? '转盘中...' : '点击开始' }}</text></view>
       <view :class="['wheel', { spinning }]">
         <view class="wheel-ring"><Avatar v-if="targetPlayer" :avatar="targetPlayer.avatar" size="large" /><text v-else class="wheel-emoji">✦</text></view>
-        <text class="wheel-name">{{ targetPlayer?.nickname ?? '等待抽取' }}</text>
+        <text class="wheel-name"><PlayerIdentity :name="targetPlayer?.nickname ?? '等待抽取'" :mbti="targetPlayer?.mbti" /></text>
       </view>
       <button class="spin-button" :disabled="spinning" @click="spin">{{ spinning ? '正在抽取' : targetPlayer ? '再转一次' : '开始转盘' }}</button>
     </view>
@@ -166,7 +167,7 @@ onShareAppMessage(() => ({
 
       <view class="prompt-card">
         <view class="prompt-card-top"><text class="prompt-badge">{{ prompt ? (prompt.type === 'truth' ? 'TRUTH' : 'DARE') : 'READY' }}</text><text class="difficulty">{{ prompt?.difficulty ?? '选择一种玩法' }}</text></view>
-        <text class="prompt-target">{{ targetPlayer.nickname }} 的题目</text>
+        <text class="prompt-target"><PlayerIdentity :name="targetPlayer.nickname" :mbti="targetPlayer.mbti" /> 的题目</text>
         <text class="prompt-text">{{ prompt?.text ?? '抽取一张题目卡，开始这一轮破冰。' }}</text>
         <view class="prompt-actions">
           <button class="draw-btn" @click="drawPrompt(activeTab)">{{ prompt ? '换一题' : '抽取题目' }}</button>

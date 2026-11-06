@@ -93,6 +93,7 @@ export interface DrawRoundResult {
 export interface LeaderboardRow {
   playerId: string
   name: string
+  mbti?: string | null
   total: number
   /** 1 开头，同分并列同名次 */
   rank: number

@@ -107,6 +107,7 @@ function clearCanvas() {
     </view>
 
     <DrawCanvas ref="canvasRef" :engine="engine" mode="draw" variant="classic" @error="errorText = $event" />
+    <button class="uc-button" :disabled="!canSubmit" @tap="submit">{{ submitting ? '正在提交…' : '完成作画并提交' }}</button>
 
     <text v-if="errorText" class="uc-note">{{ errorText }}</text>
   </view>

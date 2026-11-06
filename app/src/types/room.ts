@@ -1,4 +1,6 @@
 export type RoomPhase = 'lobby' | 'playing' | 'ended'
+import type { Mbti } from '../modules/shared/mbti'
+
 /** 房间可选的玩法；hybrid = 你画我猜谁是卧底 */
 export type GameType = 'truth-or-dare' | 'drawing' | 'undercover' | 'hybrid'
 
@@ -20,6 +22,7 @@ export interface AvatarConfig {
 export interface Player {
   id: string
   nickname: string
+  mbti?: Mbti | null
   avatar: AvatarConfig
   isHost: boolean
   isReady: boolean

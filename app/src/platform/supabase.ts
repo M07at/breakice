@@ -3,6 +3,8 @@ import { getSavedProfile, normalizeAvatar } from '../services/avatarService'
 import type { AvatarConfig, GameType, Player, Room, TruthTurn } from '../types/room'
 import { PlatformError } from './types'
 import type { CreateRoomInput, Identity, RoomApi, Unsubscribe } from './types'
+import { normalizeMbti } from '../modules/shared/mbti'
+import { isMissingRpc } from '../services/profileCompatibility'
 
 /**
  * Supabase 房间实现 —— 对接 A 的迁移（`supabase/migrations`）。
@@ -67,18 +69,30 @@ function writeSession(session: Session | null): void {
   }
 }
 
+/** 手机首次登录包含微信与 Supabase 换票，不能套用游戏轮询的短超时。 */
+function requestPolicy(path: string): { timeout: number; label: string } {
+  if (path === '/functions/v1/draw-score' || path === '/functions/v1/ai-score') return { timeout: 60000, label: 'AI 评分' }
+  if (path === '/functions/v1/wechat-auth') return { timeout: 45000, label: '微信登录' }
+  if (path.startsWith('/auth/v1/')) return { timeout: 45000, label: '登录服务' }
+  if (/\/rpc\/set_my_profile(?:_v2)?$/.test(path)) return { timeout: 30000, label: '资料同步' }
+  if (path.endsWith('/rpc/create_room')) return { timeout: 30000, label: '创建房间' }
+  if (path.endsWith('/rpc/join_room')) return { timeout: 30000, label: '加入房间' }
+  return { timeout: 10000, label: '服务器连接' }
+}
+
 function uniRequest<T>(options: {
   path: string
   method?: 'GET' | 'POST' | 'DELETE'
   body?: unknown
   token?: string
 }): Promise<T> {
+  const policy = requestPolicy(options.path)
   return new Promise((resolve, reject) => {
     uni.request({
       url: `${baseUrl()}${options.path}`,
       method: options.method ?? 'GET',
       data: options.body as Record<string, unknown> | undefined,
-      timeout: 10000,
+      timeout: policy.timeout,
       header: {
         apikey: env.supabaseAnonKey,
         Authorization: `Bearer ${options.token ?? env.supabaseAnonKey}`,
@@ -97,8 +111,11 @@ function uniRequest<T>(options: {
         // 原始 errMsg 里有 "url not in domain list" 这类关键信息，必须透出来。
         const raw = String((error as { errMsg?: string } | undefined)?.errMsg ?? '')
         const blocked = /domain|url not in|invalid url/i.test(raw)
+        const timedOut = /time\s*out|timeout/i.test(raw)
         const message = blocked
           ? '请求被微信拦下了：这个域名不在小程序的「request 合法域名」里（真机才校验，开发者工具勾了"不校验"所以没事）'
+          : timedOut
+          ? `${policy.label}请求超时（${policy.timeout / 1000} 秒），尚未收到服务器响应。请切换 Wi-Fi 或移动网络后重试。`
           : `连不上服务器，请检查网络${raw ? `（${raw.slice(0, 80)}）` : ''}`
         reject(new PlatformError(blocked ? 'NOT_CONFIGURED' : 'NETWORK', message))
       },
@@ -189,6 +206,7 @@ export class SupabaseRoomApi implements RoomApi {
     return {
       id: this.session?.userId ?? 'unauthenticated',
       nickname: profile.nickname,
+      mbti: normalizeMbti(profile.mbti),
       avatar: profile.avatar,
     }
   }
@@ -317,8 +335,10 @@ export class SupabaseRoomApi implements RoomApi {
   /** 调用 Edge Function（带登录态），给 uc-command 这类游戏指令用 */
   async invokeFunction<T>(path: string, body: unknown): Promise<T> {
     try {
-      const result = await this.call<{ error?: { code?: string; message?: string } }>(path, { method: 'POST', body })
-      if (result && typeof result === 'object' && result.error) {
+      const result = await this.call<{ error?: { code?: string; message?: string }; status?: string }>(path, { method: 'POST', body })
+      const scoringOutcome = (path === '/functions/v1/draw-score' || path === '/functions/v1/ai-score')
+        && ['failed', 'timeout', 'unsupported', 'pending'].includes(result?.status ?? '')
+      if (result && typeof result === 'object' && result.error && !scoringOutcome) {
         throw new PlatformError('UNKNOWN', result.error.message ?? '游戏服务返回错误')
       }
       return result as T
@@ -410,16 +430,23 @@ export class SupabaseRoomApi implements RoomApi {
     return this.call<T>(`/rest/v1/${table}?${query}`)
   }
 
-  async setIdentity(patch: Partial<Pick<Identity, 'nickname' | 'avatar'>>): Promise<Identity> {
+  async setIdentity(patch: Partial<Pick<Identity, 'nickname' | 'avatar' | 'mbti'>>): Promise<Identity> {
     const current = getSavedProfile()
     const next = {
       nickname: patch.nickname ?? current.nickname,
       avatar: patch.avatar ?? current.avatar,
+      mbti: normalizeMbti(patch.mbti !== undefined ? patch.mbti : current.mbti),
     }
     const session = await this.ensureSession()
     // 昵称和形象一起写进 profiles（0009），房间/游戏里才能和首页一致
-    await this.rpc<void>('set_my_profile', { p_nickname: next.nickname, p_avatar: next.avatar })
-    return { id: session.userId, nickname: next.nickname, avatar: next.avatar }
+    try {
+      await this.rpc<void>('set_my_profile_v2', { p_nickname: next.nickname, p_avatar: next.avatar, p_mbti: next.mbti })
+    } catch (issue) {
+      if (!isMissingRpc(issue, 'set_my_profile_v2')) throw issue
+      await this.rpc<void>('set_my_profile', { p_nickname: next.nickname, p_avatar: next.avatar })
+      uni.showToast({ title: 'MBTI 尚未同步，请更新服务端资料接口', icon: 'none' })
+    }
+    return { id: session.userId, ...next }
   }
 
   async createRoom(input: CreateRoomInput): Promise<Room> {
@@ -486,10 +513,10 @@ export class SupabaseRoomApi implements RoomApi {
         role: string
         ready: boolean
         online: boolean
-        profiles?: { nickname?: string; avatar?: AvatarConfig | null }
+        profiles?: { nickname?: string; avatar?: AvatarConfig | null; mbti?: string | null }
       }[]>(
         'room_members',
-        `room_id=eq.${roomId}&left_at=is.null&select=user_id,seat,role,ready,online,profiles(nickname,avatar)&order=seat`,
+        `room_id=eq.${roomId}&left_at=is.null&select=user_id,seat,role,ready,online,profiles(nickname,avatar,mbti)&order=seat`,
       ),
     ])
     const room = rooms?.[0]
@@ -498,6 +525,7 @@ export class SupabaseRoomApi implements RoomApi {
     const players: Player[] = (members ?? []).map((member) => ({
       id: member.user_id,
       nickname: member.profiles?.nickname || `玩家${member.seat}`,
+      mbti: normalizeMbti(member.profiles?.mbti),
       // 用玩家在首页设置的形象；没设过（或老数据）才按座位号兜底生成
       avatar: member.profiles?.avatar ? normalizeAvatar(member.profiles.avatar) : avatarForSeat(member.seat),
       isHost: member.role === 'host' || member.user_id === room.host_id,
@@ -516,7 +544,7 @@ export class SupabaseRoomApi implements RoomApi {
       truth: room.settings?.truth ?? null,
       players: players.length
         ? players
-        : [{ id: session.userId, nickname: getSavedProfile().nickname, avatar: getSavedProfile().avatar, isHost: true, isReady: false, online: true }],
+        : [{ id: session.userId, nickname: getSavedProfile().nickname, mbti: normalizeMbti(getSavedProfile().mbti), avatar: getSavedProfile().avatar, isHost: true, isReady: false, online: true }],
     }
   }
 

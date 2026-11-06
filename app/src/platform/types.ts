@@ -1,5 +1,7 @@
 ﻿import type { AvatarConfig, GameType, Room, TruthTurn } from '../types/room'
 
+import type { Mbti } from '../modules/shared/mbti'
+
 /** 后端形态：配置了 Supabase 就用 Supabase，否则用本机房间 */
 export type PlatformMode = 'supabase' | 'local'
 
@@ -7,6 +9,7 @@ export type PlatformMode = 'supabase' | 'local'
 export interface Identity {
   id: string
   nickname: string
+  mbti?: Mbti | null
   avatar: AvatarConfig
 }
 
@@ -31,7 +34,7 @@ export interface RoomApi {
   /** 展示用，例如「本机房间」/「Supabase 房间」 */
   readonly label: string
   identity(): Identity
-  setIdentity(patch: Partial<Pick<Identity, 'nickname' | 'avatar'>>): Promise<Identity>
+  setIdentity(patch: Partial<Pick<Identity, 'nickname' | 'avatar' | 'mbti'>>): Promise<Identity>
   createRoom(input: CreateRoomInput): Promise<Room>
   joinRoom(code: string): Promise<Room>
   leaveRoom(roomId: string): Promise<void>

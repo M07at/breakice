@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { Player } from '../types/room'
 import Avatar from './Avatar.vue'
+import PlayerIdentity from './PlayerIdentity.vue'
 
 defineProps<{
   players: Player[]
@@ -18,14 +19,14 @@ defineProps<{
       </view>
       <view class="player-copy">
         <view class="player-name-row">
-          <text class="player-name">{{ player.nickname }}</text>
+          <view class="player-name"><PlayerIdentity :name="player.nickname" :mbti="player.mbti" truncate /></view>
           <text v-if="showHostBadge && player.isHost" class="host-badge">房主</text>
         </view>
         <text class="player-state">{{ player.isReady ? '已准备' : '等待准备' }}</text>
       </view>
       <text :class="['ready-state', { ready: player.isReady }]">{{ player.isReady ? '✓' : '·' }}</text>
     </view>
-    <view v-for="slot in Math.max(0, Math.min(4, maxPlayers - players.length))" :key="`empty-${slot}`" class="player-item empty">
+    <view v-if="players.length < maxPlayers" class="player-item empty">
       <view class="empty-avatar">+</view>
       <text class="player-state">等待加入</text>
     </view>
@@ -35,7 +36,7 @@ defineProps<{
 <style scoped>
 .player-list {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: minmax(0, 1fr);
   gap: 18rpx;
 }
 
@@ -101,12 +102,11 @@ defineProps<{
 }
 
 .player-name {
-  overflow: hidden;
+  flex: 1;
+  min-width: 0;
   color: var(--ink);
   font-size: 25rpx;
   font-weight: 700;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 .host-badge {
@@ -126,6 +126,8 @@ defineProps<{
 }
 
 .ready-state {
+  flex: 0 0 auto;
+  margin-left: 16rpx;
   color: #c3c8d2;
   font-size: 38rpx;
   font-weight: 700;

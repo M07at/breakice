@@ -9,13 +9,15 @@ import { bankUrl } from '../../services/gameEntry'
 import { adoptUndercoverRound, endUndercoverRound, PLAYER_PAGE, startUndercoverRound } from '../../services/ucGame'
 import { fetchRoomLeaderboard } from '../../services/scoreBoard'
 import { toErrorMessage } from '../../platform/types'
+import { testBotCount } from '../../modules/undercover/rules'
+import { clearRemoteDrawRoom } from '../../services/drawRemoteApi'
 import type { LeaderboardRow } from '../../modules/score'
 import type { GameType } from '../../types/room'
+import { BUILD_ID as BUILD_LABEL } from '../../modules/shared/build'
 
 const roomStore = useRoomStore()
 const room = computed(() => roomStore.room)
 /** 版本标签：改这里就能确认开发者工具里跑的是不是最新包 */
-const BUILD_LABEL = 'v15-1105'
 
 const notice = ref('')
 /** 本房累计积分（由 uc-command 结算时写入 scores，0010 聚合） */
@@ -68,7 +70,7 @@ const MIN_PLAYERS: Record<GameType, number> = {
   'truth-or-dare': 2,
   undercover: 4,
   hybrid: 4,
-  drawing: 2,
+  drawing: 1,
 }
 
 function openPage(url: string) {
@@ -117,7 +119,13 @@ function pickDrawMode(): Promise<'classic' | 'emoji' | 'custom' | null> {
 async function startLocalDraw() {
   const mode = await pickDrawMode()
   if (!mode) return
+  if (mode === 'custom') {
+    const id = room.value?.id
+    if (id) openPage(`/pages-draw/setup?room=${encodeURIComponent(id)}&variant=custom&count=${roomStore.memberCount}&lock=1`)
+    return
+  }
   try {
+    if (room.value) await clearRemoteDrawRoom(room.value.id)
     await roomStore.begin('drawing')
     await nextTick()
     openPage(`${gameUrl('drawing')}&variant=${mode}`)
@@ -136,7 +144,7 @@ async function hostStart(gameType: GameType) {
   })
   notice.value = ''
 
-  // 谁是卧底 / 融合玩法人数不够时可以用机器人补位（最多补 2 个，方便两个人测试）
+  // 谁是卧底 / 融合玩法自动补足四人局，测试机器人上限为 5 个。
   const canFillBots = isUndercover(gameType)
   if (roomStore.memberCount < minPlayers && !canFillBots) {
     uni.showToast({ title: `${GAME_LABEL[gameType]}至少要 ${minPlayers} 人`, icon: 'none' })
@@ -158,7 +166,7 @@ async function hostStart(gameType: GameType) {
       return
     }
     const variant = variantOf(gameType)
-    const bots = Math.max(0, Math.min(2, 4 - roomStore.memberCount))
+    const bots = testBotCount(roomStore.memberCount)
     try {
       if (bots > 0) uni.showToast({ title: `已补 ${bots} 个机器人`, icon: 'none' })
       uni.showLoading({ title: '正在开局…', mask: true })
@@ -249,12 +257,14 @@ async function finishRound() {
   // 谁是卧底的局在 games 表里，得先让服务端把它收尾，否则下一局会被 GAME_ACTIVE 挡住
   if (isUndercover(room.value?.gameType ?? null)) {
     try {
-      await endUndercoverRound()
+      await endUndercoverRound(room.value?.id)
     } catch (issue) {
       console.warn('结束服务端局次失败', issue)
+      notice.value = toErrorMessage(issue)
+      return
     }
   }
-  await roomStore.finishGame()
+  try { await roomStore.finishGame() } catch (issue) { notice.value = toErrorMessage(issue); return }
   await loadLeaderboard()
   notice.value = '本局已结束，房间回到大厅'
 }

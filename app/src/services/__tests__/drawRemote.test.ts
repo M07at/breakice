@@ -153,6 +153,18 @@ describe('drawRemote 主持人发布器', () => {
 })
 
 describe('drawRemote 观战端', () => {
+  it('does not publish the host painter answer or answer emoji to guessers', async () => {
+    const { api, published } = fakeApi()
+    const { backend } = fakeBackend()
+    const original = await backend.view()
+    backend.view = async () => ({ ...original, word: { word: '苹果' }, palette: ['🍎'] })
+    const publisher = createDrawPublisher({ roomId: 'r1', api, backend })
+    publisher.start()
+    await publisher.flush()
+    publisher.stop()
+    expect(published[0].view).toMatchObject({ word: null, palette: [] })
+    expect((await backend.view()).word?.word).toBe('苹果')
+  })
   it('读到视图并只在版本变化时通知订阅者', async () => {
     const { api } = fakeApi()
     const room = createRemoteDrawRoom({ roomId: 'r1', api, meId: 'guest' })

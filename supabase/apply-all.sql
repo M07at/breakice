@@ -1,4 +1,4 @@
-﻿-- 破冰局 · 建库前处理：把早期原型留下的同名表改名备份
+-- 破冰局 · 建库前处理：把早期原型留下的同名表改名备份
 -- 用法：先单独执行本文件，再按 0001 → 0006 顺序执行 migrations。
 -- 只改名，不删数据；确认旧数据没用之后可以自己 drop table public.rooms_legacy_backup;
 
@@ -2499,3 +2499,120 @@ grant execute on function public.submit_artwork(uuid, text, text) to authenticat
 -- ai_scores 增加 AI 猜测结果与用时，画廊要展示
 alter table public.ai_scores add column if not exists ai_guess text;
 alter table public.ai_scores add column if not exists ai_seconds numeric;
+
+
+-- 0023_profile_mbti.sql
+-- 资料写入 v2：保留旧 RPC，旧客户端仍可继续同步昵称与形象。
+create or replace function public.set_my_profile_v2(
+  p_nickname text default null,
+  p_avatar jsonb default null,
+  p_mbti text default null
+)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_mbti text := nullif(upper(btrim(p_mbti)), '');
+begin
+  if auth.uid() is null then
+    raise exception 'AUTH_REQUIRED' using errcode = '28000';
+  end if;
+  if v_mbti is not null and v_mbti !~ '^[EI][SN][TF][JP]$' then
+    raise exception 'BAD_MBTI' using errcode = '22023';
+  end if;
+  perform public.set_my_profile(p_nickname, p_avatar);
+  update public.profiles set mbti = v_mbti where id = auth.uid();
+end;
+$$;
+
+revoke all on function public.set_my_profile_v2(text, jsonb, text) from public;
+grant execute on function public.set_my_profile_v2(text, jsonb, text) to authenticated;
+
+-- 新版积分榜带 MBTI；保留旧函数的返回格式，避免破坏旧客户端。
+create or replace function public.room_leaderboard_v2(p_room_id uuid)
+returns table (user_id uuid, nickname text, avatar jsonb, mbti text, points bigint, games bigint)
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select s.user_id, coalesce(p.nickname, '玩家'), p.avatar, p.mbti,
+    sum(s.points)::bigint, count(distinct s.game_id)::bigint
+  from public.scores s
+  join public.games g on g.id = s.game_id
+  join public.profiles p on p.id = s.user_id
+  where g.room_id = p_room_id and public.is_room_member(p_room_id)
+  group by s.user_id, p.nickname, p.avatar, p.mbti
+  order by sum(s.points) desc, coalesce(p.nickname, '玩家') asc;
+$$;
+revoke all on function public.room_leaderboard_v2(uuid) from public;
+grant execute on function public.room_leaderboard_v2(uuid) to authenticated;
+
+-- 0024: ordinary drawing score receipts (service access only)
+create table if not exists public.draw_ai_scores (
+  room_id uuid not null references public.rooms(id) on delete cascade,
+  game_key text not null,
+  round_key text not null,
+  image_ref text not null,
+  status text not null check (status in ('pending', 'success', 'failed', 'timeout', 'unsupported')),
+  result jsonb,
+  updated_at timestamptz not null default now(),
+  primary key (room_id, game_key, round_key)
+);
+alter table public.draw_ai_scores enable row level security;
+revoke all on public.draw_ai_scores from anon, authenticated;
+grant all on public.draw_ai_scores to service_role;
+
+
+-- 0025 drawing lifecycle
+-- 结束局次后回大厅并重新准备，保留结果快照。
+create or replace function public.finish_draw_session(p_room_id uuid, p_game_key text)
+returns void language plpgsql security definer set search_path=public as $$
+declare v_host uuid; v_key text;
+begin
+  select host_id into v_host from public.rooms where id=p_room_id for update;
+  if auth.uid() is null or v_host is distinct from auth.uid() then raise exception 'HOST_ONLY' using errcode='42501'; end if;
+  select view->>'gameId' into v_key from public.draw_sessions where room_id=p_room_id for update;
+  if v_key is distinct from p_game_key then raise sqlstate 'PT409' using message='STALE_GAME'; end if;
+  update public.draw_sessions set view=jsonb_set(jsonb_set(view,'{phase}','"ended"'),'{endsAt}','0'),version=version+1,updated_at=now() where room_id=p_room_id;
+  update public.rooms set status='lobby',game_type='lobby' where id=p_room_id;
+  update public.room_members set ready=false where room_id=p_room_id and left_at is null;
+end; $$;
+revoke all on function public.finish_draw_session(uuid,text) from public;
+grant execute on function public.finish_draw_session(uuid,text) to authenticated;
+
+create or replace function public.end_room_game(p_room_id uuid)
+returns void language plpgsql security definer set search_path=public as $$
+declare v_host uuid;
+begin
+  if auth.uid() is null then raise exception 'AUTH_REQUIRED' using errcode='28000'; end if;
+  select host_id into v_host from public.rooms where id=p_room_id for update;
+  if v_host is distinct from auth.uid() then raise exception 'HOST_ONLY' using errcode='42501'; end if;
+  if exists(select 1 from public.games where room_id=p_room_id and status='active') then
+    raise sqlstate 'PT409' using message='GAME_ACTIVE';
+  end if;
+  update public.draw_sessions set view=jsonb_set(jsonb_set(view,'{phase}','"ended"'),'{endsAt}','0'),version=version+1,updated_at=now() where room_id=p_room_id;
+  update public.rooms set status='lobby',game_type='lobby' where id=p_room_id;
+  update public.room_members set ready=false where room_id=p_room_id and left_at is null;
+end; $$;
+
+create or replace function public.uc_tick(p_game_id uuid,p_state jsonb,p_view jsonb,p_version bigint)
+returns bigint language plpgsql security definer set search_path=public as $$
+declare v_room uuid; v_ended boolean := p_state->>'phase'='ended';
+begin
+  update public.games set state=p_state,view=p_view,version=p_version,
+    status=case when v_ended then 'ended' else 'active' end,
+    ended_at=case when v_ended then now() else ended_at end,
+    ended_reason=case when v_ended then p_state->>'endedReason' else ended_reason end
+  where id=p_game_id and status='active' and version<p_version returning room_id into v_room;
+  if v_room is not null and v_ended then
+    update public.rooms set status='lobby',game_type='lobby' where id=v_room
+      and not exists(select 1 from public.games where room_id=v_room and status='active');
+    update public.room_members set ready=false where room_id=v_room and left_at is null;
+  end if;
+  return p_version;
+end; $$;
+revoke all on function public.uc_tick(uuid,jsonb,jsonb,bigint) from public,anon,authenticated;
+grant execute on function public.uc_tick(uuid,jsonb,jsonb,bigint) to service_role;
