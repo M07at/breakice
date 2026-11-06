@@ -50,6 +50,8 @@ const DRAW_SCORE = { aiWeight: 1, painterCap: 2000, perGuesser: 100, guesserBase
 const roomId = ref('')
 /** 结束后先把最终视图发出去，再停发布器 */
 let endedPublished = false
+/** 观战端定时补同步，避免丢片后画布不一致 */
+let syncTimer: ReturnType<typeof setInterval> | null = null
 const roomStore = useRoomStore()
 let finishing = false
 let finishRequested = false
@@ -324,6 +326,19 @@ onMounted(async () => {
 
     // 所有人都监听笔画广播（作画者自己收到自己的会 applyChunk 返回 0，不影响）
     offStroke = onLivePoke((event, payload) => {
+      // 观战端定时要全量：丢片时靠它补齐，emoji 贴纸也能重放出来
+      if (event === 'draw-sync') {
+        if (myTurn.value) pokeRoom('draw-snapshot', { ops: painterEngine.snapshot() })
+        return
+      }
+      if (event === 'draw-snapshot') {
+        const ops = (payload as { ops?: import('@/modules/draw/types').DrawOp[] }).ops
+        if (Array.isArray(ops) && !myTurn.value) {
+          viewerEngine.loadSnapshot(ops)
+          viewCanvasRef.value?.paint()
+        }
+        return
+      }
       if (event !== 'stroke') return
       const chunk = (payload as { chunk?: DrawChunk }).chunk
       if (!chunk) return
@@ -334,7 +349,14 @@ onMounted(async () => {
   }
 })
 
+syncTimer = setInterval(() => {
+  const snapshot = view.value
+  if (!snapshot || snapshot.phase !== 'drawing' || myTurn.value) return
+  pokeRoom('draw-sync')
+}, 2000)
+
 onUnmounted(() => {
+  if (syncTimer) clearInterval(syncTimer)
   if (returnTimer) clearTimeout(returnTimer)
   offView?.()
   remoteDispose?.()
