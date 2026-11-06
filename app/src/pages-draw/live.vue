@@ -353,7 +353,7 @@ function scheduleReturn() {
   publisher?.stop()
   remoteDispose?.()
   if (tickTimer) clearInterval(tickTimer)
-  if (!returnTimer) returnTimer = setTimeout(backToLobby, 5000)
+  // 结算页常驻，由玩家自己退出
 }
 async function finishDrawingSession(early = false) {
   if (finishing || !view.value || !isHost.value) return

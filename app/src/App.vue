@@ -14,10 +14,11 @@ onLaunch(() => {
 @import './styles/background.css';
 page {
   /* 全局背景：只用这张图，不叠黑底 */
+  min-height: 100vh;
   background-color: #f6f8fb;
   background-size: cover;
-  background-position: center;
-  background-attachment: fixed;
+  background-position: top center;
+  background-repeat: no-repeat;
   color: #172033;
   font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif;
   font-size: 28rpx;

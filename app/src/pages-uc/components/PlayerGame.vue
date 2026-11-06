@@ -38,7 +38,7 @@
           <text class="uc-label"><PlayerIdentity :name="nameOf(snapshot.view.currentSpeakerId)" :mbti="mbtiOf(snapshot.view.currentSpeakerId)" /> 正在画</text>
           <DrawCanvas ref="hybridCanvas" :engine="hybridViewer" mode="watch" variant="classic" @error="error = $event" />
         </view>
-        <HybridDrawAdapter ref="hybridAdapter" v-if="snapshot.view.variant === 'draw' && rights.canFinish" :key="snapshot.gameId + snapshot.view.turnKey + snapshot.playerId" :game-id="snapshot.gameId" :turn-key="snapshot.view.turnKey" :player-id="snapshot.playerId" :editable="!locked" @submit="submitDrawing" />
+        <HybridDrawAdapter ref="hybridAdapter" v-if="snapshot.view.variant === 'draw' && rights.canFinish" :seed-ops="roundOps" :key="snapshot.gameId + snapshot.view.turnKey + snapshot.playerId" :game-id="snapshot.gameId" :turn-key="snapshot.view.turnKey" :player-id="snapshot.playerId" :editable="!locked" @submit="submitDrawing" />
         <view v-if="rights.me?.alive" class="uc-card"><text class="uc-label">我的词卡</text><text v-if="secret" class="secret-word small">{{ secret.isBlank ? '你是白板' : secret.word }}</text><button class="uc-button uc-secondary" :disabled="locked" @tap="secret ? hideSecret() : reveal()">{{ secret ? '遮住我的词语' : '私密查看我的词语' }}</button></view>
         <view class="uc-card"><text class="uc-label">发言顺序</text><view v-for="(id, i) in snapshot.view.speakOrder" :key="id" class="player-line"><text>{{ seatOf(id) }} 号 · <PlayerIdentity :name="nameOf(id)" :mbti="mbtiOf(id)" /></text><text class="uc-muted">{{ i < speakerIndex ? '已发言' : id === snapshot.view.currentSpeakerId ? '正在发言' : '等待' }}</text></view></view>
       </template>
@@ -72,10 +72,9 @@
       <template v-if="snapshot.view.phase === 'ended'">
         <view class="uc-card"><text class="uc-badge">第 {{ snapshot.view.round }} 轮 · 本局结束</text><text class="person">{{ ending }}</text><text v-if="snapshot.view.endedReason === 'max_rounds'" class="uc-muted">已达到轮数上限。</text><text v-if="snapshot.view.pair" class="uc-note personal-wait">平民词：{{ snapshot.view.pair.civilian }} / 卧底词：{{ snapshot.view.pair.undercover }}</text></view>
         <view class="uc-card"><text class="uc-label">揭晓所有人的词</text><view v-for="p in snapshot.view.players" :key="p.id" class="final-player"><view class="uc-row"><text>{{ p.seat + 1 }} 号 · <PlayerIdentity :name="nameOf(p.id)" :mbti="mbtiOf(p.id)" /></text><text class="uc-badge">{{ p.role ? ROLE_LABEL[p.role] : '' }}</text></view><text class="uc-muted">{{ p.word === null ? '没有词语' : p.word }} · {{ p.alive ? '存活到最后' : '已出局' }}</text></view></view>
-        <button class="uc-button" :disabled="busy" @tap="backToLobby">回到房间 →</button><view class="uc-note">本局已结束，5 秒后回到房间。下一局需要重新准备。</view>
+        <button class="uc-button" :disabled="busy" @tap="backToLobby">退出，回到大厅 →</button><view class="uc-note">本局已结束，结算会一直保留；主持人结束本局后所有人回到大厅并重新准备。</view>
       </template>
 
-      <button v-if="rights.canEnd" class="uc-link uc-warning" :disabled="locked || confirming" @tap="confirmEnd">主持人提前结束</button>
       <template v-if="rights.isHost && port?.getInvites">
         <button class="uc-link" :disabled="busy" @tap="toggleInvites">{{ showInvites ? '收起联调邀请链接' : '分发每位玩家的联调邀请链接' }}</button>
         <view v-if="showInvites" class="uc-card"><text class="uc-label">每位玩家打开自己的链接</text><text class="uc-muted">这是本地测试入口。请将不同座位链接分别发给对应玩家，勿把同一链接发给多人。手机与电脑使用同一网络。</text><view v-for="(invite, i) in invites" :key="invite.url" class="player-line"><text>{{ i + 1 }} 号 · {{ invite.name }}</text><button class="uc-small" @tap="copyInvite(invite.url)">复制链接</button></view></view>
@@ -197,10 +196,7 @@ function receive(next: UcPlayerSnapshot) {
   if (!previous || previous.gameId !== next.gameId || previous.view.phase !== next.view.phase) { hideSecret(); selected.value = undefined }
   if (previous && previous.gameId !== next.gameId) { retry.value = null; error.value = ''; notice.value = '主持人已开始新局，你仍使用自己的身份参加。' }
   snapshot.value = next
-  if (next.view.phase === 'ended' && previous?.view.phase !== 'ended') {
-    active = false
-    endedTimer = setTimeout(backToLobby, 5000)
-  }
+  if (next.view.phase === 'ended' && previous?.view.phase !== 'ended') active = false
   if (!previous || previous.gameId !== next.gameId || previous.view.phase !== next.view.phase) void nextTick(() => uni.pageScrollTo({ scrollTop: 0, duration: 0 }))
   serverOffset = next.serverNow - Date.now()
   clock.value = Date.now()
@@ -331,6 +327,7 @@ onMounted(async () => {
       if (event === 'hybrid-snapshot') {
         const ops = (payload as { ops?: import('@/modules/draw/types').DrawOp[] }).ops
         if (Array.isArray(ops)) {
+          roundOps.value = ops
           hybridViewer.loadSnapshot(ops)
           hybridCanvas.value?.paint()
         }
@@ -389,6 +386,8 @@ function checkAutoSubmit() {
 watch(() => snapshot.value?.view.turnKey, () => { hybridSubmitted = false })
 const hybridCanvas = ref<{ paint(): void } | null>(null)
 let lastHybridTurn = ''
+/** 本轮已经画好的笔画：轮到下一位时作为接力起点 */
+const roundOps = ref<import('@/modules/draw/types').DrawOp[]>([])
 </script>
 
 <style>

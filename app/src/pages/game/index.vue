@@ -98,6 +98,12 @@ function completeRound() {
   uni.showToast({ title: '这一轮完成啦', icon: 'none' })
 }
 
+/** 合并后的单按钮：标记完成，然后直接进入下一轮 */
+function finishRound() {
+  if (prompt.value && targetPlayer.value) completeRound()
+  nextRound()
+}
+
 function nextRound() {
   round.value += 1
   targetPlayer.value = null
@@ -175,8 +181,7 @@ onShareAppMessage(() => ({
         </view>
       </view>
 
-      <button v-if="prompt" class="complete-btn" @click="completeRound">完成这一轮</button>
-      <button class="next-btn" @click="nextRound">下一轮 ›</button>
+      <button class="round-btn" @click="finishRound">完成这一轮并进入下一轮 ›</button>
     </view>
 
     <view class="game-note">题库：{{ poolText }}。题目仅供破冰参考，任何人都可以选择跳过不适合自己的问题。</view>
@@ -396,24 +401,20 @@ onShareAppMessage(() => ({
   background: rgba(255, 255, 255, 0.1);
 }
 
-.complete-btn,
-.next-btn {
+.round-btn {
   width: 100%;
-  height: 78rpx;
-  margin-top: 18rpx;
-  border-radius: 16rpx;
-  font-size: 26rpx;
-  line-height: 78rpx;
-}
-
-.complete-btn {
+  height: 84rpx;
+  margin-top: 20rpx;
+  border-radius: var(--radius-md, 20rpx);
   color: #fff;
-  background: var(--mint);
+  background: var(--brand);
+  font-size: 27rpx;
+  font-weight: 600;
+  line-height: 84rpx;
 }
 
-.next-btn {
-  color: var(--brand);
-  background: var(--brand-soft);
+.round-btn::after {
+  border: none;
 }
 
 .game-note {
