@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, nextTick, ref, watch } from 'vue'
+import { allowAutoEnter, autoEnterAllowed } from '@/services/autoEnter'
 import { onLoad, onShareAppMessage, onShow } from '@dcloudio/uni-app'
 import { useRoomStore } from '../../stores/room'
 import PlayerList from '../../components/PlayerList.vue'
@@ -202,6 +203,7 @@ async function hostStart(gameType: GameType) {
 
 /** 回到正在进行的一局；谁是卧底要先把房间里的那局接管过来 */
 async function enterCurrentGame() {
+  allowAutoEnter()
   const gameType = room.value?.gameType
   const roomId = room.value?.id
 
@@ -246,6 +248,8 @@ watch(
       return
     }
     if (phase !== 'playing' || roomStore.isHost || autoEntered.value) return
+    // 玩家主动退出过就不自动拉回，等他点「回到游戏」
+    if (!autoEnterAllowed()) return
     if (previous !== 'lobby' && previous !== undefined) return
     autoEntered.value = true
     void enterCurrentGame()
@@ -259,9 +263,9 @@ async function finishRound() {
     try {
       await endUndercoverRound(room.value?.id)
     } catch (issue) {
-      console.warn('结束服务端局次失败', issue)
-      notice.value = toErrorMessage(issue)
-      return
+      // 局次可能早已自然结束（结束后房间仍停在 playing），
+      // 这种情况不该拦住房间收尾，否则「结束本局」会卡死并提示「游戏已结束」。
+      console.warn('收尾服务端局次失败，继续结束房间', issue)
     }
   }
   try { await roomStore.finishGame() } catch (issue) { notice.value = toErrorMessage(issue); return }

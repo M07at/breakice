@@ -87,6 +87,7 @@
 
 <script setup lang="ts">
 import HybridDrawAdapter from './HybridDrawAdapter.vue'
+import { suppressAutoEnter } from '@/services/autoEnter'
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { onHide, onLoad, onShow } from '@dcloudio/uni-app'
 import { isUcError, ROLE_LABEL } from '@/modules/undercover'
@@ -298,6 +299,7 @@ function confirmEnd() {
 /** 一局结束回大厅：房间已由服务端置回 lobby 并清空准备状态 */
 /** 退出回大厅：房间仍是 playing，随时可以点「回到游戏」继续 */
 function exitToLobby() {
+  suppressAutoEnter()
   uni.navigateBack({ delta: 1, fail: () => uni.reLaunch({ url: '/pages/room/index' }) })
 }
 

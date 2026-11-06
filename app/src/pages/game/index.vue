@@ -62,6 +62,8 @@ watch(
       shared.promptId && shared.text
         ? { id: shared.promptId, type: shared.type, text: shared.text, difficulty: '轻松' }
         : null
+    // 选项卡跟着共享状态走：别人切成大冒险，这边也要跟着切
+    if (shared.type === 'truth' || shared.type === 'dare') activeTab.value = shared.type
   },
   { immediate: true },
 )
