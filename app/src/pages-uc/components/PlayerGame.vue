@@ -1,6 +1,10 @@
 <template>
   <view class="uc-page">
     <view class="uc-header"><text class="uc-eyebrow">破冰局 / {{ snapshot?.view.variant === 'draw' ? '你画我猜谁是卧底' : '谁是卧底' }}</text><view class="uc-row"><text class="uc-title">{{ title }}</text><text v-if="snapshot?.view.phaseDeadline" class="player-clock">{{ remaining }}秒</text></view><text class="uc-subtitle">{{ port?.label ?? '个人游戏界面' }}</text></view>
+    <DebugStrip
+      v-if="snapshot"
+      :text="`角色=${rights?.isHost ? '主持人' : '观战'}｜我=${seatOf(snapshot.playerId)}号｜阶段=${snapshot.view.phase}｜画者=${snapshot.view.currentSpeakerId ? seatOf(snapshot.view.currentSpeakerId) + '号' : '-'}｜轮次=${snapshot.view.round}｜玩法=${snapshot.view.variant}｜版本=${snapshot.view.version}`"
+    />
     <view v-if="snapshot" class="uc-note identity">你是 {{ seatOf(snapshot.playerId) }} 号 · <PlayerIdentity :name="nameOf(snapshot.playerId)" :mbti="mbtiOf(snapshot.playerId)" /> <text v-if="rights?.isHost">（主持人）</text></view>
     <view v-if="snapshot && snapshot.view.phaseDeadline" class="phase-countdown" :class="{ urgent: remaining <= 5 }" role="timer">
       <text>{{ timerLabel }}</text><text class="countdown-number">{{ remaining }}<text class="countdown-unit"> 秒</text></text>
@@ -87,6 +91,7 @@
 
 <script setup lang="ts">
 import HybridDrawAdapter from './HybridDrawAdapter.vue'
+import DebugStrip from '@/components/DebugStrip.vue'
 import { suppressAutoEnter } from '@/services/autoEnter'
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { onHide, onLoad, onShow } from '@dcloudio/uni-app'

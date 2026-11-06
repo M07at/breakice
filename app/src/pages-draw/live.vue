@@ -12,6 +12,7 @@ import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { suppressAutoEnter } from '@/services/autoEnter'
 import { onLoad } from '@dcloudio/uni-app'
 import DrawCanvas from '@/components/draw-canvas/draw-canvas.vue'
+import DebugStrip from '@/components/DebugStrip.vue'
 import Avatar from '@/components/Avatar.vue'
 import PlayerIdentity from '@/components/PlayerIdentity.vue'
 import { DrawEngine } from '@/modules/draw/engine'
@@ -452,7 +453,10 @@ async function endSession() {
   <view class="page">
     <view class="head row-between">
       <view>
-        <text class="eyebrow">ROUND {{ (view?.roundIndex ?? 0) + 1 }}</text>
+        <DebugStrip
+        :text="`角色=${isHost ? '主持人' : '观战'}｜我=${meId.slice(0, 6)}｜阶段=${view ? view.phase : '无视图'}｜画者=${view ? view.painterId.slice(0, 6) : '-'}｜轮次=${view ? view.roundKey : '-'}｜玩法=${drawVariant}｜通道=${liveConnected() ? '连' : '断'}`"
+      />
+      <text class="eyebrow">ROUND {{ (view?.roundIndex ?? 0) + 1 }}</text>
         <text class="title">你画我猜 · {{ roomName }}</text>
         <text class="muted">{{ isHost ? '主持人（本机权威）' : '联机观战' }} · {{ view?.players.length ?? 0 }} 人</text>
       </view>
