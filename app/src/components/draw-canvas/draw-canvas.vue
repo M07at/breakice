@@ -136,7 +136,8 @@ const props = withDefaults(
   {
     mode: 'draw',
     variant: 'classic',
-    palette: () => EMOJI_POOL.slice(0, 12),
+    // 兜底：随机 12 个，避免永远显示同一批（正常情况应由 view.palette 传入）
+  palette: () => [...EMOJI_POOL].sort(() => Math.random() - 0.5).slice(0, 12),
   },
 )
 

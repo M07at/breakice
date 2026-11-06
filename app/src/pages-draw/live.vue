@@ -481,7 +481,7 @@ async function endSession() {
 
       <view v-else-if="view.phase === 'drawing'" class="surface">
         <text class="label"><PlayerIdentity :name="painterName" :mbti="mbtiOf(view?.painterId)" /> 正在画</text>
-        <DrawCanvas ref="viewCanvasRef" :engine="viewerEngine" mode="watch" :variant="drawVariant" @error="error = $event" />
+        <DrawCanvas ref="viewCanvasRef" :engine="viewerEngine" mode="watch" :variant="drawVariant" :palette="view ? view.palette : undefined" @error="error = $event" />
       </view>
 
             <view v-if="ended" class="surface">
