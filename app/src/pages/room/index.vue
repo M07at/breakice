@@ -4,14 +4,11 @@ import { onLoad, onShareAppMessage, onShow } from '@dcloudio/uni-app'
 import { useRoomStore } from '../../stores/room'
 import PlayerList from '../../components/PlayerList.vue'
 import RoomCodeCard from '../../components/RoomCodeCard.vue'
-import Leaderboard from '../../components/leaderboard/leaderboard.vue'
 import { bankUrl } from '../../services/gameEntry'
 import { adoptUndercoverRound, endUndercoverRound, PLAYER_PAGE, startUndercoverRound } from '../../services/ucGame'
-import { fetchRoomLeaderboard } from '../../services/scoreBoard'
 import { toErrorMessage } from '../../platform/types'
 import { testBotCount } from '../../modules/undercover/rules'
 import { clearRemoteDrawRoom } from '../../services/drawRemoteApi'
-import type { LeaderboardRow } from '../../modules/score'
 import type { GameType } from '../../types/room'
 import { BUILD_ID as BUILD_LABEL } from '../../modules/shared/build'
 
@@ -20,25 +17,8 @@ const room = computed(() => roomStore.room)
 /** 版本标签：改这里就能确认开发者工具里跑的是不是最新包 */
 
 const notice = ref('')
-/** 本房累计积分（由 uc-command 结算时写入 scores，0010 聚合） */
-const leaderboard = ref<LeaderboardRow[]>([])
-const leaderboardVersion = ref(0)
-
-async function loadLeaderboard() {
-  const roomId = room.value?.id
-  if (!roomId) return
-  try {
-    const rows = await fetchRoomLeaderboard(roomId)
-    leaderboard.value = rows
-    if (rows.length) leaderboardVersion.value += 1
-  } catch (error) {
-    console.warn('读取积分榜失败', error)
-  }
-}
-
 onLoad(async () => {
   if (!roomStore.room) await roomStore.restore()
-  await loadLeaderboard()
 })
 
 /** 房主退出后房间会被关闭，这里统一把所有人送回主界面 */
@@ -53,7 +33,6 @@ watch(
 
 onShow(() => {
   if (roomStore.room) void roomStore.restore()
-  void loadLeaderboard()
 })
 
 const GAME_LABEL: Record<GameType, string> = {
@@ -112,6 +91,20 @@ function pickDrawMode(): Promise<'classic' | 'emoji' | 'custom' | null> {
       itemList: DRAW_MODES.map((mode) => mode.label),
       success: (result) => resolve(DRAW_MODES[result.tapIndex]?.key ?? null),
       fail: () => resolve(null),
+    })
+  })
+}
+
+/** 人数不足时询问是否补人机到 4 人 */
+function confirmBotFill(shortfall: number): Promise<boolean> {
+  return new Promise((resolve) => {
+    uni.showModal({
+      title: '人数不足',
+      content: `谁是卧底需要 4 人，现在少 ${shortfall} 人。要补充 ${shortfall} 个人机吗？`,
+      confirmText: '补人机',
+      cancelText: '取消',
+      success: (result) => resolve(Boolean(result.confirm)),
+      fail: () => resolve(false),
     })
   })
 }
@@ -269,7 +262,6 @@ async function finishRound() {
     }
   }
   try { await roomStore.finishGame() } catch (issue) { notice.value = toErrorMessage(issue); return }
-  await loadLeaderboard()
   notice.value = '本局已结束，房间回到大厅'
 }
 
@@ -314,10 +306,6 @@ onShareAppMessage(() => ({
         <text class="live-label">● 实时同步</text>
       </view>
       <PlayerList :players="room.players" :max-players="room.maxPlayers" show-host-badge />
-    </view>
-
-    <view v-if="leaderboard.length" class="surface leaderboard-surface">
-      <Leaderboard :rows="leaderboard" :version="leaderboardVersion" :me="roomStore.currentPlayerId" :limit="5" />
     </view>
 
     <view v-if="!roomStore.playing" class="surface ready-surface">
