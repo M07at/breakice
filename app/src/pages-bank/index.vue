@@ -14,10 +14,11 @@
       </view>
       <text class="hint">{{ r.count }} 条{{ r.bank.description ? ` · ${r.bank.description}` : '' }}</text>
       <button
-        v-if="type === 'draw'"
+        v-if="type === 'draw' || type === 'undercover'"
         class="use-btn"
-        @tap.stop="useForDraw(r.bank.id, r.bank.name)"
-      >用这本题库玩你画我猜</button>
+        :class="{ active: selectedId === r.bank.id }"
+        @tap.stop="useForGame(r.bank.id, r.bank.name)"
+      >{{ selectedId === r.bank.id ? '✓ 已选用' : (type === 'draw' ? '用这本题库玩你画我猜' : '用这本题库玩谁是卧底') }}</button>
     </view>
 
     <button class="primary" @tap="create">新建{{ GAME_TYPE_LABEL[type] }}题库</button>
@@ -44,12 +45,35 @@ async function load() {
 
 function setType(t: GameType) {
   type.value = t
+  loadSelection()
+}
+
+function setTypeLegacy(t: GameType) {
+  type.value = t
   load()
 }
 
 /** 记住这本题库，你画我猜开局时优先用它（存在本机，主持人开房即生效） */
-function useForDraw(bankId: string, name: string) {
-  uni.setStorageSync('break-ice-draw-bank', bankId)
+const selectedId = ref('')
+
+function selectionKey() {
+  return `break-ice-bank-${type.value}`
+}
+
+function loadSelection() {
+  selectedId.value = String(uni.getStorageSync(selectionKey()) || '')
+}
+
+/** 记住这本题库：按分类存，你画我猜与谁是卧底各自独立 */
+function useForGame(bankId: string, name: string) {
+  if (selectedId.value === bankId) {
+    uni.removeStorageSync(selectionKey())
+    selectedId.value = ''
+    uni.showToast({ title: '已取消选用', icon: 'none' })
+    return
+  }
+  uni.setStorageSync(selectionKey(), bankId)
+  selectedId.value = bankId
   uni.showToast({ title: `已选用：${name}`, icon: 'none' })
 }
 
@@ -93,5 +117,11 @@ function create() {
   color: var(--brand-deep, #2f6bd6);
   font-size: 22rpx;
   line-height: 1.4;
+}
+.use-btn.active {
+  border-color: var(--brand, #4f8ef7);
+  background: var(--brand, #4f8ef7);
+  color: #fff;
+  font-weight: 600;
 }
 </style>

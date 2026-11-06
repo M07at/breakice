@@ -273,7 +273,7 @@ onMounted(async () => {
         scoreConfig: DRAW_SCORE,
         // 主持人在题库页选过自定义题库就用它，否则仍用系统题库
         listItems: async () => {
-          const bankId = String(uni.getStorageSync('break-ice-draw-bank') || '')
+          const bankId = String(uni.getStorageSync('break-ice-bank-draw') || '')
           const repo = bankRepo()
           const items = (bankId
             ? await repo.listItems(bankId)

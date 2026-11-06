@@ -200,6 +200,27 @@ function install(snapshot: UcPlayerSnapshot, variant: Variant) {
 
 /** 主持人开局：服务端建局、发牌，然后把端口装好，页面直接进玩家端 */
 /** bots：人数不够时补几个机器人（测试用，最多 5 个） */
+/** 读取主持人在题库页选中的谁是卧底题库（词对） */
+async function loadCustomPairs(): Promise<{ civilian: string; undercover: string }[]> {
+  try {
+    const bankId = String(uni.getStorageSync('break-ice-bank-undercover') || '')
+    if (!bankId) return []
+    const { bankRepo } = await import('@/modules/local/session')
+    const items = await bankRepo().listItems(bankId)
+    const pairs: { civilian: string; undercover: string }[] = []
+    for (const item of items) {
+      const content = item.content as { civilian?: string; undercover?: string }
+      if (content?.civilian && content?.undercover) {
+        pairs.push({ civilian: content.civilian, undercover: content.undercover })
+      }
+    }
+    return pairs.slice(0, 100)
+  } catch (error) {
+    console.warn('读取自定义词对失败，回退系统题库', error)
+    return []
+  }
+}
+
 export async function startUndercoverRound(roomId: string, variant: Variant, bots = 0): Promise<UcPlayerSnapshot> {
   activeRoomId = roomId
   const snapshot = await invoke<UcPlayerSnapshot>({
@@ -207,6 +228,7 @@ export async function startUndercoverRound(roomId: string, variant: Variant, bot
     room_id: roomId,
     variant,
     bots,
+    pairs: await loadCustomPairs(),
     request_id: `start-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
   })
   install(snapshot, variant)

@@ -1270,9 +1270,19 @@ async function handleStart(admin: Admin, uid: string, body: Record<string, any>)
 
   const config = { ...DEFAULT_CONFIG, variant, ...(body.config ?? {}) }
   const startedAt = Date.now()
+  // 主持人在题库页选过自定义词对就用它，否则回退系统题库
+  const customPairs = Array.isArray(body.pairs)
+    ? (body.pairs as { civilian?: string; undercover?: string }[])
+        .filter((pair) => pair && pair.civilian && pair.undercover)
+        .map((pair) => ({ civilian: String(pair.civilian), undercover: String(pair.undercover) }))
+    : []
+  const pair = customPairs.length > 0
+    ? customPairs[Math.floor(Math.random() * customPairs.length)]
+    : pickPair(variant)
+
   const transition = createGame({
     playerIds: rosterIds,
-    pair: pickPair(variant),
+    pair,
     config,
     now: startedAt,
     rng: createRng(Math.floor(Math.random() * 0x7fffffff)),
