@@ -44,7 +44,7 @@ function openQr() {
       </view>
     </view>
     <view class="code-qr">
-      <QrCode :text="qrText" :size="132" canvas-id="room-code-card-qr" />
+      <QrCode :text="qrText" :size="108" canvas-id="room-code-card-qr" />
       <text class="code-qr-hint">扫码加入</text>
     </view>
   </view>

@@ -187,7 +187,6 @@ onShareAppMessage(() => ({
         <text class="prompt-text">{{ prompt?.text ?? '抽取一张题目卡，开始这一轮破冰。' }}</text>
         <view class="prompt-actions">
           <button class="draw-btn" @click="drawPrompt(activeTab)">{{ prompt ? '换一题' : '抽取题目' }}</button>
-          <button class="custom-btn" @click="showCustomPrompt = true">自定义题目</button>
         </view>
       </view>
 

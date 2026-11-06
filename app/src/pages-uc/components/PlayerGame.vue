@@ -47,7 +47,7 @@
         <text class="uc-label">{{ snapshot.view.phase === 'review' ? '作品回顾 · 倒计时后自动投票' : '本轮画作' }}</text>
         <text class="uc-muted">缺席或超时未交的画手没有作品。AI 评分失败或超时不会阻塞投票。</text>
         <view v-for="(art, index) in galleryArtworks" :key="art.id" class="final-player"><text>第 {{ index + 1 }} 位 · <PlayerIdentity :name="nameOf(art.playerId)" :mbti="mbtiOf(art.playerId)" /></text><image v-if="artworkUrls[art.id]" class="gallery-image" :src="artworkUrls[art.id]" mode="widthFix" /><view v-else class="gallery-placeholder">画作加载中…</view><text v-if="guessText(art)" class="uc-muted">{{ guessText(art) }}</text>
-          <text class="uc-muted">{{ art.status === 'pending' ? 'AI 评分中…' : art.status === 'success' ? 'AI 评分完成' : art.status === 'failed' ? '评分失败，已跳过' : '评分超时，已跳过' }}{{ art.score !== undefined ? ' · ' + art.score + '分' : '' }}</text></view>
+          <text v-if="snapshot.view.variant !== 'draw'" class="uc-muted">{{ art.status === 'pending' ? 'AI 评分中…' : art.status === 'success' ? 'AI 评分完成' : art.status === 'failed' ? '评分失败，已跳过' : '评分超时，已跳过' }}{{ art.score !== undefined ? ' · ' + art.score + '分' : '' }}</text></view>
         <view v-for="id in playersWithoutArtwork" :key="'na-' + id" class="final-player"><text><PlayerIdentity :name="nameOf(id)" :mbti="mbtiOf(id)" /> · 本轮没有作画</text><text class="uc-muted">只有轮到发言的人才会画</text></view>
         <text v-if="!snapshot.artworks?.length && !playersWithoutArtwork.length" class="uc-muted">本轮暂无已提交画作，仍会按时进入投票。</text>
       </view>

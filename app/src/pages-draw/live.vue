@@ -183,8 +183,9 @@ function adoptView(next: DrawRoomView) {
   }
   error.value = ''
   if (next.phase === 'ended') {
-    if (isHost.value && !finishRequested) void finishDrawingSession()
-    else if (!isHost.value) scheduleReturn()
+    // 结算页常驻：不自动收尾、不自动返回，等玩家点「退出，回到大厅」，
+    // 房主结束本局由大厅的「结束本局」触发。
+    if (publisher) publisher.stop()
   }
   // 玩法以主持人发布出来的视图为准：其他人是自动进房的，URL 里没有 variant
   const published = (next as { variant?: string }).variant
