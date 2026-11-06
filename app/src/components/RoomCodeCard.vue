@@ -1,5 +1,10 @@
 ﻿<script setup lang="ts">
+import QrCode from './QrCode.vue'
+
 const props = defineProps<{ code: string; roomName: string }>()
+
+/** 加入房间的二维码内容：小程序内扫码可解析 */
+const qrText = `break-ice-hall://join?code=${props.code}`
 
 function copyCode() {
   uni.setClipboardData({
@@ -36,13 +41,40 @@ function openQr() {
       <view class="code-actions">
         <button class="mini-btn" @click="copyCode">复制房间号</button>
         <button class="mini-btn secondary" @click="shareRoom">分享房间</button>
-        <button class="mini-btn" @click="openQr">二维码</button>
       </view>
+    </view>
+    <view class="code-qr">
+      <QrCode :text="qrText" :size="132" canvas-id="room-code-card-qr" />
+      <text class="code-qr-hint">扫码加入</text>
     </view>
   </view>
 </template>
 
 <style scoped>
+.code-copy {
+  flex: 1;
+  min-width: 0;
+}
+
+/* 右侧二维码：白底圆角，和蓝色卡片对比清楚 */
+.code-qr {
+  flex-shrink: 0;
+  margin-left: 20rpx;
+  padding: 10rpx;
+  border-radius: var(--radius-md);
+  background: #fff;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6rpx;
+}
+
+.code-qr-hint {
+  color: var(--brand-deep);
+  font-size: 18rpx;
+  line-height: 1;
+}
+
 .code-card {
   display: flex;
   align-items: center;

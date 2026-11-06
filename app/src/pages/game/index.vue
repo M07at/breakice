@@ -56,7 +56,7 @@ watch(
   { immediate: true },
 )
 
-const remainingText = computed(() => `${completedIds.value.length} 轮已完成`)
+const remainingText = computed(() => `${Math.max(1, round.value)} 轮已完成`)
 const poolVersion = ref(0)
 const poolText = computed(() => {
   poolVersion.value

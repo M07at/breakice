@@ -347,9 +347,10 @@ async function syncPanelUrls() {
 function backToLobby() {
   if (returning) return
   returning = true
-  uni.reLaunch({ url: '/pages/room/index' })
+  uni.navigateBack({ delta: 1, fail: () => uni.reLaunch({ url: '/pages/room/index' }) })
 }
 function scheduleReturn() {
+  // 结算页常驻：只停掉后台任务，不做任何跳转
   publisher?.stop()
   remoteDispose?.()
   if (tickTimer) clearInterval(tickTimer)
