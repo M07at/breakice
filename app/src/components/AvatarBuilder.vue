@@ -8,6 +8,9 @@ const emit = defineEmits<{ 'update:modelValue': [value: AvatarConfig] }>()
 
 const avatar = computed(() => normalizeAvatar(props.modelValue))
 
+// 颜色改成点击雪人身体切换，不再需要箭头；其余四层居中排列
+const arrowLayers = avatarLayers.filter((layer) => layer.key !== 'color')
+
 /** 每一层当前的滑入方向，动画播完就清掉，保证下次点击能重放 */
 const slides = ref<Partial<Record<AvatarLayerKey, '' | 'slide-next' | 'slide-prev'>>>({})
 const hint = ref('')
@@ -68,7 +71,7 @@ onUnmounted(() => {
   <view class="builder">
     <view class="stage">
       <view class="side">
-        <view v-for="layer in avatarLayers" :key="`prev-${layer.key}`" class="arrow-slot">
+        <view v-for="layer in arrowLayers" :key="`prev-${layer.key}`" class="arrow-slot">
           <image class="arrow" src="/static/start/arrow-left.png" mode="aspectFit" @tap="step(layer.key, -1)" />
         </view>
       </view>
@@ -86,7 +89,7 @@ onUnmounted(() => {
       </view>
 
       <view class="side">
-        <view v-for="layer in avatarLayers" :key="`next-${layer.key}`" class="arrow-slot">
+        <view v-for="layer in arrowLayers" :key="`next-${layer.key}`" class="arrow-slot">
           <image class="arrow" src="/static/start/arrow-right.png" mode="aspectFit" @tap="step(layer.key, 1)" />
         </view>
       </view>
@@ -114,7 +117,8 @@ onUnmounted(() => {
 .side {
   display: flex;
   flex-direction: column;
-  justify-content: space-between;
+  justify-content: center;
+  gap: 18rpx;
   flex: 0 0 auto;
   width: 88rpx;
   height: 470rpx;

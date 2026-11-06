@@ -97,9 +97,9 @@
       </block>
 
       <view class="actions">
-        <button size="mini" :disabled="!undoable" @tap="undo">撤销</button>
-        <button size="mini" :disabled="!redoable" @tap="redo">重做</button>
-        <button size="mini" @tap="clear">清空</button>
+        <button class="tool-btn" size="mini" :disabled="!undoable" @tap="undo">撤销</button>
+        <button class="tool-btn" size="mini" :disabled="!redoable" @tap="redo">恢复</button>
+        <button class="tool-btn" size="mini" @tap="clear">清空</button>
       </view>
     </view>
   </view>
@@ -979,5 +979,21 @@ defineExpose({ paint, exportPng, exportBase64, reset })
   margin: 8rpx 0 12rpx;
   color: #8a8f9c;
   font-size: 24rpx;
+}
+.tool-btn {
+  margin: 0 8rpx;
+  padding: 0 22rpx;
+  height: 60rpx;
+  line-height: 58rpx;
+  border: 1rpx solid var(--line, #e7eaf0);
+  border-radius: var(--radius-md, 20rpx);
+  background: var(--surface, #ffffff);
+  color: var(--ink, #172033);
+  font-size: 24rpx;
+}
+
+.tool-btn[disabled] {
+  color: var(--muted, #6c7588);
+  background: var(--canvas, #f6f8fb);
 }
 </style>
