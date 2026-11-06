@@ -73,9 +73,13 @@ export async function refreshPromptPools(): Promise<void> {
     const next: Record<PromptType, TruthOrDarePrompt[]> = { truth: [...base.truth], dare: [...base.dare] }
     for (const type of ['truth', 'dare'] as const) {
       const seen = new Set(next[type].map((prompt) => prompt.text))
-      const banks = await repo.listBanks(LOCAL_USER_ID, type)
+      // 题库页选过就只读那一本；没选过则把所有自建题库合进来（原行为）
+      const selected = String(uni.getStorageSync(`break-ice-bank-${type}`) || '')
+      const all = await repo.listBanks(LOCAL_USER_ID, type)
+      const banks = selected
+        ? all.filter((bank) => bank.id === selected)
+        : all.filter((bank) => bank.visibility === 'private')
       for (const bank of banks) {
-        if (bank.visibility !== 'private') continue
         const items = await repo.listItems(bank.id)
         for (const item of items) {
           const content = item.content as { text?: string }

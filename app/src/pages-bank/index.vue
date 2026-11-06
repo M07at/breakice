@@ -14,11 +14,11 @@
       </view>
       <text class="hint">{{ r.count }} 条{{ r.bank.description ? ` · ${r.bank.description}` : '' }}</text>
       <button
-        v-if="type === 'draw' || type === 'undercover'"
+        v-if="true"
         class="use-btn"
         :class="{ active: selectedId === r.bank.id }"
         @tap.stop="useForGame(r.bank.id, r.bank.name)"
-      >{{ selectedId === r.bank.id ? '✓ 已选用' : (type === 'draw' ? '用这本题库玩你画我猜' : '用这本题库玩谁是卧底') }}</button>
+      >{{ selectedId === r.bank.id ? '✓ 已选用' : `用这本题库玩${GAME_TYPE_LABEL[type]}` }}</button>
     </view>
 
     <button class="primary" @tap="create">新建{{ GAME_TYPE_LABEL[type] }}题库</button>
