@@ -627,12 +627,26 @@ async function handleCurrent(admin: Admin, uid: string, body: Record<string, any
     .maybeSingle()
   if (!member) throw new ApiError(403, 'NOT_A_MEMBER', '你不在这个房间里')
 
-  const { data: game } = await admin
+  // 先找进行中的，没有再退回「最近一局」——这样已结束的局也能被接管，
+  // 玩家从大厅点「回到游戏」能看到结算页（只读），而不是被拒绝。
+  const { data: active } = await admin
     .from('games')
     .select('id')
     .eq('room_id', roomId)
     .eq('status', 'active')
     .maybeSingle()
+
+  let game = active
+  if (!game) {
+    const { data: latest } = await admin
+      .from('games')
+      .select('id')
+      .eq('room_id', roomId)
+      .order('game_number', { ascending: false })
+      .limit(1)
+      .maybeSingle()
+    game = latest
+  }
   if (!game) return json({ snapshot: null })
 
   const loaded = await loadGame(admin, game.id)

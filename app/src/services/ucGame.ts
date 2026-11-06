@@ -146,7 +146,8 @@ function createPort(gameId: string, variant: Variant): UcPlayerPort {
       }
       pokeRoom('game')
       // 画作已入库，再要一次 AI 评分；评分失败/超时不影响回合推进
-      if (!drawing.artworkId) return submitted
+      // 融合玩法（variant=draw）不做 AI 评分：识别结果会写进视图，等于提示答案
+      if (!drawing.artworkId || submitted.view.variant === 'draw') return submitted
       const artworkId = drawing.artworkId
       void (async () => {
       try {

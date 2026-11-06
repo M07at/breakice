@@ -388,7 +388,7 @@ function checkAutoSubmit() {
   const view = snapshot.value?.view
   if (!view || view.variant !== 'draw' || !rights.value?.canFinish) return
   // 提前 1 秒提交：卡在归零那一刻发，请求到达时回合往往已经翻页，会被判成「不是你在画」
-  if (value > 1 || hybridSubmitted) return
+  if (value > 3 || hybridSubmitted) return
   hybridSubmitted = true
   try {
     hybridAdapter.value?.submitNow()

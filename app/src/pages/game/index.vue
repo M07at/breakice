@@ -13,6 +13,16 @@ const room = computed(() => roomStore.room)
 const targetPlayer = ref<Player | null>(null)
 const prompt = ref<TruthOrDarePrompt | null>(null)
 const completedIds = ref<string[]>([])
+
+// 房主在大厅结束本局 → 房间回 lobby，游戏页自动退回
+watch(
+  () => roomStore.room?.phase,
+  (phase, previous) => {
+    if (phase === 'lobby' && previous === 'playing') {
+      uni.navigateBack({ delta: 1, fail: () => uni.reLaunch({ url: '/pages/room/index' }) })
+    }
+  },
+)
 const round = ref(1)
 const spinning = ref(false)
 const showCustomPrompt = ref(false)
