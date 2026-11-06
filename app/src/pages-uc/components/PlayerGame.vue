@@ -75,6 +75,7 @@
         <button class="uc-button" :disabled="busy" @tap="backToLobby">退出，回到大厅 →</button><view class="uc-note">本局已结束，结算会一直保留；主持人结束本局后所有人回到大厅并重新准备。</view>
       </template>
 
+      <button class="uc-link" @tap="exitToLobby">退出，回到大厅（游戏继续）</button>
       <template v-if="rights.isHost && port?.getInvites">
         <button class="uc-link" :disabled="busy" @tap="toggleInvites">{{ showInvites ? '收起联调邀请链接' : '分发每位玩家的联调邀请链接' }}</button>
         <view v-if="showInvites" class="uc-card"><text class="uc-label">每位玩家打开自己的链接</text><text class="uc-muted">这是本地测试入口。请将不同座位链接分别发给对应玩家，勿把同一链接发给多人。手机与电脑使用同一网络。</text><view v-for="(invite, i) in invites" :key="invite.url" class="player-line"><text>{{ i + 1 }} 号 · {{ invite.name }}</text><button class="uc-small" @tap="copyInvite(invite.url)">复制链接</button></view></view>
@@ -295,6 +296,11 @@ function confirmEnd() {
   uni.showModal({ title: '提前结束本局？', content: '所有玩家会同步看到结果和词语。', success: r => { if (r.confirm) void send({ type: 'endGame' }) }, complete: () => { confirming.value = false } })
 }
 /** 一局结束回大厅：房间已由服务端置回 lobby 并清空准备状态 */
+/** 退出回大厅：房间仍是 playing，随时可以点「回到游戏」继续 */
+function exitToLobby() {
+  uni.navigateBack({ delta: 1, fail: () => uni.reLaunch({ url: '/pages/room/index' }) })
+}
+
 function backToLobby() {
   if (endedTimer) clearTimeout(endedTimer)
   uni.reLaunch({ url: '/pages/room/index' })
@@ -346,6 +352,16 @@ onMounted(async () => {
 })
 onHide(() => { active = false; hideSecret() })
 onShow(() => { active = true; if (port.value) void load() })
+watch(
+      () => roomStore.room?.phase,
+      (phase) => {
+        // 房主结束本局 → 房间回 lobby，游戏页自动退回
+        if (phase === 'lobby' && snapshot.value?.view.phase !== 'ended') {
+          uni.navigateBack({ delta: 1, fail: () => uni.reLaunch({ url: '/pages/room/index' }) })
+        }
+      },
+    )
+
 onUnmounted(() => { disposed = true; hideSecret(); if (timer) clearInterval(timer); if (endedTimer) clearTimeout(endedTimer); offLive?.() })
 /** 同房间有人行动时立刻拉一次，不用等轮询 */
 let offLive: (() => void) | null = null

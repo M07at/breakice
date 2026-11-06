@@ -369,13 +369,11 @@ async function finishDrawingSession(early = false) {
     error.value = issue instanceof Error ? issue.message : String(issue)
   } finally { finishing = false }
 }
-watch(() => roomStore.room?.phase, async (phase, previous) => {
-  if (phase !== 'lobby' || previous !== 'playing' || !view.value) return
-  try {
-    const latest = await api?.readView(roomId.value)
-    adoptView({ ...(latest?.view ?? view.value), phase: 'ended', endsAt: 0 })
-  } catch { view.value = { ...view.value, phase: 'ended', endsAt: 0 } }
-  scheduleReturn()
+watch(() => roomStore.room?.phase, (phase, previous) => {
+  // 房主在大厅结束本局 → 房间回 lobby，所有人退回大厅（结算页本身不自动跳）
+  if (phase === 'lobby' && previous === 'playing') {
+    uni.navigateBack({ delta: 1, fail: () => uni.reLaunch({ url: '/pages/room/index' }) })
+  }
 })
 
 async function submitDrawing() {
@@ -433,6 +431,11 @@ async function react(targetPlayerId: string, kind: 'flower' | 'dislike') {
   } catch (issue) {
     error.value = issue instanceof Error ? issue.message : String(issue)
   }
+}
+
+/** 退出回大厅：房间仍是 playing，随时可以点「回到游戏」继续 */
+function exitToLobby() {
+  uni.navigateBack({ delta: 1, fail: () => uni.reLaunch({ url: '/pages/room/index' }) })
 }
 
 async function endSession() {
