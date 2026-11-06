@@ -111,7 +111,7 @@ onUnmounted(flushSave)
 .help-btn {
   position: absolute;
   top: 0;
-  right: 28rpx;
+  left: 28rpx;
   z-index: 10;
   width: 56rpx;
   height: 56rpx;
