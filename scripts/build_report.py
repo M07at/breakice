@@ -122,18 +122,48 @@ def table(headers, rows, widths=None):
 IMG_DIR = r"D:\1\break-ice-hall\docs\报告\images"
 
 
-def figures(items, width_cm=4.8):
-    """同一行放若干张图（行内并排），图题放在下一行居中"""
+def figures(items, width_cm=4.8, height_cm=10.4):
+    """一行两张图：用无边框表格固定尺寸并禁止跨页拆分，图题在图下方"""
+    import os
+    from docx.oxml import OxmlElement
+
+    t = doc.add_table(rows=2, cols=len(items))
+    t.alignment = WD_TABLE_ALIGNMENT.CENTER
+    tblPr = t._element.tblPr
+    borders = OxmlElement("w:tblBorders")
+    for edge in ("top", "left", "bottom", "right", "insideH", "insideV"):
+        el = OxmlElement(f"w:{edge}")
+        el.set(qn("w:val"), "none")
+        borders.append(el)
+    tblPr.append(borders)
+
+    for i, (name, title) in enumerate(items):
+        row = t.rows[0]
+        trPr = row._tr.get_or_add_trPr()
+        trPr.append(OxmlElement("w:cantSplit"))
+        cell = row.cells[i]
+        cell.width = Cm(width_cm + 0.4)
+        p = cell.paragraphs[0]
+        p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        p.paragraph_format.space_after = Pt(2)
+        p.add_run().add_picture(os.path.join(IMG_DIR, name), width=Cm(width_cm), height=Cm(height_cm))
+        cap_cell = t.rows[1].cells[i]
+        cp = cap_cell.paragraphs[0]
+        cp.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        set_font(cp.add_run(title), name="黑体", size=9)
+    spacer = doc.add_paragraph()
+    spacer.paragraph_format.space_after = Pt(4)
+
+
+def figure(name, title, width_cm=15.0):
+    """单张居中的插图，图题在图下方"""
     import os
     p = doc.add_paragraph()
     p.alignment = WD_ALIGN_PARAGRAPH.CENTER
-    for index, (name, title) in enumerate(items):
-        if index > 0:
-            p.add_run("    ")
-        p.add_run().add_picture(os.path.join(IMG_DIR, name), width=Cm(width_cm))
+    p.add_run().add_picture(os.path.join(IMG_DIR, name), width=Cm(width_cm))
     cap = doc.add_paragraph()
     cap.alignment = WD_ALIGN_PARAGRAPH.CENTER
-    set_font(cap.add_run("　　".join(title for _, title in items)), name="黑体", size=9)
+    set_font(cap.add_run(title), name="黑体", size=10)
     cap.paragraph_format.space_after = Pt(10)
 
 
@@ -239,7 +269,9 @@ para("系统的核心用例可归纳为“房间管理”与“游戏进行”�
      "返回大厅”为主线。")
 para("参与者与用例的关系为：房主可执行全部房间管理用例并参与游戏；普通成员可执行加入、准备"
      "与游戏内操作；人机由服务端驱动，仅响应必要的领词、结束回合与投票动作。")
-placeholder("D", "补充用例图与活动图（建议用 Visio 或 StarUML 绘制：房间主流程活动图、卧底投票活动图）")
+figure("01.png", "图 2-1 系统用例图", 15.0)
+para("用例图说明：房主与普通参与者共享房间管理与四种玩法；「结束本局」仅房主可执行，"
+     "人机由服务端驱动，不作为独立参与者。")
 
 section("2.3 原型系统设计")
 para("原型围绕“一屏一任务”的原则设计：首页只承担形象编辑与进入房间两件事；房间页集中展示"
@@ -250,12 +282,12 @@ para("视觉上采用浅蓝色主色与白色卡片的组合，所有页面共�
 para("主要界面如下图所示：首页负责形象编辑与进入房间；创建页只需填写房间名称与人数；"
      "加入页输入房间号即可进入；房间页集中展示房间号、二维码、成员与准备状态，并承载主持人的开局入口。")
 figures([
-    ("87116DAABB8AA052BA445E1FB1FEB6A9.png", "图 2-1 首页：雪人形象与入口"),
-    ("4476591C6742B0491D57FB8D9476D66B.png", "图 2-2 创建房间"),
+    ("87116DAABB8AA052BA445E1FB1FEB6A9.png", "图 2-2 首页：雪人形象与入口"),
+    ("4476591C6742B0491D57FB8D9476D66B.png", "图 2-3 创建房间"),
 ])
 figures([
-    ("A2E9EBA892FED853F91D9842D7501A92.png", "图 2-3 加入房间"),
-    ("7A83735AA86EBAB25E9764BE05E3721E.png", "图 2-4 房间大厅"),
+    ("A2E9EBA892FED853F91D9842D7501A92.png", "图 2-4 加入房间"),
+    ("7A83735AA86EBAB25E9764BE05E3721E.png", "图 2-5 房间大厅"),
 ], 7.0)
 
 # ---------------------------------------------------------------------
@@ -278,6 +310,8 @@ para("房间状态机定义了 lobby 与 playing 两种状态及其迁移条件�
      "仅当房主显式“结束本局”时才回到 lobby 并清空全部准备状态。")
 para("该设计解决了“结束后被强制退出”和“退出后又被自动拉回”两类问题：前者由“结束不自动收尾”"
      "保证，后者由“主动退出标记”保证。")
+
+figure("02.png", "图 3-1 房间主流程活动图", 7.6)
 
 sub("3.1.2 接口设计")
 para("系统对外接口以服务端函数与数据接口两类形式提供。房间相关接口包括创建、加入、准备、"
@@ -313,6 +347,9 @@ para("其中 rooms.settings 以 JSON 存储房间级配置；games.state 保存�
      "games.view 保存下发给客户端的公开视图，二者分离以保证私有信息（如他人词牌）不会泄露。")
 
 section("3.4 关键算法设计")
+para("谁是卧底的一轮流程如下图所示：领词、依次发言、全体投票，平票时进入加赛，"
+     "出局后按胜负条件判定是否继续。")
+figure("03.png", "图 3-2 谁是卧底投票流程活动图", 10.5)
 sub("3.4.1 胜负判定（D 参与修正）")
 para("谁是卧底的胜负判定按“卧底阵营全部出局则平民胜；平民全部出局则卧底胜；仅剩两人且为"
      "一平民一卧底时卧底胜”三条规则执行。早期实现采用“存活人数不超过 3 即卧底胜”的经验规则，"
