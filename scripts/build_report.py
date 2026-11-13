@@ -119,6 +119,24 @@ def table(headers, rows, widths=None):
     return t
 
 
+IMG_DIR = r"D:\1\break-ice-hall\docs\报告\images"
+
+
+def figures(items, width_cm=4.8):
+    """同一行放若干张图（行内并排），图题放在下一行居中"""
+    import os
+    p = doc.add_paragraph()
+    p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    for index, (name, title) in enumerate(items):
+        if index > 0:
+            p.add_run("    ")
+        p.add_run().add_picture(os.path.join(IMG_DIR, name), width=Cm(width_cm))
+    cap = doc.add_paragraph()
+    cap.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    set_font(cap.add_run("　　".join(title for _, title in items)), name="黑体", size=9)
+    cap.paragraph_format.space_after = Pt(10)
+
+
 def caption(text):
     p = doc.add_paragraph()
     p.alignment = WD_ALIGN_PARAGRAPH.CENTER
@@ -229,7 +247,16 @@ para("原型围绕“一屏一任务”的原则设计：首页只承担形象�
      "过多信息。")
 para("视觉上采用浅蓝色主色与白色卡片的组合，所有页面共享一套设计变量（主色、圆角、阴影、"
      "文字层级），保证四个模块的界面风格统一。")
-placeholder("D", "补充原型截图（首页、房间页、四种玩法界面各 1—2 张）")
+para("主要界面如下图所示：首页负责形象编辑与进入房间；创建页只需填写房间名称与人数；"
+     "加入页输入房间号即可进入；房间页集中展示房间号、二维码、成员与准备状态，并承载主持人的开局入口。")
+figures([
+    ("87116DAABB8AA052BA445E1FB1FEB6A9.png", "图 2-1 首页：雪人形象与入口"),
+    ("4476591C6742B0491D57FB8D9476D66B.png", "图 2-2 创建房间"),
+])
+figures([
+    ("A2E9EBA892FED853F91D9842D7501A92.png", "图 2-3 加入房间"),
+    ("7A83735AA86EBAB25E9764BE05E3721E.png", "图 2-4 房间大厅"),
+], 7.0)
 
 # ---------------------------------------------------------------------
 chapter("3 概要设计和详细设计")
@@ -320,7 +347,8 @@ para("开发环境为 Windows，前端使用 Node.js + Vite 构建，微信开�
 para("代码托管于 Gitee（https://gitee.com/amadys/break-ice-hall），采用功能分支开发、主分支保持"
      "可运行的策略，累计提交 175 次。提交前统一执行类型检查、单元测试与构建校验，构建产物与源码"
      "不一致时会直接拦截。")
-placeholder("D", "补充 Gitee 签入记录截图（图 4-1）")
+para("图 4-1 为 Gitee 仓库的提交记录，可见项目按功能分支开发、逐条提交并保留说明。")
+figures([("4-1.png", "图 4-1 码云平台代码提交记录")], 13.5)
 
 section("4.2 关键函数说明")
 para("前端的核心函数包括：房间状态的订阅与刷新（负责按固定间隔与实时事件刷新房间数据）、"
@@ -356,6 +384,29 @@ table(
 section("4.4 结果分析")
 para("上述测试全部通过，系统满足需求分析中提出的功能与非功能要求：房间流程完整可用，四种玩法"
      "均可完成一局并正确结算；跨房间数据隔离有效；异常退出、丢片与服务不可用等场景均有降级策略。")
+para("下图为本轮验收时各玩法的实际界面：谁是卧底的领词、发言与投票，你画我猜的作画、观战与结算，"
+     "以及你画我猜谁是卧底的作画与轮末回顾。")
+figures([
+    ("0B42CEF9C77317AD65BF04D62B94A09C.png", "图 4-2 谁是卧底：领词"),
+    ("91A2DF7B0A3485CE951AB53B02EA8237.png", "图 4-3 谁是卧底：发言"),
+], 7.0)
+figures([
+    ("647E831AC9E3E45BC4D8930038022C92.png", "图 4-4 谁是卧底：投票"),
+    ("FBB301FAB62AA51CDFCB980828F0A629.png", "图 4-5 谁是卧底：他人观战视角"),
+], 7.0)
+figures([
+    ("249830310CA57689EE90CFF71271D024.png", "图 4-6 你画我猜：作画"),
+    ("86CC90FE202FFEB857AC08447C2D6E26.png", "图 4-7 你画我猜：观战"),
+], 7.0)
+figures([
+    ("8A282D4D2508E8F804B292D8749886E1.png", "图 4-8 你画我猜：结算与画廊"),
+    ("6CBFB35EF3CC03B97618B61276A49BD2.png", "图 4-9 真心话大冒险"),
+], 7.0)
+figures([
+    ("4526AD5D549612CBA32706FDEECEAA73.png", "图 4-10 融合玩法：接力作画"),
+    ("4F8389193CFED3A3FFD669FD2CF5482D.png", "图 4-11 融合玩法：轮末回顾与投票"),
+], 7.0)
+
 para("测试过程中也暴露出若干设计缺陷，均已完成修复并补充回归用例，典型问题包括：服务端开局未写入"
      "玩法字段导致其他成员无法进入；对局结束即清空房间状态导致结算界面无法回看；画作唯一键粒度过粗"
      "导致同轮多份画作互相覆盖；评分写入列名错误且未校验返回值导致“测试通过但数据未落库”。")
