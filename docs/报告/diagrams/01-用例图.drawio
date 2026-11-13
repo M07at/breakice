@@ -1,0 +1,67 @@
+<mxfile host="app.diagrams.net" type="device">
+  <diagram id="d1" name="用例图">
+    <mxGraphModel dx="1200" dy="800" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1180" pageHeight="900" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="c1" value="破冰局小程序" style="swimlane;whiteSpace=wrap;html=1;startSize=30;fillColor=#F8FAFF;strokeColor=#94A3B8;dashed=1;fontSize=14;" vertex="1" parent="1">
+          <mxGeometry x="330" y="90" width="560" height="720" as="geometry" />
+        </mxCell>
+        <mxCell id="c2" value="房主" style="shape=umlActor;verticalLabelPosition=bottom;verticalAlign=top;html=1;fontSize=13;" vertex="1" parent="1">
+          <mxGeometry x="120" y="330" width="60" height="110" as="geometry" />
+        </mxCell>
+        <mxCell id="c3" value="普通参与者" style="shape=umlActor;verticalLabelPosition=bottom;verticalAlign=top;html=1;fontSize=13;" vertex="1" parent="1">
+          <mxGeometry x="980" y="330" width="60" height="110" as="geometry" />
+        </mxCell>
+        <mxCell id="c4" value="创建 / 加入房间" style="ellipse;whiteSpace=wrap;html=1;fillColor=#E9F1FF;strokeColor=#4F8EF7;strokeWidth=1.5;fontSize=13;" vertex="1" parent="1">
+          <mxGeometry x="390" y="140" width="220" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="c5" value="玩谁是卧底" style="ellipse;whiteSpace=wrap;html=1;fillColor=#E9F1FF;strokeColor=#4F8EF7;strokeWidth=1.5;fontSize=13;" vertex="1" parent="1">
+          <mxGeometry x="670" y="140" width="220" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="c6" value="准备 / 取消准备" style="ellipse;whiteSpace=wrap;html=1;fillColor=#E9F1FF;strokeColor=#4F8EF7;strokeWidth=1.5;fontSize=13;" vertex="1" parent="1">
+          <mxGeometry x="390" y="300" width="220" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="c7" value="玩你画我猜" style="ellipse;whiteSpace=wrap;html=1;fillColor=#E9F1FF;strokeColor=#4F8EF7;strokeWidth=1.5;fontSize=13;" vertex="1" parent="1">
+          <mxGeometry x="670" y="300" width="220" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="c8" value="选择玩法并开局" style="ellipse;whiteSpace=wrap;html=1;fillColor=#E9F1FF;strokeColor=#4F8EF7;strokeWidth=1.5;fontSize=13;" vertex="1" parent="1">
+          <mxGeometry x="390" y="460" width="220" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="c9" value="玩融合玩法" style="ellipse;whiteSpace=wrap;html=1;fillColor=#E9F1FF;strokeColor=#4F8EF7;strokeWidth=1.5;fontSize=13;" vertex="1" parent="1">
+          <mxGeometry x="670" y="460" width="220" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="c10" value="结束本局（仅房主）" style="ellipse;whiteSpace=wrap;html=1;fillColor=#E9F1FF;strokeColor=#4F8EF7;strokeWidth=1.5;fontSize=13;" vertex="1" parent="1">
+          <mxGeometry x="390" y="620" width="220" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="c11" value="真心话大冒险" style="ellipse;whiteSpace=wrap;html=1;fillColor=#E9F1FF;strokeColor=#4F8EF7;strokeWidth=1.5;fontSize=13;" vertex="1" parent="1">
+          <mxGeometry x="670" y="620" width="220" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="e12" value="" style="endArrow=block;html=1;rounded=0;strokeWidth=1.4;strokeColor=#334155;fontSize=12;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="c2" target="c4">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e13" value="" style="endArrow=block;html=1;rounded=0;strokeWidth=1.4;strokeColor=#334155;fontSize=12;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="c2" target="c6">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e14" value="" style="endArrow=block;html=1;rounded=0;strokeWidth=1.4;strokeColor=#334155;fontSize=12;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="c2" target="c8">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e15" value="" style="endArrow=block;html=1;rounded=0;strokeWidth=1.4;strokeColor=#334155;fontSize=12;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="c2" target="c10">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e16" value="" style="endArrow=block;html=1;rounded=0;strokeWidth=1.4;strokeColor=#334155;fontSize=12;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="c3" target="c5">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e17" value="" style="endArrow=block;html=1;rounded=0;strokeWidth=1.4;strokeColor=#334155;fontSize=12;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="c3" target="c7">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e18" value="" style="endArrow=block;html=1;rounded=0;strokeWidth=1.4;strokeColor=#334155;fontSize=12;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="c3" target="c9">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e19" value="" style="endArrow=block;html=1;rounded=0;strokeWidth=1.4;strokeColor=#334155;fontSize=12;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="c3" target="c11">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

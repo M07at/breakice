@@ -1,0 +1,91 @@
+<mxfile host="app.diagrams.net" type="device">
+  <diagram id="d2" name="房间主流程活动图">
+    <mxGraphModel dx="1200" dy="800" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1000" pageHeight="1500" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="c1" value="开始" style="ellipse;whiteSpace=wrap;html=1;fillColor=#E7F8F4;strokeColor=#0F9F87;strokeWidth=1.5;fontSize=13;" vertex="1" parent="1">
+          <mxGeometry x="435" y="60" width="110" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="c2" value="进入小程序首页：编辑雪人形象与昵称" style="rounded=1;whiteSpace=wrap;html=1;arcSize=18;fillColor=#E9F1FF;strokeColor=#4F8EF7;strokeWidth=1.5;fontSize=13;fontColor=#172033;" vertex="1" parent="1">
+          <mxGeometry x="380" y="170" width="240" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="e3" value="" style="endArrow=block;html=1;rounded=0;strokeWidth=1.4;strokeColor=#334155;fontSize=12;" edge="1" parent="1" source="c1" target="c2">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="c4" value="选择：创建房间 / 加入房间" style="rounded=1;whiteSpace=wrap;html=1;arcSize=18;fillColor=#E9F1FF;strokeColor=#4F8EF7;strokeWidth=1.5;fontSize=13;fontColor=#172033;" vertex="1" parent="1">
+          <mxGeometry x="380" y="280" width="240" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="e5" value="" style="endArrow=block;html=1;rounded=0;strokeWidth=1.4;strokeColor=#334155;fontSize=12;" edge="1" parent="1" source="c2" target="c4">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="c6" value="进入房间大厅（status = lobby）" style="rounded=1;whiteSpace=wrap;html=1;arcSize=18;fillColor=#E9F1FF;strokeColor=#4F8EF7;strokeWidth=1.5;fontSize=13;fontColor=#172033;" vertex="1" parent="1">
+          <mxGeometry x="380" y="390" width="240" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="e7" value="" style="endArrow=block;html=1;rounded=0;strokeWidth=1.4;strokeColor=#334155;fontSize=12;" edge="1" parent="1" source="c4" target="c6">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="c8" value="每位成员点击「我准备好了」" style="rounded=1;whiteSpace=wrap;html=1;arcSize=18;fillColor=#E9F1FF;strokeColor=#4F8EF7;strokeWidth=1.5;fontSize=13;fontColor=#172033;" vertex="1" parent="1">
+          <mxGeometry x="380" y="500" width="240" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="e9" value="" style="endArrow=block;html=1;rounded=0;strokeWidth=1.4;strokeColor=#334155;fontSize=12;" edge="1" parent="1" source="c6" target="c8">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="c10" value="全员准备？" style="rhombus;whiteSpace=wrap;html=1;fillColor=#FFF7E0;strokeColor=#D97706;strokeWidth=1.5;fontSize=13;fontColor=#172033;" vertex="1" parent="1">
+          <mxGeometry x="400" y="630" width="200" height="90" as="geometry" />
+        </mxCell>
+        <mxCell id="e11" value="" style="endArrow=block;html=1;rounded=0;strokeWidth=1.4;strokeColor=#334155;fontSize=12;" edge="1" parent="1" source="c8" target="c10">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="c12" value="继续等待（否）" style="rounded=1;whiteSpace=wrap;html=1;arcSize=18;fillColor=#FFF7E0;strokeColor=#D97706;strokeWidth=1.5;fontSize=13;fontColor=#172033;" vertex="1" parent="1">
+          <mxGeometry x="680" y="645" width="160" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="e13" value="否" style="endArrow=block;html=1;rounded=0;strokeWidth=1.4;strokeColor=#334155;fontSize=12;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="c10" target="c12">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="c14" value="房主选择玩法" style="rounded=1;whiteSpace=wrap;html=1;arcSize=18;fillColor=#E9F1FF;strokeColor=#4F8EF7;strokeWidth=1.5;fontSize=13;fontColor=#172033;" vertex="1" parent="1">
+          <mxGeometry x="380" y="770" width="240" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="e15" value="是" style="endArrow=block;html=1;rounded=0;strokeWidth=1.4;strokeColor=#334155;fontSize=12;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="c10" target="c14">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="c16" value="房间 status = playing，所有人进入游戏" style="rounded=1;whiteSpace=wrap;html=1;arcSize=18;fillColor=#E9F1FF;strokeColor=#4F8EF7;strokeWidth=1.5;fontSize=13;fontColor=#172033;" vertex="1" parent="1">
+          <mxGeometry x="320" y="880" width="360" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="e17" value="" style="endArrow=block;html=1;rounded=0;strokeWidth=1.4;strokeColor=#334155;fontSize=12;" edge="1" parent="1" source="c14" target="c16">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="c18" value="一局自然结束：停在结算页" style="rounded=1;whiteSpace=wrap;html=1;arcSize=18;fillColor=#E9F1FF;strokeColor=#4F8EF7;strokeWidth=1.5;fontSize=13;fontColor=#172033;" vertex="1" parent="1">
+          <mxGeometry x="380" y="990" width="240" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="e19" value="" style="endArrow=block;html=1;rounded=0;strokeWidth=1.4;strokeColor=#334155;fontSize=12;" edge="1" parent="1" source="c16" target="c18">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="c20" value="房主结束本局？" style="rhombus;whiteSpace=wrap;html=1;fillColor=#FFF7E0;strokeColor=#D97706;strokeWidth=1.5;fontSize=13;fontColor=#172033;" vertex="1" parent="1">
+          <mxGeometry x="400" y="1100" width="200" height="90" as="geometry" />
+        </mxCell>
+        <mxCell id="e21" value="" style="endArrow=block;html=1;rounded=0;strokeWidth=1.4;strokeColor=#334155;fontSize=12;" edge="1" parent="1" source="c18" target="c20">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="c22" value="status = lobby，全员准备清零" style="rounded=1;whiteSpace=wrap;html=1;arcSize=18;fillColor=#E9F1FF;strokeColor=#4F8EF7;strokeWidth=1.5;fontSize=13;fontColor=#172033;" vertex="1" parent="1">
+          <mxGeometry x="350" y="1240" width="300" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="e23" value="是" style="endArrow=block;html=1;rounded=0;strokeWidth=1.4;strokeColor=#334155;fontSize=12;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="c20" target="c22">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="c24" value="结束" style="ellipse;whiteSpace=wrap;html=1;fillColor=#E7F8F4;strokeColor=#0F9F87;strokeWidth=1.5;fontSize=13;" vertex="1" parent="1">
+          <mxGeometry x="435" y="1350" width="110" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="e25" value="" style="endArrow=block;html=1;rounded=0;strokeWidth=1.4;strokeColor=#334155;fontSize=12;" edge="1" parent="1" source="c22" target="c24">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="c26" value="结算页常驻（否）" style="rounded=1;whiteSpace=wrap;html=1;arcSize=18;fillColor=#FFF7E0;strokeColor=#D97706;strokeWidth=1.5;fontSize=13;fontColor=#172033;" vertex="1" parent="1">
+          <mxGeometry x="680" y="1100" width="180" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="e27" value="否" style="endArrow=block;html=1;rounded=0;strokeWidth=1.4;strokeColor=#334155;fontSize=12;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="c20" target="c26">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
