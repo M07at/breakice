@@ -3,6 +3,9 @@ set -euo pipefail
 
 log() { echo "[entrypoint] $*"; }
 
+# 云托管的证书钩子需要这个目录
+mkdir -p /app/cert
+
 DB_NAME="${POSTGRES_DB:-breakice}"
 DB_PASS="${POSTGRES_PASSWORD:-postgres}"
 

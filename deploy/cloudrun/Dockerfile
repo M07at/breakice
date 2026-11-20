@@ -24,11 +24,18 @@ RUN apt-get update \
 # PostgREST：官方镜像里的二进制
 COPY --from=postgrest /bin/postgrest /usr/local/bin/postgrest
 
-# GoTrue：官方镜像入口（若构建报 no such file，改成 /bin/auth 或 /usr/local/bin/gotrue）
+# GoTrue：官方镜像入口（若报 no such file，改 /bin/auth 或 /usr/local/bin/gotrue）
 COPY --from=gotrue /usr/local/bin/auth /usr/local/bin/gotrue
 
 # Deno：跑 storage-shim 与边缘函数
 COPY --from=deno /usr/bin/deno /usr/local/bin/deno
+
+# ---------- 云托管要求的证书初始化目录 ----------
+# 平台会向 /app/cert/initenv.sh 注入生命周期钩子；目录与脚本必须先存在，
+# 否则会报 "Exec lifecycle hook ... exited with 137"。
+RUN mkdir -p /app/cert \
+    && printf '#!/bin/sh\nexit 0\n' > /app/cert/initenv.sh \
+    && chmod +x /app/cert/initenv.sh
 
 # ---------- 应用内容（扁平路径，与 zip 根目录一致） ----------
 ENV PGDATA=/var/lib/postgresql/data
@@ -50,7 +57,7 @@ RUN chmod +x /opt/app/entrypoint.sh && nginx -t
 
 EXPOSE 80
 
-HEALTHCHECK --interval=30s --timeout=5s --start-period=90s \
+HEALTHCHECK --interval=30s --timeout=5s --start-period=120s \
   CMD curl -fsS http://127.0.0.1/healthz || exit 1
 
 CMD ["/opt/app/entrypoint.sh"]
