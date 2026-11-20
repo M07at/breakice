@@ -40,6 +40,7 @@ RUN chmod +x /opt/app/entrypoint.sh
 RUN nginx -t
 RUN postgrest --version && deno --version
 RUN test -f /opt/app/entrypoint.sh && test -d /opt/app/migrations && test -f /opt/app/functions/wechat-auth/index.ts
+RUN head -1 /opt/app/entrypoint.sh | grep -q '^#!'
 
 EXPOSE 80
 
