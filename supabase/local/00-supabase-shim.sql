@@ -169,6 +169,10 @@ begin
   alter table auth.users add column if not exists phone_confirmed_at timestamptz;
   alter table auth.users add column if not exists recovery_sent_at timestamptz;
   alter table auth.users add column if not exists reauthentication_sent_at timestamptz;
+  alter table auth.users add column if not exists email_confirmed_at timestamptz;
+  alter table auth.users add column if not exists encrypted_password varchar(255);
+  alter table auth.users add column if not exists raw_app_meta_data jsonb;
+  alter table auth.users add column if not exists raw_user_meta_data jsonb;
   alter table auth.users add column if not exists invited_at timestamptz;
   alter table auth.users add column if not exists last_sign_in_at timestamptz;
 end $$;
