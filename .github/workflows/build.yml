@@ -14,6 +14,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
       - name: Prepare context
         run: |
           mkdir -p ctx/local
@@ -21,10 +22,16 @@ jobs:
           cp -r supabase/migrations supabase/functions ctx/
           cp supabase/local/00-supabase-shim.sql ctx/local/
           find ctx -type f | head -40
+
       - name: Login
         run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+
       - name: Build and push
+        env:
+          OWNER: ${{ github.repository_owner }}
         run: |
-          IMG=ghcr.io/${{ github.repository_owner }}/breakice-backend:latest
+          # ghcr 要求镜像名全小写；GitHub 用户名含大写时必须转换
+          IMG="ghcr.io/$(echo "$OWNER" | tr '[:upper:]' '[:lower:]')/breakice-backend:latest"
+          echo "IMAGE=$IMG"
           docker build -t "$IMG" ctx
           docker push "$IMG"
