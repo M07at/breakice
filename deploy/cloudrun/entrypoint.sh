@@ -47,9 +47,12 @@ if pg_isready -h 127.0.0.1 -p 5432 -q; then
   fi
 
   HAS_ROOMS=$(psql -h 127.0.0.1 -U "$DB_USER" -d "$DB_NAME" -tAc "select to_regclass('public.rooms') is not null" 2>/dev/null || echo "f")
+  # 兼容层每次都跑：语句全是幂等的，补列不用清数据目录
+  log "补 Supabase 兼容对象（幂等）"
+  psql -h 127.0.0.1 -U "$DB_USER" -d "$DB_NAME" -v ON_ERROR_STOP=0 -q -f "$APP/00-supabase-shim.sql" || log "兼容层有报错，继续"
+
   if [ "$HAS_ROOMS" != "t" ]; then
-    log "首次启动：补 Supabase 兼容对象（已存在则跳过）"
-    psql -h 127.0.0.1 -U "$DB_USER" -d "$DB_NAME" -v ON_ERROR_STOP=0 -q -f "$APP/00-supabase-shim.sql" || true
+    log "首次启动：执行迁移"
 
     log "依次执行迁移"
     for f in $(ls "$APP"/migrations/*.sql 2>/dev/null | sort); do
