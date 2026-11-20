@@ -79,3 +79,18 @@ immutable
 as $$
   select (string_to_array(name, '/'))[1:array_length(string_to_array(name, '/'), 1) - 1]
 $$;
+
+
+-- ---------- 兼容已存在的 storage 表 ----------
+-- base 镜像可能已经建好 storage.buckets / storage.objects，但列集合与旧版不同。
+-- 用 DO 块幂等补齐迁移脚本依赖的列，缺什么补什么，已有则跳过。
+do $$
+begin
+  if exists (select 1 from information_schema.tables where table_schema = 'storage' and table_name = 'buckets') then
+    begin alter table storage.buckets add column if not exists public boolean default false; exception when others then null; end;
+  end if;
+  if exists (select 1 from information_schema.tables where table_schema = 'storage' and table_name = 'objects') then
+    begin alter table storage.objects add column if not exists owner uuid; exception when others then null; end;
+    begin alter table storage.objects add column if not exists bucket_id text; exception when others then null; end;
+  end if;
+end $$;

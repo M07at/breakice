@@ -12,6 +12,7 @@ log() { echo "[entrypoint] $*"; }
 
 DB_NAME="${POSTGRES_DB:-breakice}"
 DB_PASS="${POSTGRES_PASSWORD:-postgres}"
+DB_USER="${POSTGRES_SUPERUSER:-supabase_admin}"
 APP=/opt/app
 
 # 云托管的证书钩子需要这个目录
@@ -40,20 +41,20 @@ pg_isready -h 127.0.0.1 -p 5432 || { log "PostgreSQL 未就绪"; tail -n 50 /tmp
 # ---------- 3. 建库 + 迁移 ----------
 if pg_isready -h 127.0.0.1 -p 5432 -q; then
   export PGPASSWORD="$DB_PASS"
-  if ! psql -h 127.0.0.1 -U postgres -tAc "select 1 from pg_database where datname='$DB_NAME'" | grep -q 1; then
+  if ! psql -h 127.0.0.1 -U "$DB_USER" -tAc "select 1 from pg_database where datname='$DB_NAME'" | grep -q 1; then
     log "创建数据库 $DB_NAME"
-    createdb -h 127.0.0.1 -U postgres "$DB_NAME" || log "建库失败（可能已存在）"
+    createdb -h 127.0.0.1 -U "$DB_USER" "$DB_NAME" || log "建库失败（可能已存在）"
   fi
 
-  HAS_ROOMS=$(psql -h 127.0.0.1 -U postgres -d "$DB_NAME" -tAc "select to_regclass('public.rooms') is not null" 2>/dev/null || echo "f")
+  HAS_ROOMS=$(psql -h 127.0.0.1 -U "$DB_USER" -d "$DB_NAME" -tAc "select to_regclass('public.rooms') is not null" 2>/dev/null || echo "f")
   if [ "$HAS_ROOMS" != "t" ]; then
     log "首次启动：补 Supabase 兼容对象（已存在则跳过）"
-    psql -h 127.0.0.1 -U postgres -d "$DB_NAME" -v ON_ERROR_STOP=0 -q -f "$APP/00-supabase-shim.sql" || true
+    psql -h 127.0.0.1 -U "$DB_USER" -d "$DB_NAME" -v ON_ERROR_STOP=0 -q -f "$APP/00-supabase-shim.sql" || true
 
     log "依次执行迁移"
     for f in $(ls "$APP"/migrations/*.sql 2>/dev/null | sort); do
       log "  $(basename "$f")"
-      psql -h 127.0.0.1 -U postgres -d "$DB_NAME" -v ON_ERROR_STOP=1 -q -f "$f" || log "  迁移失败：$(basename "$f")"
+      psql -h 127.0.0.1 -U "$DB_USER" -d "$DB_NAME" -v ON_ERROR_STOP=1 -q -f "$f" || log "  迁移失败：$(basename "$f")"
     done
   else
     log "检测到已有结构，跳过迁移"
@@ -62,7 +63,7 @@ fi
 
 # ---------- 4. 业务组件 ----------
 log "启动 PostgREST"
-PGRST_DB_URI="postgres://postgres:${DB_PASS}@127.0.0.1:5432/${DB_NAME}" \
+PGRST_DB_URI="postgres://${DB_USER}:${DB_PASS}@127.0.0.1:5432/${DB_NAME}" \
 PGRST_DB_SCHEMAS=public \
 PGRST_DB_ANON_ROLE=anon \
 PGRST_JWT_SECRET="${JWT_SECRET:-insecure-dev-secret-insecure-dev-secret}" \
