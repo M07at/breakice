@@ -1,13 +1,12 @@
 name: build-cloudrun-image
 
-# 在 GitHub 的 Docker 环境里构建镜像，推送到腾讯云容器镜像服务（TCR），
+# 在 GitHub 的 Docker 环境里构建镜像，推送到 GitHub Container Registry（ghcr.io）。
 # 云托管只负责「从镜像仓库拉取镜像」运行——绕开云托管自带构建器的兼容问题。
 #
-# 需要的 Secrets（仓库设置 → Secrets and variables → Actions）：
-#   TCR_REGISTRY   例：ccr.ccs.tencentyun.com
-#   TCR_NAMESPACE  例：breakice（TCR 个人版里创建的命名空间）
-#   TCR_USERNAME   TCR 登录用户名（通常是腾讯云账号 ID）
-#   TCR_PASSWORD   TCR 登录密码
+# 为什么用 ghcr.io：CI 本来就在 GitHub，GITHUB_TOKEN 自动可用，不需要额外申请
+# 任何账号或密码；把包设为 Public 后，云托管拉取也不需要认证。
+#
+# 可选：如果你想改用腾讯云 TCR，见文件末尾的注释。
 
 on:
   workflow_dispatch:
@@ -19,6 +18,10 @@ on:
       - "supabase/functions/**"
       - "supabase/local/**"
       - ".github/workflows/build-cloudrun-image.yml"
+
+permissions:
+  contents: read
+  packages: write
 
 jobs:
   build:
@@ -38,17 +41,18 @@ jobs:
           cp -r supabase/functions build-ctx/functions
           mkdir -p build-ctx/local
           cp supabase/local/00-supabase-shim.sql build-ctx/local/
-          ls -R build-ctx | head -40
+          echo "--- context ---"
+          find build-ctx -type f | head -40
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Login to TCR
+      - name: Login to GHCR
         uses: docker/login-action@v3
         with:
-          registry: ${{ secrets.TCR_REGISTRY }}
-          username: ${{ secrets.TCR_USERNAME }}
-          password: ${{ secrets.TCR_PASSWORD }}
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Build and push
         uses: docker/build-push-action@v6
@@ -57,7 +61,19 @@ jobs:
           file: build-ctx/Dockerfile
           push: true
           tags: |
-            ${{ secrets.TCR_REGISTRY }}/${{ secrets.TCR_NAMESPACE }}/breakice-backend:latest
-            ${{ secrets.TCR_REGISTRY }}/${{ secrets.TCR_NAMESPACE }}/breakice-backend:${{ github.sha }}
+            ghcr.io/${{ github.repository_owner }}/breakice-backend:latest
+            ghcr.io/${{ github.repository_owner }}/breakice-backend:${{ github.sha }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+# ============ 如果以后要改用腾讯云 TCR ============
+# 把上面的 Login 与 tags 换成：
+#
+#   - name: Login to TCR
+#     uses: docker/login-action@v3
+#     with:
+#       registry: ${{ secrets.TCR_REGISTRY }}      # ccr.ccs.tencentyun.com
+#       username: ${{ secrets.TCR_USERNAME }}      # 腾讯云账号 ID
+#       password: ${{ secrets.TCR_PASSWORD }}      # 个人版固定密码
+#
+#   tags: ${{ secrets.TCR_REGISTRY }}/${{ secrets.TCR_NAMESPACE }}/breakice-backend:latest
