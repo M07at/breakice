@@ -136,3 +136,39 @@ begin
   alter table auth.users add column if not exists invited_at timestamptz;
   alter table auth.users add column if not exists last_sign_in_at timestamptz;
 end $$;
+
+do $$
+begin
+  perform 1 from information_schema.tables
+   where table_schema = 'auth' and table_name = 'users';
+  if not found then
+    return;
+  end if;
+
+  alter table auth.users add column if not exists instance_id uuid;
+  alter table auth.users add column if not exists aud varchar(255);
+  alter table auth.users add column if not exists role varchar(255);
+  alter table auth.users add column if not exists email varchar(255);
+  alter table auth.users add column if not exists email_change varchar(255);
+  alter table auth.users add column if not exists email_change_token_new varchar(255);
+  alter table auth.users add column if not exists email_change_token_current varchar(255);
+  alter table auth.users add column if not exists email_change_confirm_status smallint default 0;
+  alter table auth.users add column if not exists recovery_token varchar(255);
+  alter table auth.users add column if not exists phone text;
+  alter table auth.users add column if not exists phone_change text;
+  alter table auth.users add column if not exists phone_change_token varchar(255);
+  alter table auth.users add column if not exists confirmation_token varchar(255);
+  alter table auth.users add column if not exists reauthentication_token varchar(255);
+  alter table auth.users add column if not exists is_sso_user boolean not null default false;
+  alter table auth.users add column if not exists is_anonymous boolean not null default false;
+  alter table auth.users add column if not exists deleted_at timestamptz;
+  alter table auth.users add column if not exists banned_until timestamptz;
+  alter table auth.users add column if not exists confirmation_sent_at timestamptz;
+  alter table auth.users add column if not exists email_change_sent_at timestamptz;
+  alter table auth.users add column if not exists phone_change_sent_at timestamptz;
+  alter table auth.users add column if not exists phone_confirmed_at timestamptz;
+  alter table auth.users add column if not exists recovery_sent_at timestamptz;
+  alter table auth.users add column if not exists reauthentication_sent_at timestamptz;
+  alter table auth.users add column if not exists invited_at timestamptz;
+  alter table auth.users add column if not exists last_sign_in_at timestamptz;
+end $$;
