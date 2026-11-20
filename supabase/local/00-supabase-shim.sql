@@ -176,3 +176,40 @@ begin
   alter table auth.users add column if not exists invited_at timestamptz;
   alter table auth.users add column if not exists last_sign_in_at timestamptz;
 end $$;
+
+
+
+-- ---------- 补齐 GoTrue v2 依赖的表 ----------
+create table if not exists auth.sessions (
+  id           uuid primary key,
+  user_id      uuid not null references auth.users (id) on delete cascade,
+  created_at   timestamptz,
+  updated_at   timestamptz,
+  factor_id    uuid,
+  aal          text,
+  not_after    timestamptz,
+  refreshed_at timestamptz,
+  user_agent   text,
+  ip           inet,
+  tag          text
+);
+create index if not exists sessions_user_id_idx on auth.sessions (user_id);
+
+create table if not exists auth.mfa_amr_claims (
+  session_id  uuid not null references auth.sessions (id) on delete cascade,
+  created_at  timestamptz not null,
+  updated_at  timestamptz not null,
+  authentication_method text not null,
+  id          uuid primary key,
+  constraint mfa_amr_claims_session_id_authentication_method_pkey
+    unique (session_id, authentication_method)
+);
+
+do $$
+begin
+  if exists (select 1 from information_schema.tables where table_schema = 'auth' and table_name = 'refresh_tokens') then
+    begin alter table auth.refresh_tokens add column if not exists session_id uuid; exception when others then null; end;
+    begin alter table auth.refresh_tokens add column if not exists parent text; exception when others then null; end;
+    begin alter table auth.refresh_tokens add column if not exists revoked boolean default false; exception when others then null; end;
+  end if;
+end $$;
