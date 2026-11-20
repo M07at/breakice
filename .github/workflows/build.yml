@@ -1,0 +1,30 @@
+name: build
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [master]
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Prepare context
+        run: |
+          mkdir -p ctx/local
+          cp deploy/cloudrun/Dockerfile deploy/cloudrun/nginx.conf deploy/cloudrun/entrypoint.sh deploy/cloudrun/storage-shim.ts ctx/
+          cp -r supabase/migrations supabase/functions ctx/
+          cp supabase/local/00-supabase-shim.sql ctx/local/
+          find ctx -type f | head -40
+      - name: Login
+        run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+      - name: Build and push
+        run: |
+          IMG=ghcr.io/${{ github.repository_owner }}/breakice-backend:latest
+          docker build -t "$IMG" ctx
+          docker push "$IMG"
