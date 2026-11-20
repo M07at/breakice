@@ -60,4 +60,5 @@ EXPOSE 80
 HEALTHCHECK --interval=30s --timeout=5s --start-period=120s \
   CMD curl -fsS http://127.0.0.1/healthz || exit 1
 
-CMD ["/opt/app/entrypoint.sh"]
+ENTRYPOINT ["/opt/app/entrypoint.sh"]
+# 基础镜像自带 ENTRYPOINT docker-entrypoint.sh，必须覆盖，否则 nginx 不会启动
