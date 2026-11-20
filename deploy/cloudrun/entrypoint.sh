@@ -71,6 +71,8 @@ PGRST_SERVER_PORT=3000 \
 postgrest > /tmp/postgrest.log 2>&1 &
 
 log "启动 GoTrue"
+API_EXTERNAL_URL="${PUBLIC_URL:-http://127.0.0.1:9999}" \
+GOTRUE_API_EXTERNAL_URL="${PUBLIC_URL:-http://127.0.0.1:9999}" \
 GOTRUE_JWT_SECRET="${JWT_SECRET:-insecure-dev-secret-insecure-dev-secret}" \
 GOTRUE_JWT_EXP=3600 \
 GOTRUE_DB_DRIVER=postgres \
