@@ -21,6 +21,9 @@ RUN curl -fsSL -o /tmp/deno.zip https://github.com/denoland/deno/releases/downlo
 
 COPY --from=gotrue /usr/local/bin/auth /usr/local/bin/gotrue
 
+# Ubuntu 的 nginx 自带 sites-enabled/default（listen 80 default_server），
+# 它会抢走所有请求，让我们的 conf.d/default.conf 永远不生效。
+RUN rm -f /etc/nginx/sites-enabled/default
 RUN mkdir -p /app/cert /opt/app /etc/nginx/conf.d /var/lib/storage
 RUN printf '#!/bin/sh\nexit 0\n' > /app/cert/initenv.sh && chmod +x /app/cert/initenv.sh
 
