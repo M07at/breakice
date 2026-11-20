@@ -1548,7 +1548,7 @@ async function handleWord(admin: Admin, uid: string, body: Record<string, any>):
   return json({ ...secret, acknowledged: game.state.wordConfirmedIds.includes(uid) })
 }
 
-Deno.serve(async (req: Request) => {
+Deno.serve({ port: Number(Deno.env.get("PORT") ?? "8000") }, async (req: Request) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
   if (req.method !== 'POST') return json({ error: { code: 'BAD_REQUEST', message: '只支持 POST' } }, 405)
 

@@ -76,9 +76,18 @@ STORAGE_DIR="${STORAGE_DIR}" JWT_SECRET="${JWT_SECRET}" PORT=9000 \
   deno run --allow-net --allow-read --allow-write --allow-env /opt/app/storage-shim.ts \
   > /tmp/storage.log 2>&1 &
 
-log "启动 Edge Functions"
-deno run --allow-net --allow-env --allow-read --allow-import /opt/app/functions/deno-server.ts \
-  > /tmp/functions.log 2>&1 &
+log "启动 Edge Functions（每个函数一个进程）"
+start_fn() {
+  local name="$1" port="$2"
+  PORT="$port" deno run --allow-net --allow-env --allow-read "$APP/functions/$name/index.ts" \
+    > "/tmp/fn-$name.log" 2>&1 &
+}
+APP=/opt/app
+start_fn wechat-auth 9101
+start_fn uc-command 9102
+start_fn ai-score 9103
+start_fn draw-score 9104
+start_fn wechat-qrcode 9105
 
 sleep 3
 

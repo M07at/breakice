@@ -57,7 +57,7 @@ async function loadAccessToken(admin: Admin, appid: string, secret: string, forc
   return payload.access_token
 }
 
-Deno.serve(async (req) => {
+Deno.serve({ port: Number(Deno.env.get("PORT") ?? "8000") }, async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders })
   if (req.method !== "POST") return json({ error: "METHOD_NOT_ALLOWED" }, 405)
 

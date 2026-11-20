@@ -15,5 +15,6 @@ Copy-Item (Join-Path $root 'supabase\migrations') $stage -Recurse -Force
 Copy-Item (Join-Path $root 'supabase\local') $stage -Recurse -Force
 Copy-Item (Join-Path $root 'supabase\functions') $stage -Recurse -Force
 $zip = Join-Path $dist 'cloudrun.zip'
-Compress-Archive -Path (Join-Path $stage '*') -DestinationPath $zip -Force
+Add-Type -AssemblyName System.IO.Compression.FileSystem
+[System.IO.Compression.ZipFile]::CreateFromDirectory($stage, $zip, [System.IO.Compression.CompressionLevel]::Optimal, $false)
 Write-Host ('zip ready: ' + $zip + '  ' + [math]::Round((Get-Item $zip).Length / 1MB, 2) + ' MB')
