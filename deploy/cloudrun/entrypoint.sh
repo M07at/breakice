@@ -73,6 +73,11 @@ PGRST_JWT_SECRET="${JWT_SECRET:-insecure-dev-secret-insecure-dev-secret}" \
 PGRST_SERVER_PORT=3000 \
 postgrest > /tmp/postgrest.log 2>&1 &
 
+# 让 GoTrue 重新执行自带迁移：镜像里的 auth schema 只到初始版本
+psql -h 127.0.0.1 -U "$DB_USER" -d "$DB_NAME" -v ON_ERROR_STOP=0 -q \
+  -c "drop table if exists auth.schema_migrations" \
+  || log "清理 auth 迁移记录失败（继续）"
+
 log "启动 GoTrue"
 API_EXTERNAL_URL="${PUBLIC_URL:-http://127.0.0.1:9999}" \
 GOTRUE_API_EXTERNAL_URL="${PUBLIC_URL:-http://127.0.0.1:9999}" \
