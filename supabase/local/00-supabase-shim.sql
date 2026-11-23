@@ -40,7 +40,15 @@ returns uuid
 language sql
 stable
 as $$
-  select nullif(current_setting('request.jwt.claim.sub', true), '')::uuid
+  -- PostgREST 12 只设置 request.jwt.claims（整段 JSON），旧版本才设置 request.jwt.claim.sub。
+  -- 先读旧键，读不到再从 JSON 里取 sub，两种部署都能工作。
+  select nullif(
+    coalesce(
+      current_setting('request.jwt.claim.sub', true),
+      (nullif(current_setting('request.jwt.claims', true), '')::jsonb ->> 'sub')
+    ),
+    ''
+  )::uuid
 $$;
 
 create or replace function auth.role()
@@ -96,47 +104,10 @@ begin
 end $$;
 
 
-
 -- ---------- 补齐 auth.users 的新列 ----------
 -- 基础镜像里的 auth.users 是旧版 schema，而 GoTrue v2.x 会写入下列列。
 -- 缺任何一列，匿名登录都会报 "Database error creating anonymous user"。
 -- 用 add column if not exists 保证幂等。
-do $$
-begin
-  perform 1 from information_schema.tables
-   where table_schema = 'auth' and table_name = 'users';
-  if not found then
-    return;
-  end if;
-
-  alter table auth.users add column if not exists instance_id uuid;
-  alter table auth.users add column if not exists aud varchar(255);
-  alter table auth.users add column if not exists role varchar(255);
-  alter table auth.users add column if not exists email varchar(255);
-  alter table auth.users add column if not exists email_change varchar(255);
-  alter table auth.users add column if not exists email_change_token_new varchar(255);
-  alter table auth.users add column if not exists email_change_token_current varchar(255);
-  alter table auth.users add column if not exists email_change_confirm_status smallint default 0;
-  alter table auth.users add column if not exists recovery_token varchar(255);
-  alter table auth.users add column if not exists phone text;
-  alter table auth.users add column if not exists phone_change text;
-  alter table auth.users add column if not exists phone_change_token varchar(255);
-  alter table auth.users add column if not exists confirmation_token varchar(255);
-  alter table auth.users add column if not exists reauthentication_token varchar(255);
-  alter table auth.users add column if not exists is_sso_user boolean not null default false;
-  alter table auth.users add column if not exists is_anonymous boolean not null default false;
-  alter table auth.users add column if not exists deleted_at timestamptz;
-  alter table auth.users add column if not exists banned_until timestamptz;
-  alter table auth.users add column if not exists confirmation_sent_at timestamptz;
-  alter table auth.users add column if not exists email_change_sent_at timestamptz;
-  alter table auth.users add column if not exists phone_change_sent_at timestamptz;
-  alter table auth.users add column if not exists phone_confirmed_at timestamptz;
-  alter table auth.users add column if not exists recovery_sent_at timestamptz;
-  alter table auth.users add column if not exists reauthentication_sent_at timestamptz;
-  alter table auth.users add column if not exists invited_at timestamptz;
-  alter table auth.users add column if not exists last_sign_in_at timestamptz;
-end $$;
-
 do $$
 begin
   perform 1 from information_schema.tables
@@ -178,8 +149,9 @@ begin
 end $$;
 
 
-
 -- ---------- 补齐 GoTrue v2 依赖的表 ----------
+-- 基础镜像的 auth schema 是旧版，缺少 sessions 等新表；
+-- 匿名登录时 GoTrue 会写 users + sessions + refresh_tokens + mfa_amr_claims。
 create table if not exists auth.sessions (
   id           uuid primary key,
   user_id      uuid not null references auth.users (id) on delete cascade,
