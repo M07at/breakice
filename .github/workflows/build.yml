@@ -18,7 +18,7 @@ jobs:
       - name: Prepare context
         run: |
           mkdir -p ctx/local
-          cp deploy/cloudrun/Dockerfile deploy/cloudrun/nginx.conf deploy/cloudrun/entrypoint.sh deploy/cloudrun/storage-shim.ts ctx/
+          cp deploy/cloudrun/*.ts deploy/cloudrun/*.sh deploy/cloudrun/*.conf deploy/cloudrun/Dockerfile ctx/
           cp -r supabase/migrations supabase/functions ctx/
           cp supabase/local/00-supabase-shim.sql ctx/local/
           find ctx -type f | head -40
