@@ -34,6 +34,7 @@ WORKDIR /opt/app
 
 COPY entrypoint.sh ./entrypoint.sh
 COPY storage-shim.ts ./storage-shim.ts
+COPY auth-shim.ts ./auth-shim.ts
 COPY migrations ./migrations
 COPY functions ./functions
 COPY local/00-supabase-shim.sql ./00-supabase-shim.sql
@@ -42,6 +43,7 @@ COPY nginx.conf /etc/nginx/conf.d/default.conf
 RUN chmod +x /opt/app/entrypoint.sh
 RUN nginx -t
 RUN postgrest --version && deno --version
+RUN test -f /opt/app/auth-shim.ts
 RUN test -f /opt/app/entrypoint.sh && test -d /opt/app/migrations && test -f /opt/app/functions/wechat-auth/index.ts
 RUN head -1 /opt/app/entrypoint.sh | grep -q '^#!'
 
