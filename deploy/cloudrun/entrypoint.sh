@@ -92,7 +92,7 @@ GOTRUE_DISABLE_SIGNUP=false \
 GOTRUE_ENABLE_ANONYMOUS_SIGNINS=true \
 GOTRUE_ANONYMOUS_USERS_ENABLED=true \
 GOTRUE_EXTERNAL_ANONYMOUS_USERS_ENABLED=true \
-gotrue > /tmp/gotrue.log 2>&1 &
+( cd /tmp && gotrue > /tmp/gotrue.log 2>&1 ) &
 
 log "启动 storage-shim"
 STORAGE_DIR="${STORAGE_DIR:-/var/lib/storage}" JWT_SECRET="${JWT_SECRET:-}" PORT=9000 \
