@@ -46,11 +46,12 @@ if pg_isready -h 127.0.0.1 -p 5432 -q; then
     createdb -h 127.0.0.1 -U "$DB_USER" "$DB_NAME" || log "建库失败（可能已存在）"
   fi
 
-  HAS_ROOMS=$(psql -h 127.0.0.1 -U "$DB_USER" -d "$DB_NAME" -tAc "select to_regclass('public.rooms') is not null" 2>/dev/null || echo "f")
-  # 兼容层每次都跑：语句全是幂等的，补列不用清数据目录
+  # 兼容层每次都跑：里面的语句全是幂等的（if not exists / add column if not exists），
+  # 这样以后补列、补扩展不需要清空数据目录。
   log "补 Supabase 兼容对象（幂等）"
-  psql -h 127.0.0.1 -U "$DB_USER" -d "$DB_NAME" -v ON_ERROR_STOP=0 -q -f "$APP/00-supabase-shim.sql" || log "兼容层有报错，继续"
+  psql -h 127.0.0.1 -U "$DB_USER" -d "$DB_NAME" -v ON_ERROR_STOP=0 -q -f "$APP/00-supabase-shim.sql" || log "兼容层执行有报错，继续"
 
+  HAS_ROOMS=$(psql -h 127.0.0.1 -U "$DB_USER" -d "$DB_NAME" -tAc "select to_regclass('public.rooms') is not null" 2>/dev/null || echo "f")
   if [ "$HAS_ROOMS" != "t" ]; then
     log "首次启动：执行迁移"
 
@@ -73,26 +74,14 @@ PGRST_JWT_SECRET="${JWT_SECRET:-insecure-dev-secret-insecure-dev-secret}" \
 PGRST_SERVER_PORT=3000 \
 postgrest > /tmp/postgrest.log 2>&1 &
 
-# 让 GoTrue 重新执行自带迁移：镜像里的 auth schema 只到初始版本
-psql -h 127.0.0.1 -U "$DB_USER" -d "$DB_NAME" -v ON_ERROR_STOP=0 -q \
-  -c "drop table if exists auth.schema_migrations" \
-  || log "清理 auth 迁移记录失败（继续）"
-
-log "启动 GoTrue"
-API_EXTERNAL_URL="${PUBLIC_URL:-http://127.0.0.1:9999}" \
-GOTRUE_API_EXTERNAL_URL="${PUBLIC_URL:-http://127.0.0.1:9999}" \
-GOTRUE_JWT_SECRET="${JWT_SECRET:-insecure-dev-secret-insecure-dev-secret}" \
-GOTRUE_JWT_EXP=3600 \
-GOTRUE_DB_DRIVER=postgres \
-GOTRUE_DB_DATABASE_URL="postgres://supabase_auth_admin:${DB_PASS}@127.0.0.1:5432/${DB_NAME}?search_path=auth" \
-GOTRUE_API_HOST=127.0.0.1 \
-PORT=9999 \
-GOTRUE_SITE_URL="https://example.com" \
-GOTRUE_DISABLE_SIGNUP=false \
-GOTRUE_ENABLE_ANONYMOUS_SIGNINS=true \
-GOTRUE_ANONYMOUS_USERS_ENABLED=true \
-GOTRUE_EXTERNAL_ANONYMOUS_USERS_ENABLED=true \
-( cd /tmp && gotrue > /tmp/gotrue.log 2>&1 ) &
+log "启动 auth-shim（替代 GoTrue）"
+PORT=9998 \
+JWT_SECRET="${JWT_SECRET:-insecure-dev-secret-insecure-dev-secret}" \
+POSTGRES_SUPERUSER="$DB_USER" \
+POSTGRES_DB="$DB_NAME" \
+POSTGRES_PASSWORD="$DB_PASS" \
+  deno run --allow-net --allow-env --allow-read --allow-run "$APP/auth-shim.ts" \
+  > /tmp/auth.log 2>&1 &
 
 log "启动 storage-shim"
 STORAGE_DIR="${STORAGE_DIR:-/var/lib/storage}" JWT_SECRET="${JWT_SECRET:-}" PORT=9000 \
